@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
+import 'package:http/http.dart' as http;
+import '../services/sms_service.dart';
 
 class DoctorUserScreen extends StatefulWidget {
   final String doctorId;
@@ -211,6 +213,21 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
               onPressed: _refreshing ? null : _refreshBookings,
               tooltip: 'تحديث',
             ),
+             IconButton(
+               icon: const Icon(Icons.schedule),
+               onPressed: () {
+                 Navigator.of(context).push(
+                   MaterialPageRoute(
+                     builder: (context) => _ScheduledAppointmentsScreen(
+                       doctorId: widget.doctorId,
+                       centerId: widget.centerId,
+                       doctorName: widget.doctorName,
+                     ),
+                   ),
+                 );
+               },
+               tooltip: 'المواعيد المجدولة',
+            ),
             IconButton(
               icon: const Icon(Icons.logout),
               onPressed: _logout,
@@ -368,7 +385,7 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
                                               Text(
                                                 patientName,
                                                 style: const TextStyle(
-                                                  fontSize: 14,
+                                              fontSize: 14,
                                                   fontWeight: FontWeight.w600,
                                                 ),
                                               ),
@@ -379,10 +396,10 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
                                                   fontSize: 12,
                                               color: Colors.grey[600],
                                                   fontWeight: FontWeight.w500,
-                                                ),
                                             ),
-                                            ],
                                           ),
+                                            ],
+                                        ),
                                         ),
                                         SizedBox(width: 12),
                                         Expanded(
@@ -445,7 +462,13 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
                                                                 title: 'رسالة للمريض',
                                                                 color: Colors.orange,
                                                                 onTap: () {
-                                                                  // TODO: Navigate to message page
+                                                                  Navigator.of(context).push(
+                                                                    MaterialPageRoute(
+                                                                      builder: (context) => _MessageScreen(
+                                                                        booking: booking,
+                                                                      ),
+                                                                    ),
+                                                                  );
                                                                 },
                                                               ),
                                                               _buildGridItem(
@@ -453,7 +476,17 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
                                                                 title: 'تحديد موعد',
                                                                 color: Colors.purple,
                                                                 onTap: () {
-                                                                  // TODO: Navigate to schedule page
+                                                                  Navigator.of(context).push(
+                                                                    MaterialPageRoute(
+                                                                      builder: (context) => _ScheduleAppointmentScreen(
+                                                                        doctorId: widget.doctorId,
+                                                                        centerId: widget.centerId,
+                                                                        doctorName: widget.doctorName,
+                                                                        patientName: patientName,
+                                                                        patientPhone: booking['patientPhone'] ?? '',
+                                                                      ),
+                                                                    ),
+                                                                  );
                                                                 },
                                                               ),
                                                             ],
@@ -885,6 +918,1136 @@ class _PatientDetailsScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MessageScreen extends StatefulWidget {
+  final Map<String, dynamic> booking;
+
+  const _MessageScreen({required this.booking});
+
+  @override
+  State<_MessageScreen> createState() => _MessageScreenState();
+}
+
+class _MessageScreenState extends State<_MessageScreen> {
+  final TextEditingController _messageController = TextEditingController();
+  bool _sendingWhatsApp = false;
+  bool _sendingSMS = false;
+  final String _apologyTemplate = 'عذراً، تم إلغاء موعد اليوم. يرجى الحجز في يوم آخر.';
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendWhatsAppMessage() async {
+    final phone = widget.booking['patientPhone']?.toString() ?? '';
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('رقم الهاتف غير متوفر')),
+      );
+      return;
+    }
+
+    print('📱 WhatsApp - رقم الهاتف الأصلي: $phone');
+    print('💬 WhatsApp - نص الرسالة: ${_messageController.text}');
+
+    setState(() {
+      _sendingWhatsApp = true;
+    });
+
+         try {
+       // استخدام الرقم كما هو محفوظ في Firestore بدون أي تعديل
+       final formattedPhone = phone;
+       print('📞 WhatsApp - رقم الهاتف كما هو محفوظ: $formattedPhone');
+
+      var headers = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      };
+      
+      print('🌐 WhatsApp - إرسال طلب إلى API...');
+      var request = http.Request('POST', Uri.parse('https://api.ultramsg.com/instance140877/messages/chat'));
+      request.bodyFields = {
+        'token': 'df2r46jz82otkegg',
+        'to': formattedPhone,
+        'body': _messageController.text,
+      };
+      request.headers.addAll(headers);
+
+      print('📡 WhatsApp - محتوى الطلب: ${request.bodyFields}');
+      http.StreamedResponse response = await request.send();
+
+      print('📊 WhatsApp - رمز الاستجابة: ${response.statusCode}');
+      final responseBody = await response.stream.bytesToString();
+      print('📄 WhatsApp - محتوى الاستجابة: $responseBody');
+
+      if (response.statusCode == 200) {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم إرسال الرسالة عبر واتساب')),
+          );
+        }
+      } else {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('خطأ في إرسال الرسالة: ${response.statusCode} - ${responseBody}')),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ WhatsApp - خطأ: $e');
+      if (mounted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _sendingWhatsApp = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _sendSMS() async {
+    final phone = widget.booking['patientPhone']?.toString() ?? '';
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('رقم الهاتف غير متوفر')),
+      );
+      return;
+    }
+
+    setState(() {
+      _sendingSMS = true;
+    });
+
+    try {
+      final result = await SMSService.sendSimpleSMS(phone, _messageController.text);
+      
+      if (result['success'] == true) {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم إرسال الرسالة النصية')),
+          );
+        }
+      } else {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('فشل في إرسال الرسالة: ${result['message']}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _sendingSMS = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('رسالة للمريض'),
+          backgroundColor: const Color(0xFF2FBDAF),
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // Title
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'رسالة اعتذار',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Message text field
+                TextField(
+                  controller: _messageController,
+                  maxLines: null,
+                  textAlignVertical: TextAlignVertical.top,
+                  onTap: () {
+                    if (_messageController.text.trim().isEmpty) {
+                      _messageController.text = _apologyTemplate;
+                      _messageController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _messageController.text.length),
+                      );
+                    }
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'اكتب الرسالة هنا...',
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.all(16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.black),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.black),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.black, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Send buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _sendingWhatsApp ? null : _sendWhatsAppMessage,
+                        icon: const Icon(Icons.chat, color: Colors.white),
+                        label: Text(_sendingWhatsApp ? 'جاري الإرسال...' : 'واتساب'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _sendingSMS ? null : _sendSMS,
+                        icon: const Icon(Icons.sms, color: Colors.white),
+                        label: Text(_sendingSMS ? 'جاري الإرسال...' : 'رسالة نصية'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2FBDAF),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduleAppointmentScreen extends StatefulWidget {
+  final String doctorId;
+  final String centerId;
+  final String doctorName;
+  final String patientName;
+  final String patientPhone;
+
+  const _ScheduleAppointmentScreen({
+    required this.doctorId,
+    required this.centerId,
+    required this.doctorName,
+    required this.patientName,
+    required this.patientPhone,
+  });
+
+  @override
+  State<_ScheduleAppointmentScreen> createState() => _ScheduleAppointmentScreenState();
+}
+
+class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> {
+  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
+  String _appointmentType = 'مقابلة';
+  bool _saving = false;
+
+  final List<String> _appointmentTypes = [
+    'مقابلة',
+    'عملية صغيرة',
+  ];
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    try {
+      final DateTime? picked = await showDatePicker(
+        context: context,
+        initialDate: _selectedDate,
+        firstDate: DateTime.now().add(const Duration(days: 1)),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+        locale: const Locale('ar', 'SA'),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: Color(0xFF2FBDAF),
+                onPrimary: Colors.white,
+                surface: Colors.white,
+                onSurface: Colors.black,
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+      
+      if (picked != null) {
+        setState(() {
+          _selectedDate = DateTime(picked.year, picked.month, picked.day);
+        });
+        print('تم اختيار التاريخ: $_selectedDate');
+      }
+    } catch (e) {
+      print('خطأ في اختيار التاريخ: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطأ في اختيار التاريخ: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+
+
+  Future<void> _saveAppointment() async {
+    if (_selectedDate.isBefore(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا يمكن تحديد موعد في الماضي')),
+      );
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+    });
+
+    try {
+      // إنشاء تاريخ الموعد (بدون وقت محدد)
+      final appointmentDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+      );
+
+      // حفظ الموعد في Firestore
+      await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('doctors')
+          .doc(widget.doctorId)
+          .collection('scheduledAppointments')
+          .add({
+        'patientName': widget.patientName,
+        'patientPhone': widget.patientPhone,
+        'doctorId': widget.doctorId,
+        'doctorName': widget.doctorName,
+        'centerId': widget.centerId,
+        'appointmentDate': appointmentDateTime.toIso8601String(),
+        'appointmentType': _appointmentType,
+        'scheduledAt': FieldValue.serverTimestamp(),
+        'reminderSent': false,
+        'status': 'scheduled',
+      });
+
+      if (mounted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حفظ الموعد بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في حفظ الموعد: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('تحديد موعد - ${widget.patientName}'),
+          backgroundColor: const Color(0xFF2FBDAF),
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+
+                // اختيار التاريخ
+                _buildSection(
+                  title: 'تاريخ الموعد',
+                  child: InkWell(
+                    onTap: _selectDate,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.calendar_today, color: const Color(0xFF2FBDAF)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _formatDate(_selectedDate),
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // نوع الموعد
+                _buildSection(
+                  title: 'نوع الموعد',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      value: _appointmentType,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      ),
+                      items: _appointmentTypes.map((String type) {
+                        return DropdownMenuItem<String>(
+                          value: type,
+                          child: Text(type),
+                        );
+                      }).toList(),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _appointmentType = newValue;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // زر الحفظ
+                ElevatedButton(
+                  onPressed: _saving ? null : _saveAppointment,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2FBDAF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    _saving ? 'جاري الحفظ...' : 'حفظ الموعد',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final days = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
+    final months = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    ];
+    
+    return '${days[date.weekday - 1]} ${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Widget _buildSection({required String title, required Widget child}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
+          ),
+        ),
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+}
+
+class _ScheduledAppointmentsScreen extends StatefulWidget {
+  final String doctorId;
+  final String centerId;
+  final String doctorName;
+
+  const _ScheduledAppointmentsScreen({
+    required this.doctorId,
+    required this.centerId,
+    required this.doctorName,
+  });
+
+  @override
+  State<_ScheduledAppointmentsScreen> createState() => _ScheduledAppointmentsScreenState();
+}
+
+class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScreen> {
+  int _refreshKey = 0;
+
+  Future<List<Map<String, dynamic>>> _fetchScheduledAppointments() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('doctors')
+          .doc(widget.doctorId)
+          .collection('scheduledAppointments')
+          .where('status', isEqualTo: 'scheduled')
+          .orderBy('appointmentDate')
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['appointmentId'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      print('Error fetching scheduled appointments: $e');
+      return [];
+    }
+  }
+
+  Future<void> _cancelAppointment(String appointmentId, String patientName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد الإلغاء'),
+        content: Text('هل أنت متأكد من إلغاء موعد "$patientName"؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('إلغاء الموعد'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .collection('scheduledAppointments')
+            .doc(appointmentId)
+            .update({
+          'status': 'cancelled',
+          'cancelledAt': FieldValue.serverTimestamp(),
+        });
+
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم إلغاء موعد "$patientName"'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          setState(() {
+            _refreshKey++;
+          });
+        }
+      } catch (e) {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطأ في إلغاء الموعد: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  String _formatAppointmentDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(date);
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'scheduled':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      case 'completed':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'scheduled':
+        return 'مجدول';
+      case 'cancelled':
+        return 'ملغي';
+      case 'completed':
+        return 'مكتمل';
+      default:
+        return status;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('المواعيد المجدولة - د. ${widget.doctorName}'),
+          backgroundColor: const Color(0xFF2FBDAF),
+          foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                setState(() {
+                  _refreshKey++;
+                });
+              },
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            key: ValueKey(_refreshKey),
+            future: _fetchScheduledAppointments(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF2FBDAF)),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'حدث خطأ في تحميل المواعيد',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              final appointments = snapshot.data ?? [];
+
+              if (appointments.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.schedule, size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      Text(
+                        'لا توجد مواعيد مجدولة',
+                        style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'ستظهر هنا المواعيد التي تم جدولتها',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: appointments.length,
+                itemBuilder: (context, index) {
+                  final appointment = appointments[index];
+                  final patientName = appointment['patientName'] ?? 'مريض غير معروف';
+                  final patientPhone = appointment['patientPhone'] ?? '';
+                  final appointmentDate = appointment['appointmentDate'] ?? '';
+                  final appointmentType = appointment['appointmentType'] ?? 'موعد';
+                  final notes = appointment['notes'] ?? '';
+                  final status = appointment['status'] ?? 'scheduled';
+                  final reminderSent = appointment['reminderSent'] ?? false;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.08),
+                          spreadRadius: 1,
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      patientName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      patientPhone,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(status),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  _getStatusText(status),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                              const SizedBox(width: 8),
+                              Text(
+                                _formatAppointmentDate(appointmentDate),
+                                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.medical_services, size: 16, color: Colors.grey[600]),
+                              const SizedBox(width: 8),
+                              Text(
+                                appointmentType,
+                                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                              ),
+                              if (reminderSent) ...[
+                                const SizedBox(width: 16),
+                                Icon(Icons.notifications_active, size: 16, color: Colors.green[600]),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'تم التذكير',
+                                  style: TextStyle(fontSize: 12, color: Colors.green[600]),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (notes.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'ملاحظات: $notes',
+                              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                            ),
+                          ],
+                          if (status == 'scheduled') ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () => _cancelAppointment(
+                                    appointment['appointmentId'],
+                                    patientName,
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: const Text('إلغاء الموعد'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScheduledAppointmentsList extends StatelessWidget {
+  final String doctorId;
+  final String centerId;
+  final int refreshKey;
+  final VoidCallback onAppointmentChanged;
+
+  const _ScheduledAppointmentsList({
+    required this.doctorId,
+    required this.centerId,
+    required this.refreshKey,
+    required this.onAppointmentChanged,
+  });
+
+  Future<List<Map<String, dynamic>>> _fetchScheduledAppointments() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(centerId)
+          .collection('doctors')
+          .doc(doctorId)
+          .collection('scheduledAppointments')
+          .where('status', isEqualTo: 'scheduled')
+          .orderBy('appointmentDate')
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['appointmentId'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      print('Error fetching scheduled appointments: $e');
+      return [];
+    }
+  }
+
+  Future<void> _cancelAppointment(BuildContext context, String appointmentId, String patientName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد الإلغاء'),
+        content: Text('هل أنت متأكد من إلغاء موعد "$patientName"؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('إلغاء الموعد'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(centerId)
+            .collection('doctors')
+            .doc(doctorId)
+            .collection('scheduledAppointments')
+            .doc(appointmentId)
+            .update({
+          'status': 'cancelled',
+          'cancelledAt': FieldValue.serverTimestamp(),
+        });
+
+        onAppointmentChanged();
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطأ في إلغاء الموعد: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  String _formatAppointmentDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(date);
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      key: ValueKey(refreshKey),
+      future: _fetchScheduledAppointments(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(color: Color(0xFF2FBDAF)),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'حدث خطأ في تحميل المواعيد',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          );
+        }
+
+        final appointments = snapshot.data ?? [];
+
+        if (appointments.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Center(
+              child: Text(
+                'لا توجد مواعيد مجدولة',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ),
+          );
+        }
+
+        return Container(
+          constraints: const BoxConstraints(maxHeight: 300),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: appointments.length,
+            itemBuilder: (context, index) {
+              final appointment = appointments[index];
+              final patientName = appointment['patientName'] ?? 'مريض غير معروف';
+              final patientPhone = appointment['patientPhone'] ?? '';
+              final appointmentDate = appointment['appointmentDate'] ?? '';
+              final appointmentType = appointment['appointmentType'] ?? 'موعد';
+              final reminderSent = appointment['reminderSent'] ?? false;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  patientName,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  patientPhone,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (reminderSent)
+                            Icon(Icons.notifications_active, size: 16, color: Colors.green[600]),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _formatAppointmentDate(appointmentDate),
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.medical_services, size: 14, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            appointmentType,
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () => _cancelAppointment(
+                              context,
+                              appointment['appointmentId'],
+                              patientName,
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            child: const Text(
+                              'إلغاء',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
