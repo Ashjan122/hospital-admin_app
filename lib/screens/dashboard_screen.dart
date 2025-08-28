@@ -61,7 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: const Color(0xFF2FBDAF),
+        backgroundColor: const Color(0xFF2196F3),
         foregroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false, // تعطيل الزر التلقائي
@@ -129,7 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF2FBDAF),
+                          color: Color(0xFF2196F3),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -156,7 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context,
                         'الأطباء',
                         Icons.medical_services,
-                        const Color(0xFF2FBDAF),
+                        const Color(0xFF2196F3),
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -172,7 +172,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Color(0xFF2196F3),
                               ),
                             );
                           }
@@ -182,7 +182,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context,
                         'التخصصات',
                         Icons.medical_services,
-                        const Color(0xFF2FBDAF),
+                        const Color(0xFF2196F3),
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -198,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Color(0xFF2196F3),
                               ),
                             );
                           }
@@ -208,7 +208,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context,
                         'شركات التأمين',
                         Icons.security,
-                        const Color(0xFF2FBDAF),
+                        const Color(0xFF2196F3),
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -224,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Color(0xFF2196F3),
                               ),
                             );
                           }
@@ -234,7 +234,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context,
                         'جدول الأطباء',
                         Icons.schedule,
-                        const Color(0xFF2FBDAF),
+                        const Color(0xFF2196F3),
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -250,7 +250,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Color(0xFF2196F3),
                               ),
                             );
                           }
@@ -260,7 +260,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context,
                         'المستخدمين',
                         Icons.people,
-                        const Color(0xFF2FBDAF),
+                        const Color(0xFF2196F3),
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -276,7 +276,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Color(0xFF2196F3),
                               ),
                             );
                           }
@@ -286,7 +286,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context,
                         'الحجوزات',
                         Icons.calendar_today,
-                        const Color(0xFF2FBDAF),
+                        const Color(0xFF2196F3),
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -302,7 +302,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Color(0xFF2196F3),
                               ),
                             );
                           }
@@ -312,7 +312,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context,
                         'التقارير',
                         Icons.analytics,
-                        const Color(0xFF2FBDAF),
+                        const Color(0xFF2196F3),
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -328,7 +328,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Color(0xFF2196F3),
                               ),
                             );
                           }

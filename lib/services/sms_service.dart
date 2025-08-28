@@ -1,5 +1,8 @@
 import 'package:http/http.dart' as http;
 import 'dart:math';
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SMSService {
   static const String _baseUrl = 'https://www.airtel.sd/api/html_send_sms/';
@@ -228,4 +231,280 @@ class SMSService {
     return inputOTP == storedOTP;
   }
 
+}
+
+class NotificationService {
+  static const String _notificationsKey = 'reception_notifications';
+
+  // حفظ إشعار جديد
+  static Future<void> saveNotification({
+    required String userId,
+    required String doctorId,
+    required String doctorName,
+    required String patientName,
+    required String appointmentDate,
+    required String appointmentTime,
+    required String appointmentId,
+    required String centerId,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final notifications = prefs.getStringList('${_notificationsKey}_$userId') ?? [];
+      
+      final notification = {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'doctorId': doctorId,
+        'doctorName': doctorName,
+        'patientName': patientName,
+        'appointmentDate': appointmentDate,
+        'appointmentTime': appointmentTime,
+        'appointmentId': appointmentId,
+        'centerId': centerId,
+        'timestamp': DateTime.now().toIso8601String(),
+        'isRead': false,
+      };
+      
+      // تحويل إلى JSON string للحفظ
+      final notificationJson = jsonEncode(notification);
+      notifications.insert(0, notificationJson); // إضافة في البداية
+      
+      // حفظ آخر 50 إشعار فقط
+      if (notifications.length > 50) {
+        notifications.removeRange(50, notifications.length);
+      }
+      
+      final success = await prefs.setStringList('${_notificationsKey}_$userId', notifications);
+      print('Notification saved for user $userId: ${notification['id']}, success: $success');
+    } catch (e) {
+      print('Error saving notification: $e');
+    }
+  }
+
+  // تنظيف وتحويل البيانات القديمة إلى JSON
+  static Future<void> _cleanupOldData(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final notifications = prefs.getStringList('${_notificationsKey}_$userId') ?? [];
+      
+      if (notifications.isEmpty) return;
+      
+      final cleanedNotifications = <String>[];
+      bool hasChanges = false;
+      
+      for (var notificationStr in notifications) {
+        try {
+          // محاولة تحليل كـ JSON
+          jsonDecode(notificationStr);
+          // إذا نجح، فهو JSON صحيح
+          cleanedNotifications.add(notificationStr);
+        } catch (e) {
+          // إذا فشل، فهو String representation قديم
+          try {
+            final cleanStr = notificationStr.replaceAll('{', '').replaceAll('}', '');
+            final pairs = cleanStr.split(', ');
+            final Map<String, dynamic> notification = {};
+            
+            for (var pair in pairs) {
+              final keyValue = pair.split(': ');
+              if (keyValue.length == 2) {
+                final key = keyValue[0].trim();
+                final value = keyValue[1].trim().replaceAll("'", '');
+                notification[key] = value;
+              }
+            }
+            
+            // تحويل إلى JSON صحيح
+            final jsonStr = jsonEncode(notification);
+            cleanedNotifications.add(jsonStr);
+            hasChanges = true;
+            print('Converted old format to JSON: ${notification['id']}');
+          } catch (e2) {
+            print('Failed to convert notification, skipping: $notificationStr');
+          }
+        }
+      }
+      
+      if (hasChanges) {
+        await prefs.setStringList('${_notificationsKey}_$userId', cleanedNotifications);
+        print('Cleaned up old data format');
+      }
+    } catch (e) {
+      print('Error cleaning up old data: $e');
+    }
+  }
+
+  // جلب الإشعارات
+  static Future<List<Map<String, dynamic>>> getNotifications(String userId) async {
+    try {
+      // تنظيف البيانات القديمة أولاً
+      await _cleanupOldData(userId);
+      
+      final prefs = await SharedPreferences.getInstance();
+      final notifications = prefs.getStringList('${_notificationsKey}_$userId') ?? [];
+      
+      return notifications.map((notificationStr) {
+        try {
+          // محاولة تحليل كـ JSON أولاً
+          final notification = jsonDecode(notificationStr) as Map<String, dynamic>;
+          return notification;
+        } catch (e) {
+          // إذا فشل JSON، محاولة تحليل كـ String representation
+          try {
+            print('Trying to parse as string representation: $notificationStr');
+            final cleanStr = notificationStr.replaceAll('{', '').replaceAll('}', '');
+            final pairs = cleanStr.split(', ');
+            final Map<String, dynamic> notification = {};
+            
+            for (var pair in pairs) {
+              final keyValue = pair.split(': ');
+              if (keyValue.length == 2) {
+                final key = keyValue[0].trim();
+                final value = keyValue[1].trim().replaceAll("'", '');
+                notification[key] = value;
+              }
+            }
+            
+            print('Successfully parsed string representation: $notification');
+            return notification;
+          } catch (e2) {
+            print('Error parsing notification (both methods failed): $e2');
+            print('Problematic string: $notificationStr');
+            return <String, dynamic>{};
+          }
+        }
+      }).where((notification) => notification.isNotEmpty).toList();
+    } catch (e) {
+      print('Error loading notifications: $e');
+      return [];
+    }
+  }
+
+  // تحديث حالة القراءة
+  static Future<void> markAsRead(String userId, String notificationId) async {
+    try {
+      print('Marking notification as read: $notificationId for user: $userId');
+      final prefs = await SharedPreferences.getInstance();
+      final notifications = prefs.getStringList('${_notificationsKey}_$userId') ?? [];
+      
+      print('Found ${notifications.length} notifications');
+      
+      final updatedNotifications = notifications.map((notificationStr) {
+        final notification = jsonDecode(notificationStr) as Map<String, dynamic>;
+        if (notification['id'] == notificationId) {
+          print('Found notification to mark as read: ${notification['id']}');
+          notification['isRead'] = true;
+        }
+        return jsonEncode(notification);
+      }).toList();
+      
+      final success = await prefs.setStringList('${_notificationsKey}_$userId', updatedNotifications);
+      print('Successfully marked notification as read: $success');
+      
+      // انتظار لحظة لضمان حفظ البيانات
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // التحقق من أن البيانات تم حفظها
+      final savedNotifications = prefs.getStringList('${_notificationsKey}_$userId') ?? [];
+      print('Saved notifications count: ${savedNotifications.length}');
+      
+      // التحقق من أن الإشعار المحدد أصبح مقروء
+      for (var notificationStr in savedNotifications) {
+        final notification = jsonDecode(notificationStr) as Map<String, dynamic>;
+        if (notification['id'] == notificationId) {
+          print('Verification: Notification ${notification['id']} isRead = ${notification['isRead']}');
+          break;
+        }
+      }
+      
+      // التحقق النهائي من أن البيانات تم حفظها بشكل صحيح
+      if (!success) {
+        print('WARNING: Failed to save notification data!');
+        // محاولة إعادة الحفظ
+        final retrySuccess = await prefs.setStringList('${_notificationsKey}_$userId', updatedNotifications);
+        print('Retry save success: $retrySuccess');
+      }
+    } catch (e) {
+      print('Error marking notification as read: $e');
+    }
+  }
+
+  // حذف إشعار
+  static Future<void> deleteNotification(String userId, String notificationId) async {
+    try {
+      print('Deleting notification: $notificationId for user: $userId');
+      final prefs = await SharedPreferences.getInstance();
+      final notifications = prefs.getStringList('${_notificationsKey}_$userId') ?? [];
+      
+      print('Found ${notifications.length} notifications before deletion');
+      
+      final updatedNotifications = notifications.where((notificationStr) {
+        final notification = jsonDecode(notificationStr) as Map<String, dynamic>;
+        return notification['id'] != notificationId;
+      }).toList();
+      
+      print('Notifications after deletion: ${updatedNotifications.length}');
+      
+      final success = await prefs.setStringList('${_notificationsKey}_$userId', updatedNotifications);
+      print('Successfully deleted notification: $success');
+      
+      // انتظار لحظة لضمان حفظ البيانات
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // التحقق من أن البيانات تم حفظها
+      final savedNotifications = prefs.getStringList('${_notificationsKey}_$userId') ?? [];
+      print('Saved notifications count after deletion: ${savedNotifications.length}');
+      
+      // التحقق النهائي من أن البيانات تم حفظها بشكل صحيح
+      if (!success) {
+        print('WARNING: Failed to delete notification data!');
+        // محاولة إعادة الحفظ
+        final retrySuccess = await prefs.setStringList('${_notificationsKey}_$userId', updatedNotifications);
+        print('Retry delete success: $retrySuccess');
+      }
+    } catch (e) {
+      print('Error deleting notification: $e');
+    }
+  }
+
+  // عدد الإشعارات غير المقروءة
+  static Future<int> getUnreadCount(String userId) async {
+    try {
+      print('Getting unread count for user: $userId');
+      // تنظيف البيانات القديمة أولاً
+      await _cleanupOldData(userId);
+      final notifications = await getNotifications(userId);
+      print('Total notifications: ${notifications.length}');
+      
+      final unreadCount = notifications.where((notification) {
+        final isRead = notification['isRead'];
+        final isUnread = isRead == false || isRead == 'false';
+        print('Notification ${notification['id']}: isRead=$isRead, isUnread=$isUnread');
+        return isUnread;
+      }).length;
+      
+      print('Unread count: $unreadCount');
+      
+      // التحقق من صحة العد
+      final verification = await getNotifications(userId);
+      final verificationCount = verification.where((n) => n['isRead'] == false || n['isRead'] == 'false').length;
+      print('Verification unread count: $verificationCount');
+      
+      return unreadCount;
+    } catch (e) {
+      print('Error getting unread count: $e');
+      return 0;
+    }
+  }
+
+  // حذف جميع الإشعارات
+  static Future<void> clearAllNotifications(String userId) async {
+    try {
+      print('Clearing all notifications for user: $userId');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('${_notificationsKey}_$userId');
+      print('Successfully cleared all notifications');
+    } catch (e) {
+      print('Error clearing notifications: $e');
+    }
+  }
 }

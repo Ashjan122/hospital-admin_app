@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hospital_admin_app/services/central_data_service.dart';
 
 class CentralDoctorsScreen extends StatefulWidget {
   const CentralDoctorsScreen({super.key});
@@ -573,6 +574,13 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
         'specialization': specializationId,
         'phoneNumber': phone,
       });
+
+      // مزامنة بيانات الطبيب إلى جميع المراكز التي تستخدمه
+      await CentralDataService.propagateDoctorUpdate(
+        doctorId: id,
+        name: name,
+        phoneNumber: phone,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

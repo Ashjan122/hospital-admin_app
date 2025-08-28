@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hospital_admin_app/services/central_data_service.dart';
 
 class CentralInsuranceScreen extends StatefulWidget {
   const CentralInsuranceScreen({super.key});
@@ -407,6 +408,14 @@ class _CentralInsuranceScreenState extends State<CentralInsuranceScreen> {
         'description': description,
         'phone': phone,
       });
+
+      // مزامنة شركة التأمين إلى جميع المراكز التي تستخدمها
+      await CentralDataService.propagateInsuranceUpdate(
+        insuranceId: id,
+        name: name,
+        description: description,
+        phone: phone,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

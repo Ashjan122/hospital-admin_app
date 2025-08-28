@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'admin_user_profile_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
   final String centerId;
@@ -124,101 +125,105 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     final userPhoneController = TextEditingController();
     final userPasswordController = TextEditingController();
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('إضافة مستخدم جديد'),
-        content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-              controller: userNameController,
-                decoration: const InputDecoration(
-                  labelText: 'اسم المستخدم',
-                  border: OutlineInputBorder(),
+          showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('إضافة مستخدم جديد'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: userNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'اسم المستخدم',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: userPhoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'رقم الهاتف',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: userPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'كلمة المرور',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (userNameController.text.trim().isNotEmpty &&
+                    userPhoneController.text.trim().isNotEmpty &&
+                    userPasswordController.text.trim().isNotEmpty) {
+                  
+                  Navigator.pop(context);
+                  
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .add({
+                      'userName': userNameController.text.trim(),
+                      'userPhone': userPhoneController.text.trim(),
+                      'userPassword': userPasswordController.text.trim(),
+                      'centerId': widget.centerId,
+                      'centerName': widget.centerName,
+                      // افتراضيًا يكون موظف استقبال، يمكن تغييره من البروفايل
+                      'userType': 'reception',
+                      'createdAt': FieldValue.serverTimestamp(),
+                    });
+
+                    // تحديث فوري للمفتاح
+                    if (mounted) {
+                      setState(() {
+                        _refreshKey++; // تحديث المفتاح لإعادة تشغيل FutureBuilder
+                      });
+                    }
+
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('تم إضافة المستخدم "${userNameController.text.trim()}" بنجاح'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('خطأ في إضافة المستخدم: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2FBDAF),
+                foregroundColor: Colors.white,
               ),
-            const SizedBox(height: 12),
-              TextField(
-              controller: userPhoneController,
-                decoration: const InputDecoration(
-                  labelText: 'رقم الهاتف',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-            const SizedBox(height: 12),
-              TextField(
-              controller: userPasswordController,
-              obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'كلمة المرور',
-                  border: OutlineInputBorder(),
-                ),
+              child: const Text('إضافة'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (userNameController.text.trim().isNotEmpty &&
-                  userPhoneController.text.trim().isNotEmpty &&
-                  userPasswordController.text.trim().isNotEmpty) {
-                Navigator.pop(context);
-                
-                try {
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .add({
-                    'userName': userNameController.text.trim(),
-                    'userPhone': userPhoneController.text.trim(),
-                    'userPassword': userPasswordController.text.trim(),
-                    'centerId': widget.centerId,
-                    'centerName': widget.centerName,
-                    'userType': 'user',
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-
-                  // تحديث فوري للمفتاح
-                  if (mounted) {
-                    setState(() {
-                      _refreshKey++; // تحديث المفتاح لإعادة تشغيل FutureBuilder
-                    });
-                  }
-
-                  if (mounted && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('تم إضافة المستخدم "${userNameController.text.trim()}" بنجاح'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('خطأ في إضافة المستخدم: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2FBDAF),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('إضافة'),
-          ),
-        ],
-      ),
-    );
+      );
   }
 
   @override
@@ -389,10 +394,23 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                     itemCount: filteredUsers.length,
                     itemBuilder: (context, index) {
                       final user = filteredUsers[index];
-                        final userName = user['userName'] ?? 'مستخدم غير معروف';
-                        final userPhone = user['userPhone'] ?? 'غير محدد';
+                      final userName = user['userName'] ?? 'مستخدم غير معروف';
+                      final userPhone = user['userPhone'] ?? 'غير محدد';
 
-                                             return Container(
+                      return InkWell(
+                        onTap: () async {
+                          final changed = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) => AdminUserProfileScreen(userId: user['userId']),
+                            ),
+                          );
+                          if (changed == true && mounted) {
+                            setState(() {
+                              _refreshKey++;
+                            });
+                          }
+                        },
+                        child: Container(
                          margin: const EdgeInsets.only(bottom: 12),
                          decoration: BoxDecoration(
                            color: Colors.white,
@@ -456,6 +474,34 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                          ),
                                        ],
                                      ),
+                                     const SizedBox(height: 8),
+                                     Row(
+                                       children: [
+                                         Text(
+                                           'نوع المستخدم: ',
+                                           style: TextStyle(
+                                             fontSize: 15,
+                                             fontWeight: FontWeight.w600,
+                                             color: Colors.grey[700],
+                                           ),
+                                         ),
+                                         Container(
+                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                           decoration: BoxDecoration(
+                                             color: _getUserTypeColor(user['userType'] ?? 'reception'),
+                                             borderRadius: BorderRadius.circular(12),
+                                           ),
+                                           child: Text(
+                                             _getUserTypeLabel(user['userType'] ?? 'reception'),
+                                             style: const TextStyle(
+                                               fontSize: 12,
+                                               fontWeight: FontWeight.bold,
+                                               color: Colors.white,
+                                             ),
+                                           ),
+                                         ),
+                                       ],
+                                     ),
                                    ],
                                  ),
                                ),
@@ -480,7 +526,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                              ],
                            ),
                          ),
-                       );
+                       ),
+                      );
                     },
                   );
                 },
@@ -491,5 +538,29 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         ),
       ),
     );
+  }
+
+  Color _getUserTypeColor(String userType) {
+    switch (userType) {
+      case 'admin':
+        return Colors.red;
+      case 'doctor':
+        return Colors.blue;
+      case 'reception':
+      default:
+        return const Color(0xFF2FBDAF);
+    }
+  }
+
+  String _getUserTypeLabel(String userType) {
+    switch (userType) {
+      case 'admin':
+        return 'مدير';
+      case 'doctor':
+        return 'طبيب';
+      case 'reception':
+      default:
+        return 'موظف استقبال';
+    }
   }
 }

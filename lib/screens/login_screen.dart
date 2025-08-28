@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/dashboard_screen.dart';
 import 'package:hospital_admin_app/screens/control_panel_screen.dart';
+import 'package:hospital_admin_app/screens/reception_staff_screen.dart';
+import 'package:hospital_admin_app/screens/doctor_bookings_screen.dart';
+import 'package:hospital_admin_app/screens/doctor_user_screen.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,24 +43,54 @@ class _LoginScreenState extends State<LoginScreen> {
     final centerName = prefs.getString('centerName');
 
     if (isLoggedIn) {
-      if (userType == 'control') {
-        // Control user is logged in
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const ControlPanelScreen(),
-          ),
-        );
-      } else if ((userType == 'admin' || userType == 'user') && centerId != null && centerName != null) {
-        // Admin or user is logged in
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => DashboardScreen(
-              centerId: centerId,
-              centerName: centerName,
+              if (userType == 'control') {
+          // Control user is logged in
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const ControlPanelScreen(),
             ),
-          ),
-        );
-      }
+          );
+        } else if (userType == 'admin' && centerId != null && centerName != null) {
+          // Admin is logged in
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => DashboardScreen(
+                centerId: centerId,
+                centerName: centerName,
+              ),
+            ),
+          );
+        } else if (userType == 'reception' && centerId != null && centerName != null) {
+          // Reception staff is logged in
+          final userId = prefs.getString('userId') ?? '';
+          final userName = prefs.getString('userName') ?? '';
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => ReceptionStaffScreen(
+                centerId: centerId,
+                centerName: centerName,
+                userId: userId,
+                userName: userName,
+              ),
+            ),
+          );
+        } else if (userType == 'doctor' && centerId != null && centerName != null) {
+          // Doctor is logged in
+          final userId = prefs.getString('userId') ?? '';
+          final userName = prefs.getString('userName') ?? '';
+          final doctorId = prefs.getString('doctorId') ?? '';
+          final doctorName = prefs.getString('doctorName') ?? userName;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => DoctorUserScreen(
+                doctorId: doctorId,
+                centerId: centerId,
+                centerName: centerName,
+                doctorName: doctorName,
+              ),
+            ),
+          );
+        }
     }
   }
 
@@ -66,7 +99,9 @@ class _LoginScreenState extends State<LoginScreen> {
     String? centerName, 
     String? userEmail, 
     String? userName, 
-    String? userId
+    String? userId,
+    String? doctorId,
+    String? doctorName,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', true);
@@ -77,6 +112,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (userEmail != null) await prefs.setString('userEmail', userEmail);
     if (userName != null) await prefs.setString('userName', userName);
     if (userId != null) await prefs.setString('userId', userId);
+    if (doctorId != null) await prefs.setString('doctorId', doctorId);
+    if (doctorName != null) await prefs.setString('doctorName', doctorName);
   }
 
   Future<void> _login() async {
@@ -122,28 +159,69 @@ class _LoginScreenState extends State<LoginScreen> {
             final userName = userData['userName'] ?? '';
             final centerId = userData['centerId'] ?? '';
             final centerName = userData['centerName'] ?? '';
+            final userType = userData['userType'] ?? 'user';
+            final doctorId = userData['doctorId'] ?? '';
+            final doctorName = userData['doctorName'] ?? '';
 
             // Save user login data
-            await _saveLoginData('user', 
+            await _saveLoginData(userType, 
               centerId: centerId, 
               centerName: centerName,
               userEmail: userName,
               userName: userName,
-              userId: userId
+              userId: userId,
+              doctorId: doctorId,
+              doctorName: doctorName,
             );
 
             if (mounted) {
               setState(() {
                 _isLoading = false;
               });
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => DashboardScreen(
-                    centerId: centerId,
-                    centerName: centerName,
+              
+              // Redirect based on user type
+              if (userType == 'admin') {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => DashboardScreen(
+                      centerId: centerId,
+                      centerName: centerName,
+                    ),
                   ),
-                ),
-              );
+                );
+              } else if (userType == 'reception') {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => ReceptionStaffScreen(
+                      centerId: centerId,
+                      centerName: centerName,
+                      userId: userId,
+                      userName: userName,
+                    ),
+                  ),
+                );
+              } else if (userType == 'doctor') {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => DoctorUserScreen(
+                      doctorId: doctorId,
+                      centerId: centerId,
+                      centerName: centerName,
+                      doctorName: doctorName.isNotEmpty ? doctorName : userName,
+                    ),
+                  ),
+                );
+              } else {
+                // Default to dashboard for other user types
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => DashboardScreen(
+                      centerId: centerId,
+                      centerName: centerName,
+                    ),
+                  ),
+                );
+              }
             }
             return; // Exit the function after successful user login
           } else {

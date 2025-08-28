@@ -5,6 +5,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hospital_admin_app/services/sms_service.dart';
 import 'package:hospital_admin_app/widgets/optimized_loading_widget.dart';
 
+
+
 class AdminBookingsScreen extends StatefulWidget {
   final String centerId;
   final String? centerName;
@@ -24,6 +26,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
   String _searchQuery = '';
   String _selectedFilter = 'all'; // all, today, upcoming, past
   Set<String> _confirmingBookings = {}; // لتتبع الحجوزات التي يتم تأكيدها
+  Set<String> _cancelingBookings = {}; // لتتبع الحجوزات التي يتم إلغاؤها
   List<Map<String, dynamic>> _allBookings = [];
   bool _isLoadingMore = false;
   bool _hasMoreData = true;
@@ -35,6 +38,19 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
   void initState() {
     super.initState();
     fetchAllBookings();
+    
+    // بدء مراقبة التغييرات في الحجوزات
+    _startBookingsListener();
+  }
+
+  void _startBookingsListener() {
+    // مراقبة التغييرات في الحجوزات كل 30 ثانية
+    Future.delayed(const Duration(seconds: 30), () {
+      if (mounted) {
+        fetchAllBookings();
+        _startBookingsListener(); // إعادة تشغيل المراقبة
+      }
+    });
   }
 
   Future<void> fetchAllBookings() async {
@@ -61,8 +77,39 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
       
       await Future.wait(futures);
       
-      // ترتيب الحجوزات حسب التاريخ (الأحدث أولاً)
+      // ترتيب الحجوزات حسب وقت الحجز (آخر حجز يظهر أولاً)
       allBookings.sort((a, b) {
+        final createdAtA = a['createdAt'];
+        final createdAtB = b['createdAt'];
+        
+        // إذا كان وقت الحجز متوفر، نرتب حسبه
+        if (createdAtA != null && createdAtB != null) {
+          try {
+            DateTime timeA, timeB;
+            
+            if (createdAtA is Timestamp) {
+              timeA = createdAtA.toDate();
+            } else if (createdAtA is String) {
+              timeA = DateTime.parse(createdAtA);
+            } else {
+              throw Exception('Invalid createdAt type');
+            }
+            
+            if (createdAtB is Timestamp) {
+              timeB = createdAtB.toDate();
+            } else if (createdAtB is String) {
+              timeB = DateTime.parse(createdAtB);
+            } else {
+              throw Exception('Invalid createdAt type');
+            }
+            
+            return timeB.compareTo(timeA); // آخر حجز أولاً
+          } catch (e) {
+            // في حالة خطأ في تحليل التاريخ، نرتب حسب تاريخ الحجز
+          }
+        }
+        
+        // إذا لم يكن وقت الحجز متوفر، نرتب حسب تاريخ الحجز
         final dateA = DateTime.tryParse(a['date'] ?? '');
         final dateB = DateTime.tryParse(b['date'] ?? '');
         
@@ -245,8 +292,39 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
         break;
     }
     
-    // إعادة ترتيب النتائج المصفاة حسب التاريخ (الأحدث أولاً)
+    // إعادة ترتيب النتائج المصفاة حسب وقت الحجز (آخر حجز يظهر أولاً)
     filteredBookings.sort((a, b) {
+      final createdAtA = a['createdAt'];
+      final createdAtB = b['createdAt'];
+      
+      // إذا كان وقت الحجز متوفر، نرتب حسبه
+      if (createdAtA != null && createdAtB != null) {
+        try {
+          DateTime timeA, timeB;
+          
+          if (createdAtA is Timestamp) {
+            timeA = createdAtA.toDate();
+          } else if (createdAtA is String) {
+            timeA = DateTime.parse(createdAtA);
+          } else {
+            throw Exception('Invalid createdAt type');
+          }
+          
+          if (createdAtB is Timestamp) {
+            timeB = createdAtB.toDate();
+          } else if (createdAtB is String) {
+            timeB = DateTime.parse(createdAtB);
+          } else {
+            throw Exception('Invalid createdAt type');
+          }
+          
+          return timeB.compareTo(timeA); // آخر حجز أولاً
+        } catch (e) {
+          // في حالة خطأ في تحليل التاريخ، نرتب حسب تاريخ الحجز
+        }
+      }
+      
+      // إذا لم يكن وقت الحجز متوفر، نرتب حسب تاريخ الحجز
       final dateA = DateTime.tryParse(a['date'] ?? '');
       final dateB = DateTime.tryParse(b['date'] ?? '');
       
@@ -331,6 +409,124 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
     }
   }
 
+  String formatBookingTime(dynamic createdAt) {
+    if (createdAt == null) return '';
+    try {
+      DateTime date;
+      if (createdAt is Timestamp) {
+        date = createdAt.toDate();
+      } else if (createdAt is String) {
+        date = DateTime.parse(createdAt);
+      } else {
+        return '';
+      }
+      
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final yesterday = today.subtract(const Duration(days: 1));
+      final bookingDay = DateTime(date.year, date.month, date.day);
+      
+      String timeText = intl.DateFormat('HH:mm', 'en').format(date);
+      
+      if (bookingDay == today) {
+        return 'اليوم $timeText';
+      } else if (bookingDay == yesterday) {
+        return 'أمس $timeText';
+      } else {
+        // إذا كان قديماً، نعرض التاريخ الكامل
+        String dateText = intl.DateFormat('yyyy/MM/dd', 'en').format(date);
+        return '$dateText $timeText';
+      }
+    } catch (e) {
+      return '';
+    }
+  }
+
+  void _updateBookingInLocalList(String appointmentId, Map<String, dynamic> updates) {
+    setState(() {
+      final index = _allBookings.indexWhere((b) => b['appointmentId'] == appointmentId);
+      if (index != -1) {
+        _allBookings[index].addAll(updates);
+      }
+    });
+  }
+
+  void _removeBookingFromLocalList(String appointmentId) {
+    setState(() {
+      _allBookings.removeWhere((b) => b['appointmentId'] == appointmentId);
+    });
+  }
+
+  Future<void> _cancelBooking(Map<String, dynamic> booking) async {
+    final appointmentId = booking['appointmentId'] as String;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تأكيد إلغاء الحجز'),
+        content: Text('هل تريد إلغاء حجز المريض ${booking['patientName']}؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('إلغاء الحجز'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // إضافة loading محلي للحجز المحدد
+      setState(() {
+        _cancelingBookings.add(appointmentId);
+      });
+
+      try {
+        // حذف الحجز من قاعدة البيانات
+        await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(booking['specializationId'])
+            .collection('doctors')
+            .doc(booking['doctorId'])
+            .collection('appointments')
+            .doc(appointmentId)
+            .delete();
+
+        // إزالة الحجز من القائمة المحلية
+        _removeBookingFromLocalList(appointmentId);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم إلغاء الحجز'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('خطأ في إلغاء الحجز: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        // إزالة loading المحلي
+        setState(() {
+          _cancelingBookings.remove(appointmentId);
+        });
+      }
+    }
+  }
+
   Future<void> _confirmBooking(Map<String, dynamic> booking) async {
     final appointmentId = booking['appointmentId'] as String;
     
@@ -388,15 +584,14 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
           await SMSService.sendSimpleSMS(patientPhone, message);
         }
 
+
+
         // تحديث الحجز في القائمة المحلية
-                      setState(() {
-          final index = _allBookings.indexWhere((b) => b['appointmentId'] == appointmentId);
-          if (index != -1) {
-            _allBookings[index]['isConfirmed'] = true;
-            _allBookings[index]['confirmedAt'] = DateTime.now();
-          }
-          _confirmingBookings.remove(appointmentId);
+        _updateBookingInLocalList(appointmentId, {
+          'isConfirmed': true,
+          'confirmedAt': DateTime.now(),
         });
+        _confirmingBookings.remove(appointmentId);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -422,6 +617,8 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
       }
     }
   }
+
+
 
   Widget _buildBookingsList() {
     final filteredBookings = filterBookings();
@@ -608,49 +805,99 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
                 // Status badge and confirm button
                 Column(
                   children: [
-                               Container(
-                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                 decoration: BoxDecoration(
+                    // Booking time
+                    if (booking['createdAt'] != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          formatBookingTime(booking['createdAt']),
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    // Status badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
                         color: getStatusColor(date, isConfirmed: booking['isConfirmed'] ?? false).withOpacity(0.1),
-                                   borderRadius: BorderRadius.circular(12),
-                                   border: Border.all(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
                           color: getStatusColor(date, isConfirmed: booking['isConfirmed'] ?? false).withOpacity(0.3),
-                                   ),
-                                 ),
-                                 child: Text(
+                        ),
+                      ),
+                      child: Text(
                         getStatusText(date, isConfirmed: booking['isConfirmed'] ?? false),
-                                   style: TextStyle(
-                                     fontSize: 10,
+                        style: TextStyle(
+                          fontSize: 10,
                           color: getStatusColor(date, isConfirmed: booking['isConfirmed'] ?? false),
-                                     fontWeight: FontWeight.bold,
-                                   ),
-                                 ),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                     if (!(booking['isConfirmed'] ?? false)) ...[
                       const SizedBox(height: 8),
-                      ElevatedButton(
-                        onPressed: _confirmingBookings.contains(booking['appointmentId'])
-                            ? null
-                            : () => _confirmBooking(booking),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          minimumSize: const Size(0, 30),
-                        ),
-                        child: _confirmingBookings.contains(booking['appointmentId'])
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text(
-                                'تأكيد الحجز',
-                                style: TextStyle(fontSize: 10),
-                              ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton(
+                            onPressed: _confirmingBookings.contains(booking['appointmentId'])
+                                ? null
+                                : () => _confirmBooking(booking),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              minimumSize: const Size(0, 30),
+                            ),
+                            child: _confirmingBookings.contains(booking['appointmentId'])
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    'تأكيد',
+                                    style: TextStyle(fontSize: 10),
+                                  ),
+                          ),
+                          const SizedBox(width: 4),
+                          ElevatedButton(
+                            onPressed: _cancelingBookings.contains(booking['appointmentId'])
+                                ? null
+                                : () => _cancelBooking(booking),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              minimumSize: const Size(0, 30),
+                            ),
+                            child: _cancelingBookings.contains(booking['appointmentId'])
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    'إلغاء',
+                                    style: TextStyle(fontSize: 10),
+                                  ),
+                          ),
+                        ],
                       ),
                     ],
                   ],

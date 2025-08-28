@@ -21,6 +21,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   Map<String, dynamic> _statistics = {};
   String _selectedPeriod = 'today'; // today, week, month, all
   String _loadingMessage = 'جاري تحميل الإحصائيات...';
+  bool _showDoctorsWithoutSchedule = false; // التحكم في إظهار/إخفاء القائمة
   
   // متغيرات لتتبع حالة تحميل كل إحصائية
   Map<String, bool> _loadingStates = {
@@ -30,6 +31,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     'users': true,
     'patients': true,
     'bookings': true,
+    'doctorsWithoutSchedule': true,
   };
 
   @override
@@ -47,6 +49,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       'users': 0,
       'confirmedBookings': 0,
       'totalBookings': 0,
+      'doctorsWithoutSchedule': 0,
+      'doctorsWithoutScheduleList': [],
     };
     // تعيين _isLoading إلى false ليعرض الكروت فوراً
     _isLoading = false;
@@ -71,6 +75,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         _loadUsersCount(),
         _loadDoctorsAndBookings(),
         _loadPatientsCount(),
+        _loadDoctorsWithoutSchedule(),
       ]);
     } catch (e) {
       print('Error loading statistics: $e');
@@ -353,6 +358,75 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     }
   }
 
+  // تحميل الأطباء النشطين الذين ليس لديهم جدول
+  Future<void> _loadDoctorsWithoutSchedule() async {
+    try {
+      final specializationsSnapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .get();
+
+      List<Map<String, dynamic>> doctorsWithoutSchedule = [];
+
+      for (var specDoc in specializationsSnapshot.docs) {
+        final specializationData = specDoc.data();
+        final specializationName = specializationData['specName'] ?? specDoc.id;
+
+        final doctorsSnapshot = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(specDoc.id)
+            .collection('doctors')
+            .where('isActive', isEqualTo: true)
+            .get();
+
+        for (var doctorDoc in doctorsSnapshot.docs) {
+          final doctorData = doctorDoc.data();
+          final doctorName = doctorData['docName'] ?? 'طبيب غير معروف';
+
+          // التحقق من وجود جدول للطبيب
+          final scheduleSnapshot = await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(doctorDoc.id)
+              .collection('schedule')
+              .get();
+
+          // إذا لم يكن لدى الطبيب جدول، أضفه للقائمة
+          if (scheduleSnapshot.docs.isEmpty) {
+            doctorsWithoutSchedule.add({
+              'doctorId': doctorDoc.id,
+              'doctorName': doctorName,
+              'specialization': specializationName,
+              'specializationId': specDoc.id,
+              'photoUrl': doctorData['photoUrl'] ?? '',
+            });
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _statistics['doctorsWithoutSchedule'] = doctorsWithoutSchedule.length;
+          _statistics['doctorsWithoutScheduleList'] = doctorsWithoutSchedule;
+          _loadingStates['doctorsWithoutSchedule'] = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading doctors without schedule: $e');
+      if (mounted) {
+        setState(() {
+          _loadingStates['doctorsWithoutSchedule'] = false;
+        });
+      }
+    }
+  }
+
   Future<Map<String, dynamic>> _calculateStatistics() async {
     Map<String, dynamic> stats = {
       'specializations': 0,
@@ -508,6 +582,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       stats['confirmedBookings'] = confirmedBookings;
       stats['totalBookings'] = totalBookings;
       stats['patients'] = uniquePatients.length;
+      stats['doctorsWithoutSchedule'] = 0;
+      stats['doctorsWithoutScheduleList'] = [];
 
     } catch (e) {
       print('Error calculating statistics: $e');
@@ -650,7 +726,162 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                         ),
                       ),
 
-                                             const SizedBox(height: 24),
+                      const SizedBox(height: 16),
+
+                      // Doctors Without Schedule - Collapsible at the top
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Column(
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _showDoctorsWithoutSchedule = !_showDoctorsWithoutSchedule;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Colors.orange[600],
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'الأطباء النشطين بدون جدول',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange[700],
+                                        ),
+                                      ),
+                                    ),
+                                    if (_loadingStates['doctorsWithoutSchedule'] == true)
+                                      SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.orange[600]!),
+                                        ),
+                                      )
+                                    else
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange[100],
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Text(
+                                          '${_statistics['doctorsWithoutSchedule']}',
+                                          style: TextStyle(
+                                            color: Colors.orange[700],
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      _showDoctorsWithoutSchedule ? Icons.expand_less : Icons.expand_more,
+                                      color: Colors.orange[700],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            if (_showDoctorsWithoutSchedule && (_statistics['doctorsWithoutSchedule'] ?? 0) > 0)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Divider(height: 1),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'الأطباء التالية أسماؤهم نشطين ولكن ليس لديهم جدول عمل محدد:',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...(_statistics['doctorsWithoutScheduleList'] as List<dynamic>).map((doctor) {
+                                      return Container(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange[50],
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Colors.orange[200]!),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 18,
+                                              backgroundColor: Colors.orange[100],
+                                              child: Text(
+                                                (doctor['doctorName'] as String).substring(0, 1),
+                                                style: TextStyle(
+                                                  color: Colors.orange[700],
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    doctor['doctorName'],
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    doctor['specialization'],
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey[600],
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Icon(
+                                              Icons.schedule,
+                                              color: Colors.orange[600],
+                                              size: 18,
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
 
                        // Period Selection
                        Container(
@@ -836,7 +1067,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 24),
+                      // تمت إضافة هذا القسم للأعلى ليكون قابل للطي/الفتح
 
                       // Summary Card
                       Container(
@@ -863,7 +1094,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                               'يحتوي المركز على ${_statistics['specializations'] ?? 0} تخصص طبي، '
                               'ويعمل فيه ${_statistics['doctors'] ?? 0} طبيب، '
                               'ويخدم ${_statistics['patients'] ?? 0} مريض، '
-                              'ويتعامل مع ${_statistics['insuranceCompanies'] ?? 0} شركات تأمين.',
+                              'ويتعامل مع ${_statistics['insuranceCompanies'] ?? 0} شركات تأمين.'
+                              '${_statistics['doctorsWithoutSchedule'] > 0 ? ' يوجد ${_statistics['doctorsWithoutSchedule']} طبيب نشط بدون جدول عمل.' : ''}',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[700],

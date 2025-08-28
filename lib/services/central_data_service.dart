@@ -25,6 +25,98 @@ class CentralDataService {
     }
   }
 
+  // ===== مزامنة التغييرات إلى جميع المراكز =====
+
+  // تحديث اسم ووصف التخصص في جميع المراكز التي تستخدمه
+  static Future<void> propagateSpecialtyUpdate({
+    required String specialtyId,
+    required String name,
+    required String description,
+  }) async {
+    try {
+      final query = await _firestore
+          .collectionGroup('specializations')
+          .where('centralSpecialtyId', isEqualTo: specialtyId)
+          .get();
+
+      final WriteBatch batch = _firestore.batch();
+      for (final doc in query.docs) {
+        batch.update(doc.reference, {
+          'specName': name,
+          'description': description,
+        });
+      }
+
+      if (query.docs.isNotEmpty) {
+        await batch.commit();
+      }
+    } catch (e) {
+      print('خطأ في مزامنة اسم التخصص إلى المراكز: $e');
+    }
+  }
+
+  // تحديث بيانات الطبيب (الاسم/الهاتف/الصورة) في جميع المراكز التي تستخدمه
+  static Future<void> propagateDoctorUpdate({
+    required String doctorId,
+    required String name,
+    String? phoneNumber,
+    String? photoUrl,
+  }) async {
+    try {
+      final query = await _firestore
+          .collectionGroup('doctors')
+          .where('centralDoctorId', isEqualTo: doctorId)
+          .get();
+
+      final WriteBatch batch = _firestore.batch();
+      for (final doc in query.docs) {
+        final Map<String, dynamic> updates = {
+          'docName': name,
+        };
+        if (phoneNumber != null) updates['phoneNumber'] = phoneNumber;
+        if (photoUrl != null) updates['photoUrl'] = photoUrl;
+        batch.update(doc.reference, updates);
+      }
+
+      if (query.docs.isNotEmpty) {
+        await batch.commit();
+      }
+    } catch (e) {
+      print('خطأ في مزامنة بيانات الطبيب إلى المراكز: $e');
+    }
+  }
+
+  // تحديث اسم/وصف/هاتف شركة التأمين في جميع المراكز التي تستخدمها
+  static Future<void> propagateInsuranceUpdate({
+    required String insuranceId,
+    required String name,
+    required String description,
+    String? phone,
+  }) async {
+    try {
+      final query = await _firestore
+          .collectionGroup('insuranceCompanies')
+          .where('centralInsuranceId', isEqualTo: insuranceId)
+          .get();
+
+      final WriteBatch batch = _firestore.batch();
+      for (final doc in query.docs) {
+        final Map<String, dynamic> updates = {
+          'name': name,
+          'description': description,
+        };
+        if (phone != null) updates['phone'] = phone;
+        batch.update(doc.reference, updates);
+      }
+
+      if (query.docs.isNotEmpty) {
+        await batch.commit();
+      }
+    } catch (e) {
+      print('خطأ في مزامنة شركة التأمين إلى المراكز: $e');
+    }
+  }
+
   // جلب جميع الأطباء من المجموعة المركزية
   static Future<List<Map<String, dynamic>>> getAllDoctors() async {
     try {
