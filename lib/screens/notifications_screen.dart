@@ -7,12 +7,14 @@ class NotificationsScreen extends StatefulWidget {
   final String userId;
   final String centerName;
   final VoidCallback? onNotificationsChanged;
+  final Function(String doctorId, String doctorName, DateTime bookingDate)? onBookingNotificationTapped;
 
   const NotificationsScreen({
     super.key,
     required this.userId,
     required this.centerName,
     this.onNotificationsChanged,
+    this.onBookingNotificationTapped,
   });
 
   @override
@@ -99,8 +101,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _navigateToDoctorBookings(Map<String, dynamic> notification) async {
-    print('Navigating to doctor bookings for notification: ${notification['id']}');
+    print('=== NAVIGATING TO DOCTOR BOOKINGS FROM NOTIFICATION ===');
+    print('Notification ID: ${notification['id']}');
     print('Current isRead status: ${notification['isRead']}');
+    print('User ID: ${widget.userId}');
+    print('User ID is null: ${widget.userId == null}');
+    print('User ID is empty: ${widget.userId.isEmpty}');
+    print('Doctor ID: ${notification['doctorId']}');
+    print('Doctor Name: ${notification['doctorName']}');
+    print('Center ID: ${notification['centerId']}');
     
     // تحديد الإشعار كمقروء عند الضغط عليه
     if (notification['isRead'] != true && notification['isRead'] != 'true') {
@@ -122,6 +131,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     }
     
+    // استخراج تاريخ الحجز من الإشعار
+    DateTime? bookingDate;
+    try {
+      if (notification['appointmentDate'] != null) {
+        bookingDate = DateTime.parse(notification['appointmentDate']);
+        print('Extracted booking date: $bookingDate');
+      }
+    } catch (e) {
+      print('Error parsing appointment date: $e');
+      bookingDate = null;
+    }
+    
+    print('🔄 Creating DoctorBookingsScreen with userId: ${widget.userId}');
+    
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -130,6 +153,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           centerId: notification['centerId'],
           centerName: widget.centerName,
           doctorName: notification['doctorName'],
+          initialDate: bookingDate, // التاريخ المحدد للحجز الجديد
+          userId: widget.userId, // تمرير معرف المستخدم لتفعيل عداد الحجوزات المؤكدة
         ),
       ),
     );

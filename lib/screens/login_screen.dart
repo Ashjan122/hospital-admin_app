@@ -123,22 +123,33 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        // Check if control credentials (super admin)
-        if (_usernameController.text.trim().toLowerCase() == 'كنترول' && _passwordController.text == '11223344') {
-          // Control login - redirect to control panel
-          await _saveLoginData('control');
-          
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-            });
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => const ControlPanelScreen(),
-              ),
-            );
+        // Check if control credentials (super admin) from database
+        final controlQuery = await FirebaseFirestore.instance
+            .collection('controlUsers')
+            .where('userName', isEqualTo: _usernameController.text.trim())
+            .get();
+
+        if (controlQuery.docs.isNotEmpty) {
+          final controlDoc = controlQuery.docs.first;
+          final controlData = controlDoc.data();
+          final controlPassword = controlData['userPassword'] ?? '';
+
+          if (controlPassword == _passwordController.text) {
+            // Control login successful
+            await _saveLoginData('control');
+            
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const ControlPanelScreen(),
+                ),
+              );
+            }
+            return;
           }
-          return;
         }
         
         // First, check if it's a user login
@@ -240,35 +251,38 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         // If not a user login, check if admin credentials (center ID or name)
-        if (_passwordController.text == '12345678') {
-          // Check if username is a center ID or name
-          final centerQuery = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .where('available', isEqualTo: true)
-              .get();
+        // Check if username is a center ID or name
+        final centerQuery = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .where('available', isEqualTo: true)
+            .get();
 
-          bool isAdminLogin = false;
-          String centerId = '';
-          String centerName = '';
+        bool isAdminLogin = false;
+        String centerId = '';
+        String centerName = '';
+        String centerPassword = '';
 
-          for (var doc in centerQuery.docs) {
-            final centerData = doc.data();
-            final centerDocId = doc.id;
-            final centerDocName = centerData['name'] ?? '';
+        for (var doc in centerQuery.docs) {
+          final centerData = doc.data();
+          final centerDocId = doc.id;
+          final centerDocName = centerData['name'] ?? '';
 
-            // Check if username matches center ID or name (case insensitive)
-            if (_usernameController.text.trim() == centerDocId || 
-                _usernameController.text.trim().toLowerCase() == centerDocName.toLowerCase() ||
-                _usernameController.text.trim().toLowerCase().contains(centerDocName.toLowerCase()) ||
-                centerDocName.toLowerCase().contains(_usernameController.text.trim().toLowerCase())) {
-              isAdminLogin = true;
-              centerId = centerDocId;
-              centerName = centerDocName;
-              break;
-            }
+          // Check if username matches center ID or name (case insensitive)
+          if (_usernameController.text.trim() == centerDocId || 
+              _usernameController.text.trim().toLowerCase() == centerDocName.toLowerCase() ||
+              _usernameController.text.trim().toLowerCase().contains(centerDocName.toLowerCase()) ||
+              centerDocName.toLowerCase().contains(_usernameController.text.trim().toLowerCase())) {
+            isAdminLogin = true;
+            centerId = centerDocId;
+            centerName = centerDocName;
+            centerPassword = centerData['adminPassword'] ?? '12345678'; // Default password if not set
+            break;
           }
+        }
 
-          if (isAdminLogin) {
+        if (isAdminLogin) {
+          // Check if password matches
+          if (_passwordController.text == centerPassword) {
             // Save admin login data
             await _saveLoginData('admin', centerId: centerId, centerName: centerName);
             
@@ -287,25 +301,25 @@ class _LoginScreenState extends State<LoginScreen> {
               );
             }
           } else {
-            // Not a valid center, show error
+            // Invalid password for center
             setState(() {
               _isLoading = false;
             });
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('اسم المركز غير موجود أو غير مفعل'),
+                content: Text('كلمة المرور غير صحيحة'),
                 backgroundColor: Colors.red,
               ),
             );
           }
         } else {
-          // Invalid credentials for admin
+          // Not a valid center, show error
           setState(() {
             _isLoading = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('اسم المستخدم أو كلمة المرور غير صحيحة'),
+              content: Text('اسم المركز غير موجود أو غير مفعل'),
               backgroundColor: Colors.red,
             ),
           );

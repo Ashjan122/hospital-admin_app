@@ -174,11 +174,8 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
       
       final uploadTask = storageRef.putFile(_selectedImageFile!, metadata);
       
-      // مراقبة تقدم الرفع
-      uploadTask.snapshotEvents.listen((snapshot) {
-        final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-        // Upload progress: ${(progress * 100).toStringAsFixed(1)}%
-      });
+      // مراقبة تقدم الرفع (بدون استخدام متغيرات محلية لتفادي تحذيرات اللينتر)
+      uploadTask.snapshotEvents.listen((_) {});
       
       // انتظار اكتمال الرفع
       final snapshot = await uploadTask;
@@ -752,6 +749,70 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
     }
   }
 
+  Future<void> toggleDoctorBooking(bool isEnabled) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // البحث عن الطبيب في جميع التخصصات
+      final specializationsSnapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .get();
+
+      for (var specDoc in specializationsSnapshot.docs) {
+        final doctorDoc = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(specDoc.id)
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .get();
+
+        if (doctorDoc.exists) {
+          // تحديث حالة تفعيل الحجز للطبيب
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(widget.doctorId)
+              .update({
+            'isBookingEnabled': isEnabled,
+          });
+
+          // تحديث البيانات المحلية
+          if (_doctorData != null) {
+            _doctorData!['isBookingEnabled'] = isEnabled;
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isEnabled ? 'تم تفعيل الحجز للطبيب' : 'تم إيقاف الحجز للطبيب'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          break;
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ في تحديث حالة الحجز'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   void _showImagePickerDialog(BuildContext context) {
     _showImageSourceDialog();
   }
@@ -859,6 +920,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
             final phoneNumber = doctorData['phoneNumber'] ?? 'غير متوفر';
             final isActive = doctorData['isActive'] ?? true;
+            final isBookingEnabled = doctorData['isBookingEnabled'] ?? true;
 
             // تعيين القيم في controllers إذا لم تكن محددة
             if (!_isEditing) {
@@ -1045,6 +1107,64 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Booking status indicator (tappable toggle)
+                  InkWell(
+                    onTap: _isLoading ? null : () {
+                      toggleDoctorBooking(!isBookingEnabled);
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: isBookingEnabled ? Colors.green[50] : Colors.orange[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isBookingEnabled ? Colors.green[200]! : Colors.orange[200]!,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isBookingEnabled ? Icons.play_circle : Icons.pause_circle,
+                            color: isBookingEnabled ? Colors.green : Colors.orange,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isBookingEnabled ? 'الحجز مُفعّل' : 'الحجز متوقف',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isBookingEnabled ? Colors.green[700] : Colors.orange[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'اضغط للتبديل',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_isLoading)
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

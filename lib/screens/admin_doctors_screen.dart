@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'admin_doctor_details_screen.dart';
 import 'add_doctor_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class AdminDoctorsScreen extends StatefulWidget {
   final String? centerId;
@@ -28,16 +30,136 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
   static const int _pageSize = 10;
   int _refreshKey = 0;
 
+  // Cache keys and duration
+  static const String _cacheKey = 'allDoctorsCache';
+  static const String _cacheTimestampKey = 'doctorsCacheTimestamp';
+  static const Duration _cacheValidDuration = Duration(hours: 1); // Cache for 1 hour
+
   @override
   void initState() {
     super.initState();
-    fetchAllDoctors();
+    _loadDataWithCache();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // دالة تحميل البيانات مع Cache
+  Future<void> _loadDataWithCache() async {
+    // محاولة تحميل البيانات من Cache أولاً
+    final cachedData = await _loadFromCache();
+    if (cachedData != null) {
+      setState(() {
+        _allDoctors = cachedData;
+        _currentPage = 0;
+        _hasMoreData = cachedData.length > _pageSize;
+        _isLoadingMore = false;
+        _isInitialLoading = false;
+      });
+    }
+    
+    // تحميل البيانات الجديدة من Firebase في الخلفية
+    _fetchDataInBackground();
+  }
+
+  // دالة تحميل البيانات من Cache
+  Future<List<Map<String, dynamic>>?> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(_cacheKey);
+      final timestamp = prefs.getInt(_cacheTimestampKey);
+      
+      if (cachedData != null && timestamp != null) {
+        final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
+        final isValid = cacheAge < _cacheValidDuration.inMilliseconds;
+        
+        if (isValid) {
+          final List<dynamic> decoded = jsonDecode(cachedData);
+          return decoded.cast<Map<String, dynamic>>();
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error loading from cache: $e');
+      return null;
+    }
+  }
+
+  // دالة حفظ البيانات في Cache
+  Future<void> _saveToCache(List<Map<String, dynamic>> doctors) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encodedData = jsonEncode(doctors);
+      await prefs.setString(_cacheKey, encodedData);
+      await prefs.setInt(_cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
+      print('Doctors data cached successfully');
+    } catch (e) {
+      print('Error saving to cache: $e');
+    }
+  }
+
+  // دالة حذف Cache
+  Future<void> _clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey);
+      await prefs.remove(_cacheTimestampKey);
+      print('Cache cleared successfully');
+    } catch (e) {
+      print('Error clearing cache: $e');
+    }
+  }
+
+  // دالة تحميل البيانات في الخلفية
+  Future<void> _fetchDataInBackground() async {
+    try {
+      final newData = await _fetchDoctorsFromFirebase();
+      if (newData.isNotEmpty) {
+        setState(() {
+          _allDoctors = newData;
+          _currentPage = 0;
+          _hasMoreData = newData.length > _pageSize;
+          _isLoadingMore = false;
+          _isInitialLoading = false;
+        });
+        // حفظ البيانات الجديدة في Cache
+        await _saveToCache(newData);
+      }
+    } catch (e) {
+      print('Background fetch error: $e');
+    }
+  }
+
+  // دالة جلب البيانات من Firebase
+  Future<List<Map<String, dynamic>>> _fetchDoctorsFromFirebase() async {
+    if (widget.centerId == null) {
+      return [];
+    }
+
+    try {
+      final specializationsSnapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .get()
+          .timeout(const Duration(seconds: 8));
+
+      List<Map<String, dynamic>> allDoctors = [];
+      List<Future<void>> futures = [];
+      
+      for (var specDoc in specializationsSnapshot.docs) {
+        futures.add(_fetchDoctorsFromSpecialization(specDoc, allDoctors));
+      }
+      
+      await Future.wait(futures);
+      return allDoctors;
+    } catch (e) {
+      print('Error fetching doctors from Firebase: $e');
+      return [];
+    }
   }
 
   Future<void> fetchAllDoctors() async {
@@ -443,8 +565,10 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
         final photoUrl = doctorData['photoUrl'] ?? 
             'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
         final doctorId = doctorData['doctorId'] ?? '';
+        final isBookingEnabled = doctorData['isBookingEnabled'] ?? true;
 
         return Card(
+          color: isBookingEnabled ? Colors.white : Colors.orange[50],
           margin: EdgeInsets.only(bottom: 12),
           elevation: 2,
           shape: RoundedRectangleBorder(
@@ -515,7 +639,12 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
                     centerName: widget.centerName,
                   ),
                 ),
-              );
+              ).then((result) {
+                // تحديث القائمة عند العودة من تفاصيل الطبيب
+                if (mounted) {
+                  fetchAllDoctors();
+                }
+              });
             },
           ),
         );

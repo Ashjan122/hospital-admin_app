@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import 'package:http/http.dart' as http;
 import '../services/sms_service.dart';
+import 'doctor_bookings_screen.dart';
 
 class DoctorUserScreen extends StatefulWidget {
   final String doctorId;
@@ -191,14 +192,14 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
     }
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'حجوزات اليوم - د. ${widget.doctorName}',
+            'د. ${widget.doctorName}',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -212,21 +213,6 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
               icon: const Icon(Icons.refresh),
               onPressed: _refreshing ? null : _refreshBookings,
               tooltip: 'تحديث',
-            ),
-             IconButton(
-               icon: const Icon(Icons.schedule),
-               onPressed: () {
-                 Navigator.of(context).push(
-                   MaterialPageRoute(
-                     builder: (context) => _ScheduledAppointmentsScreen(
-                       doctorId: widget.doctorId,
-                       centerId: widget.centerId,
-                       doctorName: widget.doctorName,
-                     ),
-                   ),
-                 );
-               },
-               tooltip: 'المواعيد المجدولة',
             ),
             IconButton(
               icon: const Icon(Icons.logout),
@@ -242,286 +228,178 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
                     color: Color(0xFF2FBDAF),
                   ),
                 )
-              : _todayBookings.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.event_busy,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'لا توجد حجوزات اليوم',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'ستظهر هنا الحجوزات الجديدة',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                                     : RefreshIndicator(
-                       onRefresh: _refreshBookings,
-                       color: const Color(0xFF2FBDAF),
-                       child: SingleChildScrollView(
-                         padding: const EdgeInsets.all(16),
-                         child: Column(
-                           children: [
-                             // تاريخ اليوم أعلى الصفحة
-                             Padding(
-                               padding: const EdgeInsets.only(bottom: 12),
-                               child: Align(
-                                 alignment: Alignment.centerRight,
-                                 child: Text(
-                                   intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now()),
-                                   style: TextStyle(
-                                     fontSize: 16,
-                                     color: Colors.grey[700],
-                                     fontWeight: FontWeight.w600,
-                                   ),
-                                 ),
-                               ),
-                             ),
-                                                           // رأس الجدول
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2FBDAF),
-                                  borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(12),
-                                    topRight: Radius.circular(12),
-                                  ),
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        flex: 1,
-                                        child: Text(
-                                          'رقم',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(width: 12),
-                                      Expanded(
-                                        flex: 9,
-                                        child: Text(
-                                          'اسم المريض',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          '',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+              : RefreshIndicator(
+                  onRefresh: _refreshBookings,
+                  color: const Color(0xFF2FBDAF),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        // تاريخ اليوم أعلى الصفحة
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now()),
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w600,
                               ),
-                             
-                                                           // صفوف الجدول
-                              ...List.generate(_todayBookings.length, (index) {
-                                final booking = _todayBookings[index];
-                                final patientName = booking['patientName'] ?? 'مريض غير معروف';
-                                final time = booking['time'] ?? '';
-                                final period = booking['period'] ?? '';
-                                
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: index.isEven ? Colors.grey[50] : Colors.white,
-                                    border: Border(
-                                      bottom: BorderSide(
-                                        color: Colors.grey[300]!,
-                                        width: 1,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
-                                            '${_todayBookings.length - index}',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 12),
-                                        Expanded(
-                                          flex: 7,
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                patientName,
-                                                style: const TextStyle(
-                                              fontSize: 14,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '${formatTime(time)} • ${getPeriodText(period)}',
-                                            style: TextStyle(
-                                                  fontSize: 12,
-                                              color: Colors.grey[600],
-                                                  fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                            ],
-                                        ),
-                                        ),
-                                        SizedBox(width: 12),
-                                        Expanded(
-                                          flex: 2,
-                                          child: ElevatedButton(
-                                            onPressed: () {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (context) => Directionality(
-                                                    textDirection: TextDirection.rtl,
-                                                    child: Scaffold(
-                                                      appBar: AppBar(
-                                                        title: Text(patientName),
-                                                        backgroundColor: const Color(0xFF2FBDAF),
-                                                        foregroundColor: Colors.white,
-                                                        elevation: 0,
-                                                      ),
-                                                      body: SafeArea(
-                                                        child: Padding(
-                                                          padding: const EdgeInsets.all(16),
-                                                          child: GridView.count(
-                                                            crossAxisCount: 2,
-                                                            crossAxisSpacing: 16,
-                                                            mainAxisSpacing: 16,
-                                                            children: [
-                                                              _buildGridItem(
-                                                                icon: Icons.note,
-                                                                title: 'ملاحظات',
-                                                                color: Colors.blue,
-                                                                onTap: () {
-                                                                  final patientPhone = booking['patientPhone'] ?? '';
-                                                                  Navigator.of(context).push(
-                                                                    MaterialPageRoute(
-                                                                      builder: (context) => _PatientNotesScreen(
-                                                                        doctorId: widget.doctorId,
-                                                                        centerId: widget.centerId,
-                                                                        patientName: patientName,
-                                                                        patientPhone: patientPhone,
-                                                                      ),
-                                                                    ),
-                                                                  );
-                                                                },
-                                                              ),
-                                                              _buildGridItem(
-                                                                icon: Icons.person,
-                                                                title: 'تفاصيل المريض',
-                                                                color: Colors.green,
-                                                                onTap: () {
-                                                                  Navigator.of(context).push(
-                                                                    MaterialPageRoute(
-                                                                      builder: (context) => _PatientDetailsScreen(
-                                                                        booking: booking,
-                                                                      ),
-                                                                    ),
-                                                                  );
-                                                                },
-                                                              ),
-                                                              _buildGridItem(
-                                                                icon: Icons.message,
-                                                                title: 'رسالة للمريض',
-                                                                color: Colors.orange,
-                                                                onTap: () {
-                                                                  Navigator.of(context).push(
-                                                                    MaterialPageRoute(
-                                                                      builder: (context) => _MessageScreen(
-                                                                        booking: booking,
-                                                                      ),
-                                                                    ),
-                                                                  );
-                                                                },
-                                                              ),
-                                                              _buildGridItem(
-                                                                icon: Icons.schedule,
-                                                                title: 'تحديد موعد',
-                                                                color: Colors.purple,
-                                                                onTap: () {
-                                                                  Navigator.of(context).push(
-                                                                    MaterialPageRoute(
-                                                                      builder: (context) => _ScheduleAppointmentScreen(
-                                                                        doctorId: widget.doctorId,
-                                                                        centerId: widget.centerId,
-                                                                        doctorName: widget.doctorName,
-                                                                        patientName: patientName,
-                                                                        patientPhone: booking['patientPhone'] ?? '',
-                                                                      ),
-                                                                    ),
-                                                                  );
-                                                                },
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: const Color(0xFF2FBDAF),
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                            ),
-                                            child: const Text(
-                                              'عرض',
-                                              style: TextStyle(fontSize: 11),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                            ),
+                          ),
+                        ),
+                        
+                        // GridView للبطاقات الأربع
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          children: [
+                            // بطاقة حجوزات اليوم
+                            _buildDashboardCard(
+                              context,
+                              'حجوزات اليوم',
+                              Icons.today,
+                              const Color(0xFF2FBDAF),
+                              '',
+                              () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => DoctorBookingsScreen(
+                                      doctorId: widget.doctorId,
+                                      centerId: widget.centerId,
+                                      centerName: widget.centerName,
+                                      doctorName: widget.doctorName,
                                     ),
                                   ),
                                 );
-                              }),
-                              
-                           ],
-                         ),
-                       ),
-                     ),
+                              },
+                            ),
+                            
+                            // بطاقة المواعيد المجدولة
+                            _buildDashboardCard(
+                              context,
+                              'المواعيد المجدولة',
+                              Icons.schedule,
+                              Colors.orange,
+                              '',
+                              () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => _ScheduledAppointmentsScreen(
+                                      doctorId: widget.doctorId,
+                                      centerId: widget.centerId,
+                                      doctorName: widget.doctorName,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            
+                            // بطاقة المفضلون
+                            _buildDashboardCard(
+                              context,
+                              'المفضلون',
+                              Icons.favorite,
+                              Colors.red,
+                              '',
+                              () {
+                                // يمكن إضافة صفحة المفضلون هنا
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('قريباً - صفحة المفضلون')),
+                                );
+                              },
+                            ),
+                            
+                            // بطاقة الإحصائيات
+                            _buildDashboardCard(
+                              context,
+                              'الإحصائيات',
+                              Icons.analytics,
+                              Colors.purple,
+                              '',
+                              () {
+                                // يمكن إضافة صفحة الإحصائيات هنا
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('قريباً - صفحة الإحصائيات')),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardCard(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+    String count,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey[300]!),
+      ),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 48,
+                color: color,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (count.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    count,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -1260,10 +1138,40 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
         _selectedDate.day,
       );
 
-      // حفظ الموعد في Firestore
+      // البحث عن التخصص الذي ينتمي إليه الطبيب
+      final specializationsSnapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .get();
+
+      String? specializationId;
+      for (var specDoc in specializationsSnapshot.docs) {
+        final doctorDoc = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(specDoc.id)
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .get();
+
+        if (doctorDoc.exists) {
+          specializationId = specDoc.id;
+          break;
+        }
+      }
+
+      if (specializationId == null) {
+        throw Exception('لم يتم العثور على تخصص الطبيب');
+      }
+
+      // حفظ الموعد في التخصص الصحيح
       await FirebaseFirestore.instance
           .collection('medicalFacilities')
           .doc(widget.centerId)
+          .collection('specializations')
+          .doc(specializationId)
           .collection('doctors')
           .doc(widget.doctorId)
           .collection('scheduledAppointments')
@@ -1462,21 +1370,49 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
 
   Future<List<Map<String, dynamic>>> _fetchScheduledAppointments() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
+      // البحث في جميع التخصصات للعثور على الطبيب
+      final specializationsSnapshot = await FirebaseFirestore.instance
           .collection('medicalFacilities')
           .doc(widget.centerId)
-          .collection('doctors')
-          .doc(widget.doctorId)
-          .collection('scheduledAppointments')
-          .where('status', isEqualTo: 'scheduled')
-          .orderBy('appointmentDate')
+          .collection('specializations')
           .get();
 
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['appointmentId'] = doc.id;
-        return data;
-      }).toList();
+      List<Map<String, dynamic>> allScheduledAppointments = [];
+
+      for (var specDoc in specializationsSnapshot.docs) {
+        final doctorDoc = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(specDoc.id)
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .get();
+
+        if (doctorDoc.exists) {
+          // جلب المواعيد المجدولة من هذا التخصص
+          final scheduledAppointmentsSnapshot = await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(widget.doctorId)
+              .collection('scheduledAppointments')
+              .where('status', isEqualTo: 'scheduled')
+              .get();
+
+          for (var appointmentDoc in scheduledAppointmentsSnapshot.docs) {
+            final appointmentData = appointmentDoc.data();
+            appointmentData['appointmentId'] = appointmentDoc.id;
+            appointmentData['specializationId'] = specDoc.id;
+            allScheduledAppointments.add(appointmentData);
+          }
+          break; // وجدنا الطبيب، لا نحتاج للبحث في تخصصات أخرى
+        }
+      }
+
+      return allScheduledAppointments;
     } catch (e) {
       print('Error fetching scheduled appointments: $e');
       return [];
@@ -1508,17 +1444,48 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
 
     if (confirmed == true) {
       try {
-        await FirebaseFirestore.instance
+        // البحث عن التخصص الذي يحتوي على الموعد
+        final specializationsSnapshot = await FirebaseFirestore.instance
             .collection('medicalFacilities')
             .doc(widget.centerId)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .collection('scheduledAppointments')
-            .doc(appointmentId)
-            .update({
-          'status': 'cancelled',
-          'cancelledAt': FieldValue.serverTimestamp(),
-        });
+            .collection('specializations')
+            .get();
+
+        bool appointmentFound = false;
+        for (var specDoc in specializationsSnapshot.docs) {
+          final appointmentDoc = await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(widget.doctorId)
+              .collection('scheduledAppointments')
+              .doc(appointmentId)
+              .get();
+
+          if (appointmentDoc.exists) {
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .doc(widget.doctorId)
+                .collection('scheduledAppointments')
+                .doc(appointmentId)
+                .update({
+              'status': 'cancelled',
+              'cancelledAt': FieldValue.serverTimestamp(),
+            });
+            appointmentFound = true;
+            break;
+          }
+        }
+
+        if (!appointmentFound) {
+          throw Exception('لم يتم العثور على الموعد');
+        }
 
         if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1815,21 +1782,101 @@ class _ScheduledAppointmentsList extends StatelessWidget {
 
   Future<List<Map<String, dynamic>>> _fetchScheduledAppointments() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
+      print('Fetching scheduled appointments for doctor: $doctorId in center: $centerId');
+      
+      // البحث في التخصصات أولاً
+      final specializationsSnapshot = await FirebaseFirestore.instance
           .collection('medicalFacilities')
           .doc(centerId)
-          .collection('doctors')
-          .doc(doctorId)
-          .collection('scheduledAppointments')
-          .where('status', isEqualTo: 'scheduled')
-          .orderBy('appointmentDate')
+          .collection('specializations')
           .get();
 
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['appointmentId'] = doc.id;
-        return data;
-      }).toList();
+      print('Found ${specializationsSnapshot.docs.length} specializations');
+
+      List<Map<String, dynamic>> allScheduledAppointments = [];
+      List<Map<String, dynamic>> allAppointments = []; // للتصحيح
+
+      for (var specDoc in specializationsSnapshot.docs) {
+        print('Checking specialization: ${specDoc.id}');
+        
+        final doctorDoc = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(centerId)
+            .collection('specializations')
+            .doc(specDoc.id)
+            .collection('doctors')
+            .doc(doctorId)
+            .get();
+
+        if (doctorDoc.exists) {
+          print('Found doctor in specialization: ${specDoc.id}');
+          
+          // البحث في جميع المواعيد أولاً للتصحيح
+          final allAppointmentsSnapshot = await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(doctorId)
+              .collection('scheduledAppointments')
+              .get();
+
+          print('Found ${allAppointmentsSnapshot.docs.length} total appointments in specialization ${specDoc.id}');
+
+          for (var appointmentDoc in allAppointmentsSnapshot.docs) {
+            final appointmentData = appointmentDoc.data();
+            appointmentData['appointmentId'] = appointmentDoc.id;
+            appointmentData['specializationId'] = specDoc.id;
+            allAppointments.add(appointmentData);
+            
+            final status = appointmentData['status']?.toString() ?? '';
+            print('Appointment: ${appointmentData['patientName']} - Status: $status - Date: ${appointmentData['appointmentDate']}');
+          }
+          
+          // البحث في المواعيد المجدولة فقط
+          final scheduledAppointmentsSnapshot = await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(doctorId)
+              .collection('scheduledAppointments')
+              .where('status', isEqualTo: 'scheduled')
+              .get();
+
+          print('Found ${scheduledAppointmentsSnapshot.docs.length} scheduled appointments in specialization ${specDoc.id}');
+
+          for (var appointmentDoc in scheduledAppointmentsSnapshot.docs) {
+            final appointmentData = appointmentDoc.data();
+            appointmentData['appointmentId'] = appointmentDoc.id;
+            appointmentData['specializationId'] = specDoc.id;
+            allScheduledAppointments.add(appointmentData);
+            print('Added scheduled appointment: ${appointmentData['patientName']} on ${appointmentData['appointmentDate']}');
+          }
+          break; // وجدنا الطبيب، لا نحتاج للبحث في تخصصات أخرى
+        }
+      }
+
+      print('=== DEBUG INFO ===');
+      print('Total appointments found: ${allAppointments.length}');
+      print('Total scheduled appointments found: ${allScheduledAppointments.length}');
+      
+      // ترتيب المواعيد حسب التاريخ
+      allScheduledAppointments.sort((a, b) {
+        final dateA = DateTime.tryParse(a['appointmentDate'] ?? '');
+        final dateB = DateTime.tryParse(b['appointmentDate'] ?? '');
+        
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return 1;
+        if (dateB == null) return -1;
+        
+        return dateA.compareTo(dateB); // ترتيب تصاعدي (الأقدم أولاً)
+      });
+
+      print('Total scheduled appointments found: ${allScheduledAppointments.length}');
+      return allScheduledAppointments;
     } catch (e) {
       print('Error fetching scheduled appointments: $e');
       return [];
@@ -1861,17 +1908,48 @@ class _ScheduledAppointmentsList extends StatelessWidget {
 
     if (confirmed == true) {
       try {
-        await FirebaseFirestore.instance
+        // البحث عن الموعد في التخصصات
+        final specializationsSnapshot = await FirebaseFirestore.instance
             .collection('medicalFacilities')
             .doc(centerId)
-            .collection('doctors')
-            .doc(doctorId)
-            .collection('scheduledAppointments')
-            .doc(appointmentId)
-            .update({
-          'status': 'cancelled',
-          'cancelledAt': FieldValue.serverTimestamp(),
-        });
+            .collection('specializations')
+            .get();
+
+        bool appointmentFound = false;
+        for (var specDoc in specializationsSnapshot.docs) {
+          final appointmentDoc = await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(doctorId)
+              .collection('scheduledAppointments')
+              .doc(appointmentId)
+              .get();
+
+          if (appointmentDoc.exists) {
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .doc(doctorId)
+                .collection('scheduledAppointments')
+                .doc(appointmentId)
+                .update({
+              'status': 'cancelled',
+              'cancelledAt': FieldValue.serverTimestamp(),
+            });
+            appointmentFound = true;
+            break;
+          }
+        }
+
+        if (!appointmentFound) {
+          throw Exception('لم يتم العثور على الموعد');
+        }
 
         onAppointmentChanged();
       } catch (e) {

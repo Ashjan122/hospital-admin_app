@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:open_filex/open_filex.dart';
+// إزالة http لعدم الحاجة بعد حذف اختبار الرابط
+import 'package:hospital_admin_app/services/app_update_service.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
@@ -19,10 +16,7 @@ class _AboutScreenState extends State<AboutScreen> {
   String _firebaseVersion = '';
   String? _updateUrl;
   bool _isLoading = true;
-  bool _isUpdating = false;
-  double _downloadProgress = 0.0;
-  String _updateStatus = '';
-  bool _forceSimulation = false; // خيار إجباري للمحاكاة (غير مستخدم الآن)
+  // أزلنا حالة التحديث داخل التطبيق
 
   @override
   void initState() {
@@ -35,10 +29,7 @@ class _AboutScreenState extends State<AboutScreen> {
     super.dispose();
   }
 
-  void _safeSetState(VoidCallback fn) {
-    if (!mounted) return;
-    setState(fn);
-  }
+  // أزلنا الدالة المساعدة غير المستخدمة
 
   Future<void> _loadData() async {
     try {
@@ -85,434 +76,32 @@ class _AboutScreenState extends State<AboutScreen> {
 
   Future<void> _handleCheckAndUpdate() async {
     try {
-      if (_firebaseVersion.isEmpty || _updateUrl == null) {
+      if (_updateUrl == null || _updateUrl!.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('بيانات التحديث غير متاحة حالياً')),
+          const SnackBar(content: Text('رابط التحديث غير متاح حالياً')),
         );
         return;
       }
-
-      // مقارنة الإصدارات بصيغة x.y.z
-      int _cmp(String a, String b) {
-        final ap = a.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-        final bp = b.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-        while (ap.length < bp.length) ap.add(0);
-        while (bp.length < ap.length) bp.add(0);
-        for (int i = 0; i < ap.length; i++) {
-          if (ap[i] < bp[i]) return -1;
-          if (ap[i] > bp[i]) return 1;
-        }
-        return 0;
-      }
-
-      final comparison = _cmp(_currentVersion, _firebaseVersion);
-      if (comparison < 0) {
-        // يوجد تحديث - عرض تأكيد التحديث
-        final shouldUpdate = await _showUpdateDialog();
-        if (shouldUpdate) {
-          await _performInAppUpdate();
-        }
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('التطبيق محدث'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      await AppUpdateService.openUpdateUrl(_updateUrl!);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذر فحص التحديث: $e')),
+        SnackBar(content: Text('تعذر فتح رابط التحديث: $e')),
       );
     }
   }
 
-  Future<bool> _showUpdateDialog() async {
-    return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('تحديث متاح'),
-        content: Text(
-          'يوجد إصدار جديد متاح: $_firebaseVersion\n'
-          'الإصدار الحالي: $_currentVersion\n\n'
-          'هل تريد تحديث التطبيق الآن؟',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('لاحقاً'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2FBDAF),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('تحديث الآن'),
-          ),
-        ],
-      ),
-    ) ?? false;
-  }
+  // أزلنا حوار التأكيد، الزر يفتح المتصفح مباشرة
 
-  Future<void> _performInAppUpdate() async {
-    if (_updateUrl == null || _updateUrl!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('رابط التحديث غير متاح'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+  // تم استبدال التحديث الداخلي بفتح الرابط في المتصفح مباشرة من أماكن الاستدعاء.
 
-    _safeSetState(() {
-      _isUpdating = true;
-      _downloadProgress = 0.0;
-      _updateStatus = 'جاري بدء التحديث...';
-    });
+  // لم نعد نستخدم مسار التثبيت داخل التطبيق، لذلك أزلنا أذونات التثبيت.
 
-    try {
-      // التحديث الحقيقي دائماً
-      print('Starting real update process...');
-      await _performRealUpdate();
-      
-      // تحديث الإصدار في التطبيق
-      if (!mounted) return;
-      _safeSetState(() {
-        _currentVersion = _firebaseVersion;
-      });
+  // تم إزالة وظيفة اختبار الرابط بعد إلغاء زر الاختبار.
 
-      // عرض رسالة نجاح
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم تحديث التطبيق بنجاح!\nالإصدار الجديد: $_firebaseVersion'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+  // أزلنا منطق التحميل والتثبيت داخل التطبيق.
 
-    } catch (e) {
-      print('Error in in-app update: $e');
-      
-      String errorMessage = 'خطأ في التحديث';
-      
-      if (e.toString().contains('SocketException')) {
-        errorMessage = 'خطأ في الاتصال بالإنترنت. تأكد من اتصالك بالشبكة.';
-      } else if (e.toString().contains('HttpException')) {
-        errorMessage = 'خطأ في الرابط. تأكد من صحة رابط التحديث.';
-      } else if (e.toString().contains('Permission')) {
-        errorMessage = 'مطلوب إذن الكتابة للتخزين.';
-      } else if (e.toString().contains('simulation')) {
-        errorMessage = 'خطأ في محاكاة التحديث.';
-      } else if (e.toString().contains('production')) {
-        errorMessage = 'خطأ في التحديث الحقيقي.';
-      }
-      
-      _safeSetState(() {
-        _updateStatus = 'فشل في التحديث: $errorMessage';
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
-    } finally {
-      _safeSetState(() {
-        _isUpdating = false;
-      });
-    }
-  }
-
-  // يتأكد من إذن تثبيت التطبيقات من خارج المتجر. يطلب الإذن أو يفتح الإعدادات عند الرفض
-  Future<bool> _ensureInstallPermission() async {
-    try {
-      // بعض الأجهزة لا تدعم هذا الإذن برمجياً، سنحاول بأفضل المتاح
-      var status = await Permission.requestInstallPackages.status;
-      if (status.isGranted) return true;
-
-      status = await Permission.requestInstallPackages.request();
-      if (status.isGranted) return true;
-
-      // إذا رفض المستخدم، نعرض حوار مع زر لفتح الإعدادات
-      if (!mounted) return false;
-      final openSettings = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          title: const Text('السماح بالتثبيت'),
-          content: const Text(
-            'لتثبيت التحديث، يجب السماح للتطبيق بتثبيت التطبيقات من خارج المتجر.\n'
-            'افتح الإعدادات وقم بتفعيل الخيار ثم عد للتطبيق وأعد المحاولة.'
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await openAppSettings();
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context, true);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2FBDAF),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('فتح الإعدادات'),
-            ),
-          ],
-        ),
-      ) ?? false;
-
-      if (!openSettings) return false;
-
-      // بعد العودة من الإعدادات، نفحص مجدداً
-      final recheck = await Permission.requestInstallPackages.status;
-      return recheck.isGranted;
-    } catch (e) {
-      // إذا فشلنا لأسباب تتعلق بالإصدار، نسمح بالمتابعة ومحاولة الفتح مباشرة
-      print('ensureInstallPermission fallback: $e');
-      return true;
-    }
-  }
-
-  // دالة للتحقق من صحة رابط التحديث (للمساعدة في التشخيص)
-  Future<bool> _isUpdateUrlValid() async {
-    try {
-      if (_updateUrl == null || _updateUrl!.isEmpty) {
-        print('No update URL provided');
-        return false;
-      }
-      
-      String cleanUrl = _updateUrl!;
-      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-        cleanUrl = 'https://$cleanUrl';
-      }
-      
-      if (!cleanUrl.toLowerCase().contains('.apk')) {
-        print('URL does not contain APK file');
-        return false;
-      }
-      
-      final response = await http.head(Uri.parse(cleanUrl));
-      print('URL validation response: ${response.statusCode}');
-      
-      return response.statusCode == 200;
-    } catch (e) {
-      print('URL validation failed: $e');
-      return false;
-    }
-  }
-
-  Future<void> _performRealUpdate() async {
-    try {
-      print('Starting real update process...');
-      
-      // مرحلة 1: التحضير (لا حاجة لإذن تخزين عند استخدام مجلد التطبيق المؤقت)
-      _safeSetState(() {
-        _updateStatus = 'جاري التحضير...';
-        _downloadProgress = 0.1;
-      });
-
-      // مرحلة 2: تحميل التحديث
-      _safeSetState(() {
-        _updateStatus = 'جاري تحميل التحديث...';
-        _downloadProgress = 0.3;
-      });
-
-      String cleanUrl = _updateUrl!;
-      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-        cleanUrl = 'https://$cleanUrl';
-      }
-      
-      print('Downloading from: $cleanUrl');
-
-      http.Response response;
-      try {
-        response = await http.get(
-          Uri.parse(cleanUrl),
-          headers: {'User-Agent': 'HospitalAdminApp/1.0'},
-        );
-        if (!mounted) return;
-
-        print('Download response: ${response.statusCode}');
-        
-        if (response.statusCode != 200) {
-          throw Exception('فشل في تحميل التحديث: ${response.statusCode}');
-        }
-        
-        if (response.bodyBytes.isEmpty) {
-          throw Exception('الملف المحمل فارغ');
-        }
-        
-        print('Download completed, file size: ${response.bodyBytes.length} bytes');
-      } catch (e) {
-        print('Download error: $e');
-        throw Exception('خطأ في التحميل: $e');
-      }
-
-      // مرحلة 3: حفظ الملف في مجلد مؤقت خاص بالتطبيق (لا يتطلب إذن تخزين)
-      _safeSetState(() {
-        _updateStatus = 'جاري حفظ الملف...';
-        _downloadProgress = 0.7;
-      });
-
-      try {
-        final tempDir = await getTemporaryDirectory();
-        print('Temp directory: ${tempDir.path}');
-
-        final file = File('${tempDir.path}/hospital_admin_update.apk');
-        await file.writeAsBytes(response.bodyBytes, flush: true);
-        
-        print('File saved successfully');
-      } catch (e) {
-        print('File save error: $e');
-        throw Exception('خطأ في حفظ الملف: $e');
-      }
-
-      // مرحلة 4: فتح ملف التثبيت عبر النظام
-      _safeSetState(() {
-        _updateStatus = 'جاري فتح ملف التثبيت...';
-        _downloadProgress = 0.9;
-      });
-
-      try {
-        // طلب إذن تثبيت الحزم من المستخدم بشكل صريح وفتح الإعدادات إن لزم
-        final granted = await _ensureInstallPermission();
-        if (!granted) {
-          throw Exception('لم يتم منح إذن التثبيت');
-        }
-
-        // استخدام نفس المجلد المؤقت الذي حفظنا به الملف
-        final tempDir = await getTemporaryDirectory();
-        final filePath = '${tempDir.path}/hospital_admin_update.apk';
-        final apkFile = File(filePath);
-        if (!await apkFile.exists()) {
-          // إذا لم يكن الملف موجوداً هنا (مثلاً إذا تم حفظه سابقاً في موقع آخر)،
-          // انسخ من الموقع السابق إن وُجد، وإلا أعد الحفظ من الذاكرة المؤقتة أعلاه
-          // ملاحظة: في هذا التدفق نحن حفظنا سابقاً في external، لذا نعيد النسخ إن لزم
-          try {
-            // لم نعد نستخدم external، لذا لا حاجة لنسخ من هناك
-          } catch (_) {}
-        }
-
-        // افتح ملف الـ APK عبر النظام
-        final result = await OpenFilex.open(
-          filePath,
-          type: 'application/vnd.android.package-archive',
-        );
-        print('OpenFilex result: ${result.type}');
-
-        _safeSetState(() {
-          _updateStatus = 'تم فتح المثبت. يرجى المتابعة للتثبيت';
-          _downloadProgress = 1.0;
-        });
-      } catch (e) {
-        print('Installer open error: $e');
-        throw Exception('تعذر فتح ملف التثبيت: $e');
-      }
-
-          } catch (e) {
-        print('Production update error: $e');
-        
-        // رسائل خطأ أكثر وضوحاً
-        String errorMessage = 'خطأ في التحديث';
-        
-        if (e.toString().contains('Permission')) {
-          errorMessage = 'مطلوب إذن الكتابة للتخزين. يرجى تفعيل الإذن في إعدادات التطبيق.';
-        } else if (e.toString().contains('SocketException')) {
-          errorMessage = 'خطأ في الاتصال بالإنترنت. تأكد من اتصالك بالشبكة.';
-        } else if (e.toString().contains('HttpException')) {
-          errorMessage = 'خطأ في رابط التحديث. تأكد من صحة الرابط في Firebase.';
-        } else if (e.toString().contains('فشل في تحميل')) {
-          errorMessage = 'فشل في تحميل ملف التحديث. تأكد من أن الرابط صحيح.';
-        } else if (e.toString().contains('الملف المحمل فارغ')) {
-          errorMessage = 'ملف التحديث فارغ. تأكد من صحة الرابط.';
-        } else if (e.toString().contains('لا يمكن الوصول')) {
-          errorMessage = 'لا يمكن الوصول إلى مجلد التخزين. تأكد من الأذونات.';
-        } else if (e.toString().contains('خطأ في حفظ')) {
-          errorMessage = 'خطأ في حفظ ملف التحديث. تأكد من وجود مساحة كافية.';
-        }
-        
-        throw Exception(errorMessage);
-      }
-  }
-
-  Future<void> _simulateUpdateProcess() async {
-    try {
-      // مرحلة 1: بدء التحديث
-      setState(() {
-        _updateStatus = 'جاري بدء التحديث...';
-        _downloadProgress = 0.1;
-      });
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // مرحلة 2: فحص الأذونات
-      setState(() {
-        _updateStatus = 'جاري فحص الأذونات...';
-        _downloadProgress = 0.2;
-      });
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      // مرحلة 3: تحميل التحديث
-      setState(() {
-        _updateStatus = 'جاري تحميل التحديث...';
-        _downloadProgress = 0.3;
-      });
-      await Future.delayed(const Duration(milliseconds: 1000));
-
-      // مرحلة 4: تحميل متقدم
-      setState(() {
-        _updateStatus = 'جاري تحميل التحديث...';
-        _downloadProgress = 0.5;
-      });
-      await Future.delayed(const Duration(milliseconds: 1200));
-
-      // مرحلة 5: تحميل شبه مكتمل
-      setState(() {
-        _updateStatus = 'جاري تحميل التحديث...';
-        _downloadProgress = 0.7;
-      });
-      await Future.delayed(const Duration(milliseconds: 1000));
-
-      // مرحلة 6: حفظ الملف
-      setState(() {
-        _updateStatus = 'جاري حفظ الملف...';
-        _downloadProgress = 0.8;
-      });
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      // مرحلة 7: تثبيت التحديث
-      setState(() {
-        _updateStatus = 'جاري تثبيت التحديث...';
-        _downloadProgress = 0.9;
-      });
-      await Future.delayed(const Duration(milliseconds: 1000));
-
-      // مرحلة 8: اكتمال التحديث
-      setState(() {
-        _updateStatus = 'تم التحديث بنجاح!';
-        _downloadProgress = 1.0;
-      });
-      await Future.delayed(const Duration(milliseconds: 500));
-
-    } catch (e) {
-      throw Exception('simulation error: $e');
-    }
-  }
+  // أزلنا محاكاة التحديث.
 
   @override
   Widget build(BuildContext context) {
@@ -653,126 +242,23 @@ class _AboutScreenState extends State<AboutScreen> {
                             ],
                             const SizedBox(height: 12),
                             
-                            // معلومات التحديث الحقيقي
-                            if (!_isUpdating) ...[
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.blue[200]!),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.info_outline,
-                                          color: Colors.blue[700],
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            'سيتم تحميل وتثبيت التحديث الحقيقي',
-                                            style: TextStyle(
-                                              color: Colors.blue[700],
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: ElevatedButton.icon(
-                                            onPressed: () async {
-                                              bool isValid = await _isUpdateUrlValid();
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      isValid 
-                                                          ? 'رابط التحديث صحيح' 
-                                                          : 'رابط التحديث غير صحيح',
-                                                    ),
-                                                    backgroundColor: isValid ? Colors.green : Colors.red,
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                            icon: const Icon(Icons.link, size: 16),
-                                            label: const Text('اختبار الرابط'),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.blue[100],
-                                              foregroundColor: Colors.blue[700],
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                            ],
-                            
-                            // شريط تقدم التحديث
-                            if (_isUpdating) ...[
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _updateStatus,
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  LinearProgressIndicator(
-                                    value: _downloadProgress,
-                                    backgroundColor: Colors.grey[300],
-                                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2FBDAF)),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '${(_downloadProgress * 100).toInt()}%',
-                                    style: TextStyle(
-                                      color: Colors.grey[600],
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ] else ...[
+                            // زر التحديث فقط يفتح المتصفح
                               Row(
                                 children: [
                                   Expanded(
                                     child: ElevatedButton.icon(
                                       onPressed: _handleCheckAndUpdate,
                                       icon: const Icon(Icons.system_update),
-                                      label: Text(
-                                        hasUpdate
-                                            ? 'تحديث التطبيق'
-                                            : 'فحص الإصدار والتحديث'
-                                      ),
+                                    label: const Text('تحديث التطبيق'),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: hasUpdate
-                                            ? Colors.green
-                                            : const Color(0xFF2FBDAF),
+                                      backgroundColor: const Color(0xFF2FBDAF),
                                         foregroundColor: Colors.white,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
+                            
                           ],
                         ),
                       ),

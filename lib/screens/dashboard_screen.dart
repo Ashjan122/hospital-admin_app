@@ -8,6 +8,7 @@ import 'package:hospital_admin_app/screens/admin_bookings_screen.dart';
 import 'package:hospital_admin_app/screens/admin_users_screen.dart';
 import 'package:hospital_admin_app/screens/admin_insurance_companies_screen.dart';
 import 'package:hospital_admin_app/screens/admin_reports_screen.dart';
+import 'package:hospital_admin_app/screens/admin_lab_results_screen.dart';
 import 'package:hospital_admin_app/screens/about_screen.dart';
 
 
@@ -54,11 +55,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'لوحة تحكم $displayCenterName',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+        title: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'لوحة التحكم',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  fontSize: 18,
+                ),
+              ),
+              Text(
+                displayCenterName ?? 'مركز طبي',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+            ],
           ),
         ),
         backgroundColor: const Color(0xFF2FBDAF),
@@ -77,29 +93,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 tooltip: 'رجوع إلى صفحة الكنترول',
               )
             : IconButton(
-                icon: const Icon(Icons.logout),
-                onPressed: () async {
-                  // إذا جاء من تسجيل الدخول العادي، امسح البيانات واذهب لصفحة تسجيل الدخول
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.clear();
-                  
-                  if (context.mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  }
+                icon: const Icon(Icons.info_outline),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const AboutScreen()),
+                  );
                 },
-                tooltip: 'تسجيل الخروج',
+                tooltip: 'حول التطبيق',
               ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const AboutScreen()),
-              );
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              // إذا جاء من تسجيل الدخول العادي، امسح البيانات واذهب لصفحة تسجيل الدخول
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              
+              if (context.mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
             },
+            tooltip: 'تسجيل الخروج',
           ),
         ],
       ),
@@ -111,39 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Welcome section
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      
-                      Text(
-                        'مرحباً بك في $displayCenterName',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2FBDAF),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'إدارة عمليات المستشفى',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
+
 
                 // Grid section
                 Expanded(
@@ -334,6 +319,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           }
                         },
                       ),
+                      // إظهار بطاقة نتيجة المختبر فقط في "مركز الرومي الطبي" وليس "مركز الرومي لطب الاسنان"
+                      if (((displayCenterName ?? '').toLowerCase().contains('الرومي') ||
+                              (displayCenterName ?? '').toLowerCase().contains('roomy') ||
+                              (displayCenterName ?? '').toLowerCase().contains('alroomy')) &&
+                          ((displayCenterName ?? '').toLowerCase().contains('طبي') ||
+                              (displayCenterName ?? '').toLowerCase().contains('medical')) &&
+                          !((displayCenterName ?? '').toLowerCase().contains('اسنان') ||
+                              (displayCenterName ?? '').toLowerCase().contains('الاسنان') ||
+                              (displayCenterName ?? '').toLowerCase().contains('أسنان') ||
+                              (displayCenterName ?? '').toLowerCase().contains('الأسنان') ||
+                              (displayCenterName ?? '').toLowerCase().contains('dental')))
+                        _buildDashboardCard(
+                          context,
+                          'نتيجة المختبر',
+                          Icons.science,
+                          const Color(0xFF2FBDAF),
+                          () {
+                            if (displayCenterId != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AdminLabResultsScreen(
+                                    centerId: displayCenterId!,
+                                    centerName: displayCenterName ?? 'مركز طبي',
+                                  ),
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('يرجى تسجيل الدخول أولاً'),
+                                  backgroundColor: Color(0xFF2FBDAF),
+                                ),
+                              );
+                            }
+                          },
+                        ),
                     ],
                   ),
                 ),
@@ -385,14 +407,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: Colors.white,
               ),
               textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'اضغط للوصول',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.white70,
-              ),
             ),
           ],
         ),

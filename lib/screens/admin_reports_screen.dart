@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart' as intl;
 
 class AdminReportsScreen extends StatefulWidget {
   final String centerId;
@@ -107,13 +106,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     }
   }
 
-  // تحميل عدد شركات التأمين
+  // تحميل عدد شركات التأمين النشطة
   Future<void> _loadInsuranceCompaniesCount() async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('medicalFacilities')
           .doc(widget.centerId)
           .collection('insuranceCompanies')
+          .where('isActive', isEqualTo: true)
           .get();
       
       if (mounted) {
@@ -179,7 +179,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       final weekAgo = today.subtract(const Duration(days: 7));
       final monthAgo = DateTime(now.year, now.month - 1, now.day);
 
-      // جلب الأطباء أولاً (سريع)
+      // جلب الأطباء (سريع)
       List<Future<QuerySnapshot>> doctorFutures = [];
       for (var specDoc in specializationsSnapshot.docs) {
         doctorFutures.add(
@@ -238,9 +238,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
           final appointmentData = appointmentDoc.data() as Map<String, dynamic>?;
           final date = appointmentData?['date'] ?? '';
           final status = appointmentData?['status'] ?? 'pending';
+          final isConfirmed = appointmentData?['isConfirmed'] ?? false;
+
+          // تجاهل الحجوزات الملغاة أو المحذوفة
+          if (status == 'cancelled' || status == 'deleted') {
+            continue;
+          }
 
           totalBookings++;
-          if (status == 'confirmed') {
+          // التحقق من الحجوزات المؤكدة باستخدام حقل isConfirmed أو status
+          if (isConfirmed == true || status == 'confirmed') {
             confirmedBookings++;
           }
 
@@ -263,6 +270,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               }
             } catch (e) {
               // تجاهل التواريخ غير الصحيحة
+              print('Invalid date format: $date');
             }
           }
         }
@@ -335,6 +343,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         for (var appointmentDoc in appointmentsSnapshot.docs) {
           final appointmentData = appointmentDoc.data() as Map<String, dynamic>?;
           final patientName = appointmentData?['patientName'] ?? '';
+          final status = appointmentData?['status'] ?? 'pending';
+          
+          // تجاهل الحجوزات الملغاة أو المحذوفة
+          if (status == 'cancelled' || status == 'deleted') {
+            continue;
+          }
           
           if (patientName.isNotEmpty) {
             uniquePatients.add(patientName);
@@ -385,20 +399,35 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         for (var doctorDoc in doctorsSnapshot.docs) {
           final doctorData = doctorDoc.data();
           final doctorName = doctorData['docName'] ?? 'طبيب غير معروف';
+          final workingSchedule = doctorData['workingSchedule'] as Map<String, dynamic>?;
 
           // التحقق من وجود جدول للطبيب
-          final scheduleSnapshot = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(widget.centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(doctorDoc.id)
-              .collection('schedule')
-              .get();
+          bool hasSchedule = false;
+          
+          if (workingSchedule != null && workingSchedule.isNotEmpty) {
+            // التحقق من وجود أيام بها جدول عمل
+            for (var day in workingSchedule.keys) {
+              final daySchedule = workingSchedule[day] as Map<String, dynamic>?;
+              if (daySchedule != null) {
+                final morning = daySchedule['morning'] as Map<String, dynamic>?;
+                final evening = daySchedule['evening'] as Map<String, dynamic>?;
+                
+                // التحقق من وجود أوقات عمل في الصباح أو المساء
+                if ((morning != null && 
+                     (morning['start']?.toString().isNotEmpty == true || 
+                      morning['end']?.toString().isNotEmpty == true)) ||
+                    (evening != null && 
+                     (evening['start']?.toString().isNotEmpty == true || 
+                      evening['end']?.toString().isNotEmpty == true))) {
+                  hasSchedule = true;
+                  break;
+                }
+              }
+            }
+          }
 
           // إذا لم يكن لدى الطبيب جدول، أضفه للقائمة
-          if (scheduleSnapshot.docs.isEmpty) {
+          if (!hasSchedule) {
             doctorsWithoutSchedule.add({
               'doctorId': doctorDoc.id,
               'doctorName': doctorName,
@@ -427,170 +456,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     }
   }
 
-  Future<Map<String, dynamic>> _calculateStatistics() async {
-    Map<String, dynamic> stats = {
-      'specializations': 0,
-      'doctors': 0,
-      'insuranceCompanies': 0,
-      'todayBookings': 0,
-      'weekBookings': 0,
-      'monthBookings': 0,
-      'patients': 0,
-      'users': 0,
-      'confirmedBookings': 0,
-      'totalBookings': 0,
-    };
-
-    try {
-      // جلب البيانات الأساسية بالتوازي
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
-      
-      final insuranceSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('insuranceCompanies')
-          .get();
-      
-      final usersSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('centerId', isEqualTo: widget.centerId)
-          .get();
-
-      stats['specializations'] = specializationsSnapshot.docs.length;
-      stats['insuranceCompanies'] = insuranceSnapshot.docs.length;
-      stats['users'] = usersSnapshot.docs.length;
-
-      // جلب الأطباء والحجوزات مع تحسين الأداء
-      int totalDoctors = 0;
-      int todayBookings = 0;
-      int weekBookings = 0;
-      int monthBookings = 0;
-      int confirmedBookings = 0;
-      int totalBookings = 0;
-      Set<String> uniquePatients = {};
-
-      // تحديد الفترات الزمنية
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final weekAgo = today.subtract(const Duration(days: 7));
-      final monthAgo = DateTime(now.year, now.month - 1, now.day);
-
-      // جلب الأطباء بالتوازي (بدلاً من حلقة متسلسلة)
-      List<Future<QuerySnapshot>> doctorFutures = [];
-      for (var specDoc in specializationsSnapshot.docs) {
-        doctorFutures.add(
-          FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(widget.centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .get()
-        );
-      }
-
-      final doctorSnapshots = await Future.wait(doctorFutures);
-      
-      // جلب الحجوزات بالتوازي مع تحديد الفترات الزمنية
-      List<Future<QuerySnapshot>> appointmentFutures = [];
-      Map<String, String> doctorToSpecialization = {};
-
-      for (int i = 0; i < specializationsSnapshot.docs.length; i++) {
-        final specDoc = specializationsSnapshot.docs[i];
-        final doctorsSnapshot = doctorSnapshots[i];
-        totalDoctors += doctorsSnapshot.docs.length;
-
-        for (var doctorDoc in doctorsSnapshot.docs) {
-          doctorToSpecialization[doctorDoc.id] = specDoc.id;
-          
-          // جلب الحجوزات مع فلتر التاريخ لتحسين الأداء
-          appointmentFutures.add(
-            FirebaseFirestore.instance
-                .collection('medicalFacilities')
-                .doc(widget.centerId)
-                .collection('specializations')
-                .doc(specDoc.id)
-                .collection('doctors')
-                .doc(doctorDoc.id)
-                .collection('appointments')
-                .where('date', isGreaterThanOrEqualTo: monthAgo.toIso8601String())
-                .get()
-          );
-        }
-      }
-
-      stats['doctors'] = totalDoctors;
-
-      // معالجة الحجوزات بالتوازي
-      final appointmentSnapshots = await Future.wait(appointmentFutures);
-
-      for (var appointmentsSnapshot in appointmentSnapshots) {
-        for (var appointmentDoc in appointmentsSnapshot.docs) {
-          final appointmentData = appointmentDoc.data() as Map<String, dynamic>?;
-          final patientName = appointmentData?['patientName'] ?? '';
-          final date = appointmentData?['date'] ?? '';
-          final status = appointmentData?['status'] ?? 'pending';
-
-          // إضافة المريض للمجموعة الفريدة
-          if (patientName.isNotEmpty) {
-            uniquePatients.add(patientName);
-          }
-
-          // إجمالي الحجوزات
-          totalBookings++;
-
-          // الحجوزات المؤكدة
-          if (status == 'confirmed') {
-            confirmedBookings++;
-          }
-
-          // حجوزات حسب الفترة الزمنية
-          if (date.isNotEmpty) {
-            try {
-              final appointmentDate = DateTime.parse(date);
-              
-              // حجوزات اليوم
-              if (appointmentDate.year == today.year &&
-                  appointmentDate.month == today.month &&
-                  appointmentDate.day == today.day) {
-                todayBookings++;
-              }
-              
-              // حجوزات الأسبوع
-              if (appointmentDate.isAfter(weekAgo) && appointmentDate.isBefore(today.add(const Duration(days: 1)))) {
-                weekBookings++;
-              }
-              
-              // حجوزات الشهر
-              if (appointmentDate.isAfter(monthAgo) && appointmentDate.isBefore(today.add(const Duration(days: 1)))) {
-                monthBookings++;
-              }
-            } catch (e) {
-              // تجاهل التواريخ غير الصحيحة
-            }
-          }
-        }
-      }
-
-      stats['todayBookings'] = todayBookings;
-      stats['weekBookings'] = weekBookings;
-      stats['monthBookings'] = monthBookings;
-      stats['confirmedBookings'] = confirmedBookings;
-      stats['totalBookings'] = totalBookings;
-      stats['patients'] = uniquePatients.length;
-      stats['doctorsWithoutSchedule'] = 0;
-      stats['doctorsWithoutScheduleList'] = [];
-
-    } catch (e) {
-      print('Error calculating statistics: $e');
-    }
-
-    return stats;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -679,54 +544,6 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2FBDAF), Color(0xFF1FA8A0)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF2FBDAF).withOpacity(0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(
-                              Icons.analytics,
-                              size: 48,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'إحصائيات ${widget.centerName}',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'آخر تحديث: ${intl.DateFormat('yyyy/MM/dd HH:mm').format(DateTime.now())}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
 
                       // Doctors Without Schedule - Collapsible at the top
                       Container(
@@ -933,55 +750,72 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                        const SizedBox(height: 24),
 
                        // Statistics Grid
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 1.2,
+                      Column(
                         children: [
-                          _buildStatCard(
-                            'التخصصات الطبية',
-                            _statistics['specializations']?.toString() ?? '0',
-                            Icons.medical_services,
-                            Colors.blue,
-                            loadingKey: 'specializations',
+                          // الصف الأول
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildStatCard(
+                                  'التخصصات الطبية',
+                                  _statistics['specializations']?.toString() ?? '0',
+                                  Icons.medical_services,
+                                  Colors.blue,
+                                  loadingKey: 'specializations',
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildStatCard(
+                                  'الأطباء',
+                                  _statistics['doctors']?.toString() ?? '0',
+                                  Icons.person,
+                                  Colors.green,
+                                  loadingKey: 'doctors',
+                                ),
+                              ),
+                            ],
                           ),
-                          _buildStatCard(
-                            'الأطباء',
-                            _statistics['doctors']?.toString() ?? '0',
-                            Icons.person,
-                            Colors.green,
-                            loadingKey: 'doctors',
+                          const SizedBox(height: 16),
+                          // الصف الثاني
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildStatCard(
+                                  'شركات التأمين',
+                                  _statistics['insuranceCompanies']?.toString() ?? '0',
+                                  Icons.security,
+                                  Colors.orange,
+                                  loadingKey: 'insuranceCompanies',
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _buildStatCard(
+                                  'المستخدمين',
+                                  _statistics['users']?.toString() ?? '0',
+                                  Icons.people,
+                                  Colors.purple,
+                                  loadingKey: 'users',
+                                ),
+                              ),
+                            ],
                           ),
-                          _buildStatCard(
-                            'شركات التأمين',
-                            _statistics['insuranceCompanies']?.toString() ?? '0',
-                            Icons.security,
-                            Colors.orange,
-                            loadingKey: 'insuranceCompanies',
-                          ),
-                          _buildStatCard(
-                            'المستخدمين',
-                            _statistics['users']?.toString() ?? '0',
-                            Icons.people,
-                            Colors.purple,
-                            loadingKey: 'users',
-                          ),
-                          _buildStatCard(
-                            'المرضى',
-                            _statistics['patients']?.toString() ?? '0',
-                            Icons.people_outline,
-                            Colors.teal,
-                            loadingKey: 'patients',
-                          ),
-                          _buildStatCard(
-                            _getPeriodTitle(),
-                            _getPeriodBookings(),
-                            Icons.calendar_today,
-                            Colors.red,
-                            loadingKey: 'bookings',
+                          const SizedBox(height: 16),
+                          // الصف الثالث - كارد المرضى يأخذ عرض كامل
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2, // يأخذ مساحة كاردين
+                                child: _buildStatCard(
+                                  'المرضى',
+                                  _statistics['patients']?.toString() ?? '0',
+                                  Icons.people_outline,
+                                  Colors.teal,
+                                  loadingKey: 'patients',
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1262,29 +1096,4 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     );
   }
 
-  String _getPeriodTitle() {
-    switch (_selectedPeriod) {
-      case 'today':
-        return 'حجوزات اليوم';
-      case 'week':
-        return 'حجوزات الأسبوع';
-      case 'month':
-        return 'حجوزات الشهر';
-      default:
-        return 'حجوزات اليوم';
-    }
-  }
-
-  String _getPeriodBookings() {
-    switch (_selectedPeriod) {
-      case 'today':
-        return _statistics['todayBookings']?.toString() ?? '0';
-      case 'week':
-        return _statistics['weekBookings']?.toString() ?? '0';
-      case 'month':
-        return _statistics['monthBookings']?.toString() ?? '0';
-      default:
-        return _statistics['todayBookings']?.toString() ?? '0';
-    }
-  }
 }

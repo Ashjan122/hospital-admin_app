@@ -18,6 +18,7 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _photoUrlController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _doctorSearchController = TextEditingController();
 
   final List<String> _roles = const ['admin', 'reception', 'doctor'];
   String _selectedRole = 'reception';
@@ -30,6 +31,7 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
   bool _saving = false;
   bool _uploadingImage = false;
   bool _loadingDoctors = false;
+  bool _showDoctorsList = false;
   File? _pickedImageFile;
 
   @override
@@ -252,6 +254,7 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
     _phoneController.dispose();
     _photoUrlController.dispose();
     _passwordController.dispose();
+    _doctorSearchController.dispose();
     super.dispose();
   }
 
@@ -407,82 +410,100 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
                                        if (v == 'doctor') {
                                          // تحميل الأطباء عند تغيير النوع إلى طبيب
                                          _loadCenterDoctors(_getCenterIdFromUser());
-                                       } else {
-                                         // إزالة معرف الطبيب عند تغيير النوع
-                                         _currentDoctorId = null;
-                                         _currentDoctorName = null;
-                                       }
+                                                                               } else {
+                                          // إزالة معرف الطبيب عند تغيير النوع
+                                          _currentDoctorId = null;
+                                          _currentDoctorName = null;
+                                          _showDoctorsList = false;
+                                        }
                                      });
                                    },
                                  ),
                                ),
                              ),
-                             // اختيار الطبيب إذا كان نوع المستخدم طبيب
-                             if (_selectedRole == 'doctor') ...[
-                               const SizedBox(height: 16),
-                               if (_loadingDoctors)
-                                 const Center(child: CircularProgressIndicator())
-                               else if (_centerDoctors.isEmpty)
-                                 const Text(
-                                   'لا يوجد أطباء في هذا المركز',
-                                   style: TextStyle(color: Colors.red),
-                                 )
-                                                       else ...[
-                          TextField(
-                            onChanged: (value) {
-                              setState(() {
-                                if (value.isEmpty) {
-                                  _filteredDoctors = _centerDoctors;
-                                } else {
-                                  _filteredDoctors = _centerDoctors.where((doctor) {
-                                    final doctorName = doctor['doctorName'].toString().toLowerCase();
-                                    final specialization = doctor['specialization'].toString().toLowerCase();
-                                    final searchQuery = value.toLowerCase();
-                                    return doctorName.contains(searchQuery) || 
-                                           specialization.contains(searchQuery);
-                                  }).toList();
-                                }
-                              });
-                            },
-                            decoration: const InputDecoration(
-                              labelText: 'البحث في الأطباء...',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.search),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            height: 200,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey[300]!),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: ListView.builder(
-                              itemCount: _filteredDoctors.length,
-                              itemBuilder: (context, index) {
-                                final doctor = _filteredDoctors[index];
-                                final isSelected = doctor['doctorId'] == _currentDoctorId;
-                                
-                                return ListTile(
-                                  title: Text(doctor['doctorName']),
-                                  subtitle: Text(doctor['specialization']),
-                                  selected: isSelected,
-                                  selectedTileColor: const Color(0xFF2FBDAF).withOpacity(0.1),
-                                  onTap: () {
-                                    setState(() {
-                                      _currentDoctorId = doctor['doctorId'] as String;
-                                      _currentDoctorName = doctor['doctorName'] as String;
-                                    });
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                                                           // اختيار الطبيب إذا كان نوع المستخدم طبيب
+                              if (_selectedRole == 'doctor') ...[
+                                const SizedBox(height: 16),
+                                if (_loadingDoctors)
+                                  const Center(child: CircularProgressIndicator())
+                                else if (_centerDoctors.isEmpty)
+                                  const Text(
+                                    'لا يوجد أطباء في هذا المركز',
+                                    style: TextStyle(color: Colors.red),
+                                  )
+                                                                  else ...[
+                                    // حقل اختيار الطبيب
+                                    TextField(
+                                      onTap: () {
+                                        setState(() {
+                                          _showDoctorsList = true;
+                                          _doctorSearchController.text = ''; // مسح النص عند الضغط
+                                        });
+                                      },
+                                      onChanged: _filterDoctors,
+                                      controller: _doctorSearchController,
+                                      decoration: InputDecoration(
+                                        labelText: 'اختر طبيب',
+                                        border: const OutlineInputBorder(),
+                                        prefixIcon: const Icon(Icons.medical_services),
+                                        suffixIcon: GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              _showDoctorsList = !_showDoctorsList;
+                                              if (!_showDoctorsList) {
+                                                _doctorSearchController.clear();
+                                              }
+                                            });
+                                          },
+                                          child: Icon(
+                                            _showDoctorsList ? Icons.arrow_drop_up : Icons.arrow_drop_down,
+                                          ),
+                                        ),
+                                        hintText: _showDoctorsList ? 'بحث...' : (_currentDoctorName ?? 'اختر طبيب'),
+                                      ),
+                                    ),
+                                    // قائمة الأطباء
+                                    if (_showDoctorsList) ...[
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        height: 200,
+                                        decoration: BoxDecoration(
+                                          border: Border.all(color: Colors.grey[300]!),
+                                          borderRadius: BorderRadius.circular(8),
+                                          color: Colors.white,
+                                        ),
+                                        child: ListView.builder(
+                                          itemCount: _filteredDoctors.length,
+                                          itemBuilder: (context, index) {
+                                            final doctor = _filteredDoctors[index];
+                                            final isSelected = doctor['doctorId'] == _currentDoctorId;
+                                            
+                                            return ListTile(
+                                              title: Text(
+                                                doctor['doctorName'] as String,
+                                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                              ),
+                                              subtitle: Text(doctor['specialization'] as String),
+                                              selected: isSelected,
+                                              selectedTileColor: const Color(0xFF2FBDAF).withOpacity(0.1),
+                                                                                             onTap: () {
+                                                 setState(() {
+                                                   _currentDoctorId = doctor['doctorId'] as String;
+                                                   _currentDoctorName = doctor['doctorName'] as String;
+                                                   _showDoctorsList = false; // إخفاء القائمة بعد الاختيار
+                                                   _doctorSearchController.clear(); // مسح النص في الحقل
+                                                 });
+                                               },
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                               ],
                              ],
-                           ],
+                           ),
                          ),
-                       ),
                       const SizedBox(height: 24),
                       SizedBox(
                         height: 48,
@@ -508,6 +529,22 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
               ),
       ),
     );
+  }
+
+  void _filterDoctors(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredDoctors = _centerDoctors;
+      } else {
+        _filteredDoctors = _centerDoctors.where((doctor) {
+          final doctorName = doctor['doctorName'].toString().toLowerCase();
+          final specialization = doctor['specialization'].toString().toLowerCase();
+          final searchQuery = query.toLowerCase();
+          return doctorName.contains(searchQuery) || 
+                 specialization.contains(searchQuery);
+        }).toList();
+      }
+    });
   }
 
   String? _getCenterIdFromUser() {

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'doctor_bookings_screen.dart';
 import '../services/sms_service.dart';
+import '../services/favorite_doctors_service.dart';
 import 'notifications_screen.dart'; // Added import for NotificationsScreen
 
 class ReceptionStaffScreen extends StatefulWidget {
@@ -30,14 +32,22 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
   List<Map<String, dynamic>> _availableDoctors = [];
   bool _loading = true;
   int _unreadNotifications = 0;
+  int _confirmedBookingsCount = 0; // عداد الحجوزات المؤكدة
 
   @override
   void initState() {
     super.initState();
     
-    print('ReceptionStaffScreen initState for user: ${widget.userId}');
+    print('=== RECEPTION STAFF SCREEN INIT ===');
+    print('User ID: ${widget.userId}');
+    print('User ID type: ${widget.userId.runtimeType}');
+    print('User ID is null: ${widget.userId == null}');
+    print('User ID is empty: ${widget.userId?.isEmpty ?? true}');
     print('Center ID: ${widget.centerId}');
     print('User Name: ${widget.userName}');
+    
+    // فحص SharedPreferences للتأكد من البيانات
+    _checkSharedPreferences();
     
     // تحميل البيانات بشكل متوازي لتحسين الأداء
     _initializeData();
@@ -47,6 +57,33 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
     
     // بدء مراقبة الحجوزات الجديدة
     _startMonitoringNewBookings();
+  }
+
+  // دالة فحص SharedPreferences
+  Future<void> _checkSharedPreferences() async {
+    try {
+      print('=== CHECKING SHARED PREFERENCES ===');
+      final prefs = await SharedPreferences.getInstance();
+      final savedUserId = prefs.getString('userId');
+      final savedCenterId = prefs.getString('centerId');
+      final savedUserName = prefs.getString('userName');
+      final savedUserType = prefs.getString('userType');
+      
+      print('SharedPreferences Data:');
+      print('- userId: $savedUserId');
+      print('- centerId: $savedCenterId');
+      print('- userName: $savedUserName');
+      print('- userType: $savedUserType');
+      
+      // مقارنة مع widget data
+      print('Widget vs SharedPreferences:');
+      print('- widget.userId: ${widget.userId}');
+      print('- savedUserId: $savedUserId');
+      print('- Match: ${widget.userId == savedUserId}');
+      
+    } catch (e) {
+      print('❌ Error checking SharedPreferences: $e');
+    }
   }
 
   void _startMonitoringNewBookings() {
@@ -149,33 +186,99 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
 
 
 
-  // دالة فحص حالة البيانات المحفوظة (للتطوير فقط)
-  Future<void> _checkSavedData() async {
+  // دالة عرض رسالة تأكيد الحذف
+  void _showDeleteConfirmation(String doctorId, String doctorName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('تأكيد الحذف'),
+          content: Text('هل أنت متأكد من حذف الدكتور $doctorName من المفضلة؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                // إضافة تأخير صغير لمنع التعليق
+                await Future.delayed(const Duration(milliseconds: 100));
+                if (mounted) {
+                  try {
+                    await _removeDoctorFromFavorites(doctorId, doctorName);
+                  } catch (e) {
+                    print('❌ Error in delete confirmation: $e');
+                    // لا حاجة لعرض رسالة خطأ إضافية هنا
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('حذف'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // دالة حذف طبيب من المفضلة
+  Future<void> _removeDoctorFromFavorites(String doctorId, String doctorName) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final favoriteKey = 'selectedDoctors_${widget.userId}';
-      final savedFavorites = prefs.getStringList(favoriteKey) ?? [];
+      print('=== REMOVING DOCTOR FROM FAVORITES ===');
+      print('Doctor ID: $doctorId');
+      print('Doctor Name: $doctorName');
+      print('Current favorites: $_selectedDoctorIds');
+      print('Current count: ${_selectedDoctorIds.length}');
       
-      print('=== Saved Data Check ===');
-      print('User ID: ${widget.userId}');
-      print('Favorite Key: $favoriteKey');
-      print('Saved Favorites Count: ${savedFavorites.length}');
-      print('Saved Favorites: $savedFavorites');
-      print('Current Selected Doctors: $_selectedDoctorIds');
-      print('=======================');
+      // إزالة الطبيب من القائمة المحلية أولاً
+      setState(() {
+        _selectedDoctorIds.remove(doctorId);
+      });
+      
+      print('Updated favorites: $_selectedDoctorIds');
+      print('Updated count: ${_selectedDoctorIds.length}');
+      
+      // حفظ التغييرات في قاعدة البيانات
+      try {
+        await _saveSelectedDoctors();
+        print('✅ Doctor removed successfully!');
+        // تم إزالة رسالة النجاح بناءً على طلب المستخدم
+      } catch (saveError) {
+        print('❌ Error saving to database: $saveError');
+        // إعادة الطبيب للقائمة في حالة فشل الحفظ
+        setState(() {
+          if (!_selectedDoctorIds.contains(doctorId)) {
+            _selectedDoctorIds.add(doctorId);
+          }
+        });
+        throw saveError;
+      }
+      
+      print('=== REMOVE COMPLETED ===');
+    } catch (e) {
+      print('❌ Error removing doctor: $e');
+      print('Error details: ${e.toString()}');
       
       if (mounted && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('البيانات المحفوظة: ${savedFavorites.length} طبيب'),
-            backgroundColor: Colors.blue,
+            content: Text('❌ خطأ في حذف الطبيب: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
-    } catch (e) {
-      print('Error checking saved data: $e');
     }
   }
+
+
+
+
+
 
   void _startNotificationTimer() {
     Future.delayed(const Duration(seconds: 30), () {
@@ -199,73 +302,134 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
       _loadSelectedDoctors(),
       _loadAvailableDoctors(),
       _loadUnreadNotifications(),
+      _loadConfirmedBookingsCount(), // تحميل عداد الحجوزات المؤكدة
     ]);
     
     print('Data initialization completed for user: ${widget.userId}');
     print('Selected doctors count: ${_selectedDoctorIds.length}');
     print('Available doctors count: ${_availableDoctors.length}');
+    print('Confirmed bookings count: $_confirmedBookingsCount');
   }
 
   Future<void> _loadSelectedDoctors() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = 'selectedDoctors_${widget.userId}';
-      final selectedDoctors = prefs.getStringList(key) ?? [];
+      print('=== LOADING SELECTED DOCTORS ===');
+      print('User ID: ${widget.userId}');
+      print('Center ID: ${widget.centerId}');
       
-      print('Loading selected doctors for user: ${widget.userId}');
-      print('Using key: $key');
-      print('Found ${selectedDoctors.length} doctors: $selectedDoctors');
+      final selectedDoctors = await FavoriteDoctorsService.getFavoriteDoctors(
+        userId: widget.userId,
+        centerId: widget.centerId,
+      );
+      
+      print('Found ${selectedDoctors.length} favorite doctors from database: $selectedDoctors');
+      print('Selected doctors: $selectedDoctors');
       
       setState(() {
         _selectedDoctorIds = selectedDoctors;
       });
       
-      // التحقق من أن البيانات تم تحميلها بشكل صحيح
-      print('Loaded selected doctors in setState: $_selectedDoctorIds');
+      print('Updated _selectedDoctorIds: $_selectedDoctorIds');
+      print('Updated count: ${_selectedDoctorIds.length}');
       
       // التحقق من أن البيانات تم تحميلها بشكل صحيح
-      final verification = prefs.getStringList(key) ?? [];
-      print('Verification after loading: ${verification.length} doctors');
+      if (_selectedDoctorIds.length != selectedDoctors.length) {
+        print('⚠️ WARNING: Count mismatch after setState!');
+        print('Expected: ${selectedDoctors.length}, Actual: ${_selectedDoctorIds.length}');
+      }
+      
+      print('=== LOAD COMPLETED ===');
       
     } catch (e) {
-      print('Error loading selected doctors: $e');
+      print('❌ Error loading selected doctors: $e');
+      print('Error details: ${e.toString()}');
       print('User ID when error occurred: ${widget.userId}');
     }
   }
 
   Future<void> _saveSelectedDoctors() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = 'selectedDoctors_${widget.userId}';
+      print('=== _saveSelectedDoctors STARTED ===');
+      print('User ID: ${widget.userId}');
+      print('Center ID: ${widget.centerId}');
+      print('Selected doctor IDs: $_selectedDoctorIds');
+      print('Selected count: ${_selectedDoctorIds.length}');
+      print('Selected types: ${_selectedDoctorIds.map((id) => '${id.runtimeType}: $id').toList()}');
       
-      print('Saving selected doctors for user: ${widget.userId}');
-      print('Using key: $key');
-      print('Doctors to save: $_selectedDoctorIds');
+      // التحقق من أن القائمة ليست فارغة
+      if (_selectedDoctorIds.isEmpty) {
+        print('⚠️ WARNING: No doctors selected!');
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('لم يتم اختيار أي أطباء للحفظ'),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
       
-      final success = await prefs.setStringList(key, _selectedDoctorIds);
-      print('Save success: $success');
+      // التحقق من صحة البيانات
+      final validIds = _selectedDoctorIds.where((id) => id != null && id.toString().isNotEmpty).toList();
+      print('Valid doctor IDs: $validIds');
+      print('Valid count: ${validIds.length}');
       
-      // التحقق من أن البيانات تم حفظها بشكل صحيح
-      final savedDoctors = prefs.getStringList(key) ?? [];
-      print('Verification after save: ${savedDoctors.length} doctors saved');
-      print('Saved doctors: $savedDoctors');
+      if (validIds.isEmpty) {
+        print('❌ ERROR: No valid doctor IDs found!');
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('خطأ: لا توجد معرفات صحيحة للأطباء'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+      
+      print('Calling FavoriteDoctorsService.saveFavoriteDoctors...');
+      final success = await FavoriteDoctorsService.saveFavoriteDoctors(
+        userId: widget.userId,
+        centerId: widget.centerId,
+        doctorIds: validIds,
+      );
+      
+      print('Save result: $success');
       
       if (mounted && context.mounted) {
+        if (success) {
+          // تم إزالة رسالة النجاح بناءً على طلب المستخدم
+          
+          // تحديث القائمة المحلية
+          setState(() {
+            _selectedDoctorIds = validIds;
+          });
+          
+          print('✅ Local state updated with: $_selectedDoctorIds');
+        } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم حفظ ${_selectedDoctorIds.length} طبيب مفضل'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
+            const SnackBar(
+              content: Text('❌ خطأ في حفظ الأطباء المفضلين'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
           ),
         );
       }
+      }
+      
+      print('=== _saveSelectedDoctors COMPLETED ===');
     } catch (e) {
-      print('Error saving selected doctors: $e');
-      print('User ID when save error occurred: ${widget.userId}');
+      print('❌ Error in _saveSelectedDoctors: $e');
+      print('Error details: ${e.toString()}');
+      print('Stack trace: ${StackTrace.current}');
+      
       if (mounted && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('خطأ في حفظ الأطباء المفضلين: $e'),
+            content: Text('❌ خطأ في حفظ الأطباء المفضلين: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
@@ -385,7 +549,125 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
     }
   }
 
+  // دالة تحميل عداد الحجوزات المؤكدة
+  Future<void> _loadConfirmedBookingsCount() async {
+    try {
+      print('=== LOADING CONFIRMED BOOKINGS COUNT ===');
+      print('User ID: ${widget.userId}');
+      
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data();
+        final count = userData?['confirmedBookingsCount'] ?? 0;
+        
+        print('Found confirmed bookings count: $count');
+        
+        if (mounted) {
+          setState(() {
+            _confirmedBookingsCount = count;
+          });
+        }
+      } else {
+        print('⚠️ User document not found');
+      }
+    } catch (e) {
+      print('❌ Error loading confirmed bookings count: $e');
+    }
+  }
+
+  // دالة اختبار زيادة العداد مباشرة للتشخيص
+  Future<void> _testIncrementConfirmedBookingsCount() async {
+    try {
+      print('=== TESTING DIRECT INCREMENT ===');
+      print('User ID: ${widget.userId}');
+      print('User ID is null: ${widget.userId == null}');
+      
+      if (widget.userId == null || widget.userId!.isEmpty) {
+        print('❌ User ID is null or empty, cannot test increment');
+        return;
+      }
+
+      // محاولة زيادة العداد مباشرة
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.userId)
+          .update({
+        'confirmedBookingsCount': FieldValue.increment(1),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ Direct increment successful, now reloading count...');
+      
+      // إعادة تحميل العداد
+      await _loadConfirmedBookingsCount();
+      
+    } catch (e) {
+      print('❌ Error in direct increment test: $e');
+      print('Error details: ${e.toString()}');
+    }
+  }
+
+  // دالة فحص البيانات المحفوظة للتشخيص
+  Future<void> _checkSavedData() async {
+    try {
+      print('=== CHECKING SAVED DATA ===');
+      print('User ID: ${widget.userId}');
+      print('Center ID: ${widget.centerId}');
+      print('User Name: ${widget.userName}');
+      
+      // فحص SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final savedUserId = prefs.getString('userId');
+      final savedCenterId = prefs.getString('centerId');
+      final savedUserName = prefs.getString('userName');
+      final savedUserType = prefs.getString('userType');
+      
+      print('SharedPreferences Data:');
+      print('- userId: $savedUserId');
+      print('- centerId: $savedCenterId');
+      print('- userName: $savedUserName');
+      print('- userType: $savedUserName');
+      
+      // فحص قاعدة البيانات
+      if (widget.userId != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(widget.userId)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          print('Firebase User Data:');
+          print('- confirmedBookingsCount: ${userData?['confirmedBookingsCount']}');
+          print('- lastUpdated: ${userData?['lastUpdated']}');
+          print('- createdAt: ${userData?['createdAt']}');
+          print('- userType: ${userData?['userType']}');
+        } else {
+          print('❌ User document not found in Firebase');
+        }
+      } else {
+        print('❌ Widget userId is null');
+      }
+      
+    } catch (e) {
+      print('❌ Error checking saved data: $e');
+    }
+  }
+
   void _viewDoctorBookings(String doctorId, String doctorName) {
+    print('=== NAVIGATING TO DOCTOR BOOKINGS ===');
+    print('Doctor ID: $doctorId');
+    print('Doctor Name: $doctorName');
+    print('Center ID: ${widget.centerId}');
+    print('Center Name: ${widget.centerName}');
+    print('User ID: ${widget.userId}');
+    print('User ID is null: ${widget.userId == null}');
+    print('User ID is empty: ${widget.userId?.isEmpty ?? true}');
+    
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -394,9 +676,14 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
           centerId: widget.centerId,
           centerName: widget.centerName,
           doctorName: doctorName,
+          userId: widget.userId, // تمرير معرف المستخدم
         ),
       ),
-    );
+    ).then((_) {
+      // تحديث عداد الحجوزات المؤكدة عند العودة
+      print('🔄 Returning from DoctorBookingsScreen, updating confirmed bookings count...');
+      _loadConfirmedBookingsCount();
+    });
   }
 
   void _openNotificationsScreen() {
@@ -596,15 +883,22 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
                       ),
                       const Spacer(),
                       ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          print('=== SAVING FROM DIALOG ===');
+                          print('Temp selected doctors: $tempSelected');
+                          print('Temp selected count: ${tempSelected.length}');
+                          
+                          // تحديث القائمة الرئيسية
                           setState(() {
                             _selectedDoctorIds = tempSelected.toList();
                           });
                           
-                          print('Saving selected doctors from dialog');
-                          print('Selected doctors: $_selectedDoctorIds');
+                          print('Updated _selectedDoctorIds: $_selectedDoctorIds');
+                          print('Updated count: ${_selectedDoctorIds.length}');
                           
-                          _saveSelectedDoctors();
+                          // حفظ البيانات في قاعدة البيانات
+                          await _saveSelectedDoctors();
+                          
                           Navigator.pop(ctx);
                         },
                         style: ElevatedButton.styleFrom(
@@ -703,6 +997,7 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
               
               print('Logout: Starting logout for user: $currentUserId');
               print('Logout: Current favorite doctors: $_selectedDoctorIds');
+              print('Logout: Center ID: ${widget.centerId}');
               
               // مسح بيانات تسجيل الدخول فقط، وليس الأطباء المفضلين
               await prefs.remove('userId');
@@ -712,12 +1007,12 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
               await prefs.remove('userType');
               await prefs.remove('isLoggedIn');
               
-
-              
-              // تأكيد أن الأطباء المفضلين محفوظة
-              final favoriteKey = 'selectedDoctors_$currentUserId';
-              final savedFavorites = prefs.getStringList(favoriteKey) ?? [];
-              print('Logout: Favorite doctors preserved: ${savedFavorites.length} doctors');
+              // تأكيد أن الأطباء المفضلين محفوظة في قاعدة البيانات
+              final savedFavorites = await FavoriteDoctorsService.getFavoriteDoctors(
+                userId: currentUserId,
+                centerId: widget.centerId,
+              );
+              print('Logout: Favorite doctors preserved in database: ${savedFavorites.length} doctors');
               print('Logout: Preserved doctors: $savedFavorites');
               
               if (mounted) {
@@ -741,8 +1036,8 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
                       padding: const EdgeInsets.all(16),
                       color: Colors.grey[50],
                       child: Column(
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             'الأطباء المفضلون',
                             style: TextStyle(
                               fontSize: 20,
@@ -750,6 +1045,10 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
                               color: Color(0xFF2FBDAF),
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          
+                          // تم حذف عداد الحجوزات المؤكدة من الشاشة
+                          // العداد لا يزال يعمل في الخلفية ويتم تحديثه في قاعدة البيانات
                         ],
                       ),
                     ),
@@ -856,7 +1155,26 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
                                           color: Colors.grey[600],
                                         ),
                                       ),
-                                      trailing: const Icon(Icons.chevron_left, color: Color(0xFF2FBDAF)),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // زر حذف الطبيب
+                                          IconButton(
+                                            onPressed: () => _showDeleteConfirmation(
+                                              doctor['doctorId'],
+                                              doctor['doctorName'],
+                                            ),
+                                            icon: const Icon(
+                                              Icons.delete_outline,
+                                              color: Colors.red,
+                                              size: 24,
+                                            ),
+                                            tooltip: 'حذف من المفضلة',
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Icon(Icons.chevron_left, color: Color(0xFF2FBDAF)),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 );

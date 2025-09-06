@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class AdminDoctorsScheduleScreen extends StatefulWidget {
   final String centerId;
@@ -21,8 +23,27 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Cache keys and duration
+  late final String _cacheKey;
+  late final String _cacheTimestampKey;
+  final Duration _cacheValidDuration = const Duration(hours: 1); // Cache for 1 hour
+
+  @override
+  void initState() {
+    super.initState();
+    // تهيئة Cache keys
+    _cacheKey = 'doctors_schedule_${widget.centerId}';
+    _cacheTimestampKey = 'doctors_schedule_timestamp_${widget.centerId}';
+  }
+
   Future<List<Map<String, dynamic>>> fetchAllDoctors() async {
     try {
+      // محاولة تحميل البيانات من Cache أولاً
+      final cachedData = await _loadFromCache();
+      if (cachedData != null) {
+        return cachedData;
+      }
+      
       // جلب جميع التخصصات
       final specializationsSnapshot = await FirebaseFirestore.instance
           .collection('medicalFacilities')
@@ -47,6 +68,13 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
         
         for (var doctorDoc in doctorsSnapshot.docs) {
           final doctorData = doctorDoc.data();
+          
+          // التحقق من أن الطبيب نشط (غير معطل)
+          final isActive = doctorData['isActive'] ?? true;
+          if (!isActive) {
+            continue; // تخطي الأطباء المعطلين
+          }
+          
           // إضافة معلومات إضافية لكل طبيب
           doctorData['specialization'] = specializationName;
           doctorData['doctorId'] = doctorDoc.id;
@@ -55,10 +83,63 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
         }
       }
       
+      // حفظ البيانات في Cache
+      if (allDoctors.isNotEmpty) {
+        await _saveToCache(allDoctors);
+      }
+      
       return allDoctors;
     } catch (e) {
       print('Error fetching doctors: $e');
       return [];
+    }
+  }
+
+  // دالة تحميل البيانات من Cache
+  Future<List<Map<String, dynamic>>?> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedData = prefs.getString(_cacheKey);
+      final timestamp = prefs.getInt(_cacheTimestampKey);
+      
+      if (cachedData != null && timestamp != null) {
+        final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
+        final isValid = cacheAge < _cacheValidDuration.inMilliseconds;
+        
+        if (isValid) {
+          final List<dynamic> decoded = jsonDecode(cachedData);
+          return decoded.cast<Map<String, dynamic>>();
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error loading from cache: $e');
+      return null;
+    }
+  }
+
+  // دالة حفظ البيانات في Cache
+  Future<void> _saveToCache(List<Map<String, dynamic>> doctors) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encodedData = jsonEncode(doctors);
+      await prefs.setString(_cacheKey, encodedData);
+      await prefs.setInt(_cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
+      print('Doctors schedule data cached successfully');
+    } catch (e) {
+      print('Error saving to cache: $e');
+    }
+  }
+
+  // دالة حذف Cache
+  Future<void> _clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey);
+      await prefs.remove(_cacheTimestampKey);
+      print('Schedule cache cleared successfully');
+    } catch (e) {
+      print('Error clearing cache: $e');
     }
   }
 
