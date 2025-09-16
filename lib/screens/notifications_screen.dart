@@ -215,6 +215,77 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  // تحديد نص اليوم/غداً بناءً على تاريخ الموعد
+  String _relativeDayLabel(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final diff = target.difference(today).inDays;
+    if (diff == 0) return 'اليوم';
+    if (diff == 1) return 'غداً';
+    return intl.DateFormat('EEEE', 'ar').format(date); // اسم اليوم لباقي الأيام
+  }
+
+  // تنسيق سطر الموعد: اليوم/غداً - التاريخ - الوقت (صباحاً/مساءً)
+  String buildAppointmentLine(String dateStr, String timeStr) {
+    DateTime? date;
+    DateTime? timeAsDate;
+    // محاولة تحليل التاريخ
+    try {
+      date = DateTime.parse(dateStr);
+    } catch (_) {
+      date = null;
+    }
+
+    // محاولة تحليل الوقت
+    try {
+      timeAsDate = DateTime.parse(timeStr);
+    } catch (_) {
+      // إذا كان HH:mm فقط
+      final parts = timeStr.split(':');
+      if (parts.length >= 2) {
+        final now = DateTime.now();
+        final hour = int.tryParse(parts[0]) ?? 0;
+        final minute = int.tryParse(parts[1]) ?? 0;
+        timeAsDate = DateTime(now.year, now.month, now.day, hour, minute);
+      } else {
+        timeAsDate = null;
+      }
+    }
+
+    // AM/PM بالعربية
+    String period = '';
+    String timeOut;
+    if (timeAsDate != null) {
+      final hour = timeAsDate.hour;
+      period = hour < 12 ? 'صباحاً' : 'مساءً';
+      timeOut = intl.DateFormat('HH:mm', 'ar').format(timeAsDate);
+    } else {
+      // fallback دون تنسيق
+      final parts = timeStr.split(':');
+      final guessHour = parts.isNotEmpty ? (int.tryParse(parts[0]) ?? 12) : 12;
+      period = guessHour < 12 ? 'صباحاً' : 'مساءً';
+      timeOut = timeStr;
+    }
+
+    String dayLabel;
+    String dateOut;
+    if (date != null) {
+      dayLabel = _relativeDayLabel(date);
+      dateOut = intl.DateFormat('yyyy/MM/dd', 'ar').format(date);
+    } else {
+      dayLabel = '';
+      dateOut = dateStr;
+    }
+
+    final parts = <String>[
+      if (dayLabel.isNotEmpty) dayLabel,
+      dateOut,
+      '$timeOut ($period)'
+    ];
+    return parts.join(' - ');
+  }
+
   String formatNotificationTime(String timestamp) {
     try {
       final date = DateTime.parse(timestamp);
@@ -362,15 +433,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'التاريخ: ${formatDate(notification['appointmentDate'])}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[500],
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'الوقت: ${notification['appointmentTime']}',
+                                  'الموعد: ${buildAppointmentLine(notification['appointmentDate'] ?? '', notification['appointmentTime'] ?? '')}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[500],

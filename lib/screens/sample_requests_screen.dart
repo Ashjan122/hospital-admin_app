@@ -11,6 +11,7 @@ class SampleRequestsScreen extends StatefulWidget {
 
 class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
   String? _currentControlId;
+  String? _currentUserName;
 
   @override
   void initState() {
@@ -38,6 +39,9 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
       
       final userName = prefs.getString('userName');
       print('Getting userName from SharedPreferences: $userName');
+      setState(() {
+        _currentUserName = userName;
+      });
       
       if (userName != null) {
         // البحث عن الكنترول في كولكشن controlUsers باستخدام userName
@@ -80,6 +84,7 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
         print('No userName found in SharedPreferences');
         setState(() {
           _currentControlId = null;
+          _currentUserName = null;
         });
       }
     } catch (e) {
@@ -116,6 +121,7 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
         'controlId': _currentControlId,
         'receivedAt': FieldValue.serverTimestamp(),
         'status': 'received',
+        'receivedByName': _currentUserName,
       });
 
       print('Request updated successfully');
@@ -268,6 +274,7 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                 final request = pendingRequests[index];
                 final requestData = request.data() as Map<String, dynamic>;
                 final requestId = request.id;
+                final receivedByName = requestData['receivedByName']?.toString();
                 
                 // طباعة جميع الحقول للتشخيص
                 print('Request ID: $requestId');
@@ -378,9 +385,11 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(color: Colors.green.withOpacity(0.3)),
                                   ),
-                                  child: const Text(
-                                    'تم الاستلام',
-                                    style: TextStyle(
+                                  child: Text(
+                                    (receivedByName != null && receivedByName.isNotEmpty)
+                                        ? 'تم الاستلام من قبل $receivedByName'
+                                        : 'تم الاستلام',
+                                    style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.green,
