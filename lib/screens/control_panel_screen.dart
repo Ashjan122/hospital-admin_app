@@ -12,6 +12,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:path/path.dart' as path;
+import 'dart:typed_data';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:hospital_admin_app/screens/users_stats_screen.dart';
+import 'package:hospital_admin_app/screens/sample_requests_screen.dart';
 
 class ControlPanelScreen extends StatefulWidget {
   const ControlPanelScreen({super.key});
@@ -43,9 +50,12 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   bool _isUploadingImage = false;
   final ImagePicker _picker = ImagePicker();
 
+  // تم استبدال نافذة الإحصائيات بشاشة مخصصة UsersStatsScreen
+
   @override
   void initState() {
     super.initState();
+    print('ControlPanelScreen initState');
     _checkLoginStatus();
   }
 
@@ -54,10 +64,18 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final userType = prefs.getString('userType');
     
+    print('ControlPanel _checkLoginStatus - isLoggedIn: $isLoggedIn, userType: $userType');
+    
     if (!isLoggedIn || userType != 'control') {
+      print('Redirecting to login screen');
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       }
+    } else {
+      print('User is logged in as control, staying in ControlPanel');
+      // حذف fromControlPanel عند الوصول للكنترول
+      await prefs.remove('fromControlPanel');
+      print('تم حذف fromControlPanel عند الوصول للكنترول');
     }
   }
 
@@ -294,6 +312,328 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     }
   }
 
+  Future<void> _exportCenterDoctorsSchedulePdf(String centerId, String centerName) async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2FBDAF),
+          ),
+        ),
+      );
+
+      final PdfDocument document = PdfDocument();
+
+      // Load assets (logo and Arabic font) if available
+      PdfBitmap? logoImage;
+      PdfFont baseFont;
+      Uint8List? arabicFontBytes;
+      try {
+        final ByteData logoData = await rootBundle.load('assets/images/logo.png');
+        logoImage = PdfBitmap(logoData.buffer.asUint8List());
+      } catch (_) {}
+
+      try {
+        final ByteData fontData = await rootBundle.load('assets/fonts/NotoNaskhArabic-Regular.ttf');
+        arabicFontBytes = fontData.buffer.asUint8List();
+        baseFont = PdfTrueTypeFont(arabicFontBytes, 12, style: PdfFontStyle.regular);
+      } catch (_) {
+        baseFont = PdfStandardFont(PdfFontFamily.helvetica, 12);
+      }
+
+      final PdfFont titleFont = (arabicFontBytes != null)
+          ? PdfTrueTypeFont(arabicFontBytes, 20, style: PdfFontStyle.bold)
+          : PdfStandardFont(PdfFontFamily.helvetica, 20, style: PdfFontStyle.bold);
+      final PdfFont headerFont = (arabicFontBytes != null)
+          ? PdfTrueTypeFont(arabicFontBytes, 16, style: PdfFontStyle.bold)
+          : PdfStandardFont(PdfFontFamily.helvetica, 16, style: PdfFontStyle.bold);
+      // Compact fonts for dense tables
+      final PdfFont colHeaderFont = (arabicFontBytes != null)
+          ? PdfTrueTypeFont(arabicFontBytes, 12, style: PdfFontStyle.bold)
+          : PdfStandardFont(PdfFontFamily.helvetica, 12, style: PdfFontStyle.bold);
+      final PdfFont bodyFont = (arabicFontBytes != null)
+          ? PdfTrueTypeFont(arabicFontBytes, 11, style: PdfFontStyle.bold)
+          : PdfStandardFont(PdfFontFamily.helvetica, 11, style: PdfFontStyle.bold);
+
+      // Fetch specializations for the center
+      final specializationsSnapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(centerId)
+          .collection('specializations')
+          .get();
+      // headerDrawn no longer needed since center header is drawn on every page
+
+      for (var specDoc in specializationsSnapshot.docs) {
+        final specData = specDoc.data();
+        final String specName = specData['specName']?.toString() ?? specDoc.id;
+
+        // Fetch doctors under this specialization
+        final doctorsSnapshot = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(centerId)
+            .collection('specializations')
+            .doc(specDoc.id)
+            .collection('doctors')
+            .get();
+
+        // Add a page per specialization
+        final PdfPage page = document.pages.add();
+        PdfGraphics currentG = page.graphics;
+        Size currentPageSize = page.getClientSize();
+
+        // Watermark on every page (more transparent centered logo)
+        if (logoImage != null) {
+          currentG.save();
+          currentG.setTransparency(0.04);
+          final double wmW = currentPageSize.width * 0.7;
+          final double wmH = wmW;
+          currentG.drawImage(
+            logoImage,
+            Rect.fromLTWH((currentPageSize.width - wmW) / 2, (currentPageSize.height - wmH) / 2, wmW, wmH),
+          );
+          currentG.restore();
+        }
+        // Draw center name and small logo on every page
+        if (logoImage != null) {
+          currentG.drawImage(logoImage, Rect.fromLTWH(currentPageSize.width - 60, 20, 40, 40));
+        }
+        currentG.drawString(
+          centerName,
+          titleFont,
+          bounds: Rect.fromLTWH(0, 30, currentPageSize.width, 36),
+          format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+        );
+        currentG.drawString(
+          specName,
+          headerFont,
+          bounds: Rect.fromLTWH(0, 80, currentPageSize.width, 28),
+          format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+        );
+
+        // Single table for all doctors in this specialization (rows=days, columns=doctors)
+        final List<String> days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+        final double topStart = 120;  // more space above for titles
+        final double rowHeight = 26;  // larger row height for clearer cells
+        final double dayColWidth = 76; // wider day column
+        final double doctorColWidth = 110; // wider doctor column
+        // Unified paddings for consistent spacing
+        const double cellPadX = 1.0;
+        const double headerPadY = 4.0;
+        const double bodyPadY = 3.0;
+
+        // Collect active doctors
+        final List<Map<String, dynamic>> activeDoctors = [];
+        for (var d in doctorsSnapshot.docs) {
+          final m = d.data();
+          if ((m['isActive'] ?? true) == true) {
+            activeDoctors.add({
+              'name': m['docName']?.toString() ?? 'غير معروف',
+              'schedule': (m['workingSchedule'] as Map<String, dynamic>?) ?? {},
+            });
+          }
+        }
+
+        // If no active doctors, skip this specialization (do not draw a page)
+        if (activeDoctors.isEmpty) {
+          // remove the just-added page (since nothing to show)
+          document.pages.remove(page);
+          continue;
+        }
+
+        // Determine how many doctor columns fit per table row (horizontally)
+        final int maxColsPerTable = 6; // allow up to 6 doctors per table row
+        const double tableSpacing = 8.0; // vertical space between stacked tables
+
+        // Render stacked tables on the same page when space allows
+        int start = 0;
+        double currentYForTables = topStart;
+        while (start < activeDoctors.length) {
+          final int remaining = activeDoctors.length - start;
+          final int colsThisTable = remaining < maxColsPerTable ? remaining : maxColsPerTable;
+
+          // For small tables (1-2 doctors), expand to minimum width and center
+          final bool isNarrow = colsThisTable <= 2;
+          double dColW = doctorColWidth;
+          double dayW = dayColWidth;
+          double localTableWidth = dayW + colsThisTable * dColW;
+          if (isNarrow) {
+            final double minTableWidth = currentPageSize.width * 0.7; // at least 70% page width
+            if (localTableWidth < minTableWidth) {
+              final double scale = minTableWidth / localTableWidth;
+              dColW *= scale;
+              dayW *= scale;
+              localTableWidth = dayW + colsThisTable * dColW;
+            }
+          }
+          // For 5- or 6-doctor tables, shrink slightly to keep layout tidy
+          if (!isNarrow && (colsThisTable == 5 || colsThisTable == 6)) {
+            final double shrink = (colsThisTable == 5) ? 0.85 : 0.80;
+            dColW *= shrink;
+            dayW *= shrink;
+            localTableWidth = dayW + colsThisTable * dColW;
+          }
+          // Ensure table fits within page width (with small margins)
+          final double maxAllowedWidth = currentPageSize.width - 16;
+          if (localTableWidth > maxAllowedWidth) {
+            final double fitScale = maxAllowedWidth / localTableWidth;
+            dColW *= fitScale;
+            dayW *= fitScale;
+            localTableWidth = dayW + colsThisTable * dColW;
+          }
+          final double startX = (currentPageSize.width - localTableWidth) / 2;
+
+          // Measure table height (header + days rows)
+          final double tableHeight = rowHeight * (1 + days.length);
+
+          // If doesn't fit on current page, create a new page and reset currentYForTables
+          if (currentYForTables + tableHeight > currentPageSize.height - 40) {
+            currentG.drawString(
+              'يتبع...',
+              baseFont,
+              bounds: Rect.fromLTWH(0, currentPageSize.height - 30, currentPageSize.width, 20),
+              format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+            );
+            final PdfPage nextPage = document.pages.add();
+            currentG = nextPage.graphics;
+            currentPageSize = nextPage.getClientSize();
+            // Watermark on paginated pages
+            if (logoImage != null) {
+              currentG.save();
+              currentG.setTransparency(0.04);
+              final double wmW2 = currentPageSize.width * 0.7;
+              final double wmH2 = wmW2;
+              currentG.drawImage(
+                logoImage,
+                Rect.fromLTWH((currentPageSize.width - wmW2) / 2, (currentPageSize.height - wmH2) / 2, wmW2, wmH2),
+              );
+              currentG.restore();
+            }
+            currentG.drawString(
+              specName,
+              headerFont,
+              bounds: Rect.fromLTWH(0, 60, currentPageSize.width, 25),
+              format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+            );
+            currentYForTables = topStart;
+          }
+
+          // Header row background
+          currentG.drawRectangle(
+            bounds: Rect.fromLTWH(startX, currentYForTables, localTableWidth, rowHeight),
+            pen: PdfPen(PdfColor(180, 180, 180)),
+            brush: PdfSolidBrush(PdfColor(235, 235, 235)),
+          );
+
+          // Day header (rightmost)
+          currentG.drawString(
+            'اليوم',
+            colHeaderFont,
+            bounds: Rect.fromLTWH(startX + colsThisTable * dColW, currentYForTables + headerPadY, dayW, rowHeight),
+            format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+          );
+
+          // Doctor headers
+          for (int c = 0; c < colsThisTable; c++) {
+            final String dName = activeDoctors[start + c]['name'] as String;
+            final double x = startX + c * dColW;
+            currentG.drawString(
+              dName,
+              colHeaderFont,
+              bounds: Rect.fromLTWH(x + cellPadX, currentYForTables + headerPadY, dColW - (cellPadX * 2), rowHeight),
+              format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+            );
+          }
+
+          double y = currentYForTables + rowHeight;
+
+          // Rows for each day
+          for (int i = 0; i < days.length; i++) {
+            final String day = days[i];
+
+            // row background
+            currentG.drawRectangle(
+              bounds: Rect.fromLTWH(startX, y, localTableWidth, rowHeight),
+              pen: PdfPen(PdfColor(220, 220, 220)),
+            );
+
+            // Day cell (rightmost)
+            currentG.drawString(
+              day,
+              bodyFont,
+              bounds: Rect.fromLTWH(startX + colsThisTable * dColW, y + bodyPadY, dayW, rowHeight),
+              format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+            );
+
+            // Doctor cells (show only period labels without times)
+            for (int c = 0; c < colsThisTable; c++) {
+              final Map<String, dynamic> schedule = activeDoctors[start + c]['schedule'] as Map<String, dynamic>;
+              String text = '—';
+              final Map<String, dynamic>? daySchedule = schedule[day] as Map<String, dynamic>?;
+              if (daySchedule != null) {
+                final bool hasMorning = daySchedule['morning'] != null;
+                final bool hasEvening = daySchedule['evening'] != null;
+                final List<String> parts = [];
+                if (hasMorning) parts.add('صباح');
+                if (hasEvening) parts.add('مساء');
+                if (parts.isNotEmpty) {
+                  text = parts.join(' - ');
+                }
+              }
+
+              final double x = startX + c * dColW;
+              currentG.drawString(
+                text,
+                bodyFont,
+                bounds: Rect.fromLTWH(x + cellPadX, y + bodyPadY, dColW - (cellPadX * 2), rowHeight),
+                format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+              );
+            }
+
+            y += rowHeight;
+          }
+
+          // advance to next block (stacked table on same page if space allows)
+          currentYForTables = y + tableSpacing;
+          start += colsThisTable;
+        }
+
+      }
+
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = 'جدول_الأطباء_${centerName.replaceAll(' ', '_')}.pdf';
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(await document.save());
+      document.dispose();
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      await OpenFilex.open(file.path);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم إنشاء وفتح ملف PDF لجدول الأطباء'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ أثناء إنشاء PDF: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _editCenter(String centerId, Map<String, dynamic> centerData) async {
     setState(() {
       _editingCenterId = centerId;
@@ -465,6 +805,15 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     );
   }
 
+  void _showSampleRequests() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SampleRequestsScreen(),
+      ),
+    );
+  }
+
   List<QueryDocumentSnapshot> _filterCenters(List<QueryDocumentSnapshot> centers) {
     // ترتيب المراكز أولاً
     final sortedCenters = List<QueryDocumentSnapshot>.from(centers);
@@ -556,6 +905,16 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
             ),
           ),
           actions: [
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const UsersStatsScreen()),
+                );
+              },
+              icon: const Icon(Icons.query_stats, color: Colors.white),
+              tooltip: 'إحصائيات المستخدمين',
+            ),
             IconButton(
               onPressed: () => setState(() => _showAddForm = !_showAddForm),
               icon: Icon(
@@ -724,6 +1083,38 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                           ),
                           child: const Text(
                             'موظفي الاستقبال',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Sample Requests Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showSampleRequests();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF2FBDAF),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: const BorderSide(
+                              color: Color(0xFF2FBDAF),
+                              width: 2,
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            ' طلبات العينات',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1152,6 +1543,9 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                                     case 'delete':
                                       _deleteCenter(centerId, centerName);
                                       break;
+                                    case 'export_pdf':
+                                      _exportCenterDoctorsSchedulePdf(centerId, centerName);
+                                      break;
                                   }
                                 },
                                 itemBuilder: (context) => [
@@ -1186,6 +1580,17 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                                         const Icon(Icons.delete, color: Colors.red, size: 20),
                                         const SizedBox(width: 8),
                                         const Text('حذف المركز'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuDivider(),
+                                  const PopupMenuItem<String>(
+                                    value: 'export_pdf',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.picture_as_pdf, color: Color(0xFF2FBDAF), size: 20),
+                                        SizedBox(width: 8),
+                                        Text('جدول الأطباء PDF'),
                                       ],
                                     ),
                                   ),

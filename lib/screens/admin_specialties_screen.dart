@@ -290,6 +290,13 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,
+          actions: [
+            IconButton(
+              onPressed: _isLoading ? null : _showAddSpecialtyDialog,
+              icon: const Icon(Icons.add),
+              tooltip: 'إضافة تخصص جديد',
+            ),
+          ],
         ),
         body: Column(
           children: [
@@ -315,24 +322,6 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                       ),
                       filled: true,
                       fillColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Add specialty button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _showAddSpecialtyDialog,
-                      icon: const Icon(Icons.add),
-                      label: Text(_isLoading ? 'جاري الإضافة...' : 'إضافة تخصص جديد'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2FBDAF),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
                     ),
                   ),
                 ],
@@ -385,9 +374,13 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
-                                leading: Icon(
-                                  Icons.medical_services,
-                                  color: isActive ? Colors.green : Colors.grey,
+                                leading: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
                                 ),
                                 title: Text(
                                   specialty['name'],

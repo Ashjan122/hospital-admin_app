@@ -2,10 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'doctor_bookings_screen.dart';
 import '../services/sms_service.dart';
 import '../services/favorite_doctors_service.dart';
 import 'notifications_screen.dart'; // Added import for NotificationsScreen
+import '../services/presence_service.dart';
+import '../services/sms_service.dart' show NotificationService;
 
 class ReceptionStaffScreen extends StatefulWidget {
   final String centerId;
@@ -33,6 +36,15 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
   bool _loading = true;
   int _unreadNotifications = 0;
   int _confirmedBookingsCount = 0; // عداد الحجوزات المؤكدة
+  bool _listenersActive = false; // لمنع الازدواجية مع المؤقت
+  bool _internalNotificationsEnabled = false; // إيقاف/تشغيل الإشعارات الداخلية مؤقتاً
+  bool _savingFavorites = false; // حالة حفظ الأطباء المفضلين
+
+  // تتبع الإشعارات التي تم معالجتها لتجنب التكرار
+  final Set<String> _notifiedAppointmentIds = <String>{};
+
+  // مستمعو الحجوزات للأطباء المفضلين (doctorId -> قائمة مستمعين)
+  final Map<String, List<StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>> _doctorAppointmentSubscriptions = {};
 
   @override
   void initState() {
@@ -57,6 +69,12 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
     
     // بدء مراقبة الحجوزات الجديدة
     _startMonitoringNewBookings();
+
+    // presence online on open
+    PresenceService.setOnline(userId: widget.userId, userType: 'reception');
+
+    // تأكد من تعطيل الإشعارات الداخلية من الخدمة أيضاً
+    NotificationService.setInternalEnabled(false);
   }
 
   // دالة فحص SharedPreferences
@@ -87,10 +105,14 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
   }
 
   void _startMonitoringNewBookings() {
+    if (!_internalNotificationsEnabled) return; // موقوفة مؤقتاً
     // مراقبة الحجوزات الجديدة كل دقيقة
     Future.delayed(const Duration(minutes: 1), () {
       if (mounted) {
-        _checkForNewBookings();
+        // إذا كانت هناك مستمعات فورية مفعلة، لا داعي للفحص الدوري لتجنب التكرار
+        if (!_listenersActive) {
+          _checkForNewBookings();
+        }
         _startMonitoringNewBookings(); // إعادة تشغيل المراقبة
       }
     });
@@ -98,6 +120,8 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
 
   Future<void> _checkForNewBookings() async {
     try {
+      if (!_internalNotificationsEnabled) return; // موقوفة مؤقتاً
+      if (_listenersActive) return; // حماية إضافية
       // التحقق من الحجوزات الجديدة للأطباء المفضلين
       for (String doctorId in _selectedDoctorIds) {
         await _checkDoctorNewBookings(doctorId);
@@ -109,6 +133,8 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
 
   Future<void> _checkDoctorNewBookings(String doctorId) async {
     try {
+      if (!_internalNotificationsEnabled) return; // موقوفة مؤقتاً
+      if (_listenersActive) return; // إذا المراقبة الفورية فعالة نتجنب الازدواجية
       // البحث عن الطبيب في جميع التخصصات
       final specializationsSnapshot = await FirebaseFirestore.instance
           .collection('medicalFacilities')
@@ -148,13 +174,21 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
 
           for (var appointmentDoc in appointmentsSnapshot.docs) {
             final appointmentData = appointmentDoc.data();
+
+            // تجاهل الحجوزات التي أنشأها موظف الاستقبال
+            final createdBy = (appointmentData['createdBy'] ?? '').toString();
+            final createdByType = (appointmentData['createdByType'] ?? '').toString();
+            if (createdBy == 'reception' || createdByType == 'reception') {
+              continue;
+            }
             
             // التحقق من أن هذا الحجز لم يتم إشعاره من قبل
-            final notificationKey = 'notification_${appointmentDoc.id}';
+            final notificationKey = 'notification_${widget.userId}_${appointmentDoc.id}';
             final prefs = await SharedPreferences.getInstance();
             final isNotified = prefs.getBool(notificationKey) ?? false;
             
             if (!isNotified) {
+              if (!_internalNotificationsEnabled) { continue; }
               // حفظ الإشعار
               await NotificationService.saveNotification(
                 userId: widget.userId,
@@ -181,6 +215,116 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
       }
     } catch (e) {
       print('Error checking new bookings for doctor $doctorId: $e');
+    }
+  }
+
+  // إلغاء كل المستمعين الحاليين
+  void _detachAllAppointmentListeners() {
+    for (final subs in _doctorAppointmentSubscriptions.values) {
+      for (final s in subs) {
+        s.cancel();
+      }
+    }
+    _doctorAppointmentSubscriptions.clear();
+  }
+
+  // إعادة بناء المستمعين لكل طبيب مفضل لمراقبة الحجوزات الجديدة
+  Future<void> _refreshAppointmentListeners() async {
+    try {
+      if (!_internalNotificationsEnabled) {
+        _detachAllAppointmentListeners();
+        _listenersActive = false;
+        return; // موقوفة مؤقتاً
+      }
+      _detachAllAppointmentListeners();
+      // فعّل العلم مبكراً لتوقيف الفحص الدوري فوراً وتجنب الازدواجية
+      _listenersActive = true;
+      for (final doctorId in _selectedDoctorIds) {
+        final subs = <StreamSubscription<QuerySnapshot<Map<String, dynamic>>>>[];
+
+        // إيجاد تخصص الطبيب ثم الاشتراك على appointments
+        final specializationsSnapshot = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .get();
+
+        for (var specDoc in specializationsSnapshot.docs) {
+          final doctorRef = FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(doctorId);
+
+          final doctorDoc = await doctorRef.get();
+          if (!doctorDoc.exists) continue;
+          final doctorData = doctorDoc.data() as Map<String, dynamic>?;
+          final fixedDoctorName = (doctorData?['docName'] ?? doctorData?['doctorName'] ?? 'طبيب غير معروف').toString();
+
+          // استمع للحجوزات الجديدة فقط (createdAt أكبر من الآن - 2 دقيقة كنافذة صغيرة)
+          final twoMinutesAgo = DateTime.now().subtract(const Duration(minutes: 2));
+          final sub = doctorRef
+              .collection('appointments')
+              .where('createdAt', isGreaterThan: Timestamp.fromDate(twoMinutesAgo))
+              .snapshots()
+              .listen((snapshot) async {
+            for (final doc in snapshot.docChanges) {
+              if (doc.type != DocumentChangeType.added) continue;
+              final data = doc.doc.data();
+              if (data == null) continue;
+
+              // تجاهل حجوزات موظف الاستقبال
+              final byType = (data['createdByType'] ?? '').toString();
+              final by = (data['createdBy'] ?? '').toString();
+              if (byType == 'reception' || by == 'reception') continue;
+
+              // منع التكرار: افحص مجموعة الذاكرة و SharedPreferences
+              final String appointmentId = doc.doc.id;
+              if (_notifiedAppointmentIds.contains(appointmentId)) continue;
+              final prefs = await SharedPreferences.getInstance();
+              final String spKey = 'notification_${widget.userId}_${appointmentId}';
+              final bool already = prefs.getBool(spKey) ?? false;
+              if (already) {
+                _notifiedAppointmentIds.add(appointmentId);
+                continue;
+              }
+
+              if (!_internalNotificationsEnabled) continue; // موقوفة مؤقتاً
+              final patientName = data['patientName'] ?? 'مريض غير معروف';
+              final appointmentDate = data['date'] ?? '';
+              final appointmentTime = data['time'] ?? '';
+
+              // حفظ الإشعار محلياً وزيادة العداد
+              await NotificationService.saveNotification(
+                userId: widget.userId,
+                doctorId: doctorId,
+                doctorName: fixedDoctorName,
+                patientName: patientName,
+                appointmentDate: appointmentDate,
+                appointmentTime: appointmentTime,
+                appointmentId: doc.doc.id,
+                centerId: widget.centerId,
+              );
+
+              // علّم بأنه تم إشعاره
+              _notifiedAppointmentIds.add(appointmentId);
+              await prefs.setBool(spKey, true);
+
+              // تحديث عداد الإشعارات في الواجهة
+              _loadUnreadNotifications();
+            }
+          });
+          subs.add(sub);
+          break; // وجدنا الطبيب
+        }
+        _doctorAppointmentSubscriptions[doctorId] = subs;
+      }
+      // ثبّت العلم بناءً على وجود مستمعين فعليين
+      _listenersActive = _doctorAppointmentSubscriptions.isNotEmpty;
+    } catch (e) {
+      print('❌ Error refreshing appointment listeners: $e');
     }
   }
 
@@ -291,6 +435,9 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
 
   @override
   void dispose() {
+    // mark offline on dispose
+    PresenceService.setOffline(userId: widget.userId);
+    _detachAllAppointmentListeners();
     super.dispose();
   }
 
@@ -339,6 +486,8 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
       }
       
       print('=== LOAD COMPLETED ===');
+      // بعد تحميل الأطباء المفضلين، حدّث المستمعين للحجوزات
+      await _refreshAppointmentListeners();
       
     } catch (e) {
       print('❌ Error loading selected doctors: $e');
@@ -356,6 +505,9 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
       print('Selected count: ${_selectedDoctorIds.length}');
       print('Selected types: ${_selectedDoctorIds.map((id) => '${id.runtimeType}: $id').toList()}');
       
+      // احتفظ بالقائمة السابقة للاشتراك/إلغاء الاشتراك في التوبيكات لاحقاً
+      final Set<String> previousDoctorIds = {..._selectedDoctorIds};
+
       // التحقق من أن القائمة ليست فارغة
       if (_selectedDoctorIds.isEmpty) {
         print('⚠️ WARNING: No doctors selected!');
@@ -409,6 +561,42 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
           });
           
           print('✅ Local state updated with: $_selectedDoctorIds');
+
+          // إدارة الاشتراك في مواضيع التنبيهات لكل طبيب
+          try {
+            final FirebaseMessaging messaging = FirebaseMessaging.instance;
+            final Set<String> newDoctorIds = {...validIds.map((e) => e.toString())};
+            final Set<String> toSubscribe = newDoctorIds.difference(previousDoctorIds);
+            final Set<String> toUnsubscribe = previousDoctorIds.difference(newDoctorIds);
+
+            // الاشتراك في الأطباء الجدد
+            for (final docId in toSubscribe) {
+              final topic = 'doctor_${docId}';
+              print('🔔 Subscribing to topic: $topic');
+              await messaging.subscribeToTopic(topic);
+            }
+
+            // في حالة عدم وجود تغيير فعلي، أعد الاشتراك في جميع المواضيع للتأكيد
+            if (toSubscribe.isEmpty && toUnsubscribe.isEmpty) {
+              for (final docId in newDoctorIds) {
+                final topic = 'doctor_${docId}';
+                print('🔁 Re-subscribing to topic (no changes detected): $topic');
+                await messaging.subscribeToTopic(topic);
+              }
+            }
+
+            // إلغاء الاشتراك من الأطباء المحذوفين
+            for (final docId in toUnsubscribe) {
+              final topic = 'doctor_${docId}';
+              print('🔕 Unsubscribing from topic: $topic');
+              await messaging.unsubscribeFromTopic(topic);
+            }
+          } catch (e) {
+            print('❌ Error managing FCM topic subscriptions: $e');
+          }
+
+          // إعادة بناء مستمعي الحجوزات بعد التحديث
+          await _refreshAppointmentListeners();
         } else {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -883,29 +1071,67 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
                       ),
                       const Spacer(),
                       ElevatedButton(
-                        onPressed: () async {
+                        onPressed: _savingFavorites ? null : () async {
                           print('=== SAVING FROM DIALOG ===');
                           print('Temp selected doctors: $tempSelected');
                           print('Temp selected count: ${tempSelected.length}');
                           
-                          // تحديث القائمة الرئيسية
-                          setState(() {
-                            _selectedDoctorIds = tempSelected.toList();
+                          setLocalState(() {
+                            _savingFavorites = true;
                           });
                           
-                          print('Updated _selectedDoctorIds: $_selectedDoctorIds');
-                          print('Updated count: ${_selectedDoctorIds.length}');
-                          
-                          // حفظ البيانات في قاعدة البيانات
-                          await _saveSelectedDoctors();
-                          
-                          Navigator.pop(ctx);
+                          try {
+                            // تحديث القائمة الرئيسية
+                            setState(() {
+                              _selectedDoctorIds = tempSelected.toList();
+                            });
+                            
+                            print('Updated _selectedDoctorIds: $_selectedDoctorIds');
+                            print('Updated count: ${_selectedDoctorIds.length}');
+                            
+                            // حفظ البيانات في قاعدة البيانات
+                            await _saveSelectedDoctors();
+                            
+                            Navigator.pop(ctx);
+                          } catch (e) {
+                            print('Error saving favorites: $e');
+                            if (mounted && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('خطأ في حفظ الأطباء المفضلين: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setLocalState(() {
+                                _savingFavorites = false;
+                              });
+                            }
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2FBDAF),
                           foregroundColor: Colors.white,
                         ),
-                        child: const Text('حفظ'),
+                        child: _savingFavorites
+                            ? const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('جاري الحفظ...'),
+                                ],
+                              )
+                            : const Text('حفظ'),
                       ),
                     ],
                   ),

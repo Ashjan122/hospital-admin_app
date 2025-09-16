@@ -1,7 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/services.dart';
 
 class AdminDoctorsScheduleScreen extends StatefulWidget {
   final String centerId;
@@ -26,7 +31,7 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
   // Cache keys and duration
   late final String _cacheKey;
   late final String _cacheTimestampKey;
-  final Duration _cacheValidDuration = const Duration(hours: 1); // Cache for 1 hour
+  final Duration _cacheValidDuration = const Duration(hours: 6); // Cache for 6 hours
 
   @override
   void initState() {
@@ -34,6 +39,29 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
     // تهيئة Cache keys
     _cacheKey = 'doctors_schedule_${widget.centerId}';
     _cacheTimestampKey = 'doctors_schedule_timestamp_${widget.centerId}';
+    
+    // تجديد Cache تلقائياً عند فتح الشاشة إذا كان قديم
+    _checkAndRefreshCache();
+  }
+
+  // دالة للتحقق من Cache وتجديده تلقائياً إذا كان قديم
+  Future<void> _checkAndRefreshCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = prefs.getInt(_cacheTimestampKey);
+      
+      if (timestamp != null) {
+        final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
+        final isExpired = cacheAge >= _cacheValidDuration.inMilliseconds;
+        
+        if (isExpired) {
+          print('Cache expired, will refresh on next load');
+          await _clearCache();
+        }
+      }
+    } catch (e) {
+      print('Error checking cache: $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> fetchAllDoctors() async {
@@ -41,8 +69,11 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
       // محاولة تحميل البيانات من Cache أولاً
       final cachedData = await _loadFromCache();
       if (cachedData != null) {
+        print('Loading doctors from cache - ${cachedData.length} doctors');
         return cachedData;
       }
+      
+      print('Cache miss - fetching doctors from Firestore...');
       
       // جلب جميع التخصصات
       final specializationsSnapshot = await FirebaseFirestore.instance
@@ -53,45 +84,63 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
 
       List<Map<String, dynamic>> allDoctors = [];
       
-      // البحث في كل تخصص
+      // تحميل الأطباء بالتوازي بدلاً من متسلسل
+      List<Future<void>> futures = [];
+      
       for (var specDoc in specializationsSnapshot.docs) {
-        final specializationData = specDoc.data();
-        final specializationName = specializationData['specName'] ?? specDoc.id;
-        
-        final doctorsSnapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .get();
-        
-        for (var doctorDoc in doctorsSnapshot.docs) {
-          final doctorData = doctorDoc.data();
-          
-          // التحقق من أن الطبيب نشط (غير معطل)
-          final isActive = doctorData['isActive'] ?? true;
-          if (!isActive) {
-            continue; // تخطي الأطباء المعطلين
-          }
-          
-          // إضافة معلومات إضافية لكل طبيب
-          doctorData['specialization'] = specializationName;
-          doctorData['doctorId'] = doctorDoc.id;
-          doctorData['specializationId'] = specDoc.id;
-          allDoctors.add(doctorData);
-        }
+        futures.add(_loadDoctorsFromSpecialization(specDoc, allDoctors));
       }
+      
+      // انتظار اكتمال جميع الطلبات
+      await Future.wait(futures);
       
       // حفظ البيانات في Cache
       if (allDoctors.isNotEmpty) {
         await _saveToCache(allDoctors);
+        print('Cached ${allDoctors.length} doctors for 6 hours');
       }
       
       return allDoctors;
     } catch (e) {
       print('Error fetching doctors: $e');
       return [];
+    }
+  }
+
+  // دالة منفصلة لتحميل الأطباء من تخصص واحد
+  Future<void> _loadDoctorsFromSpecialization(
+    DocumentSnapshot specDoc,
+    List<Map<String, dynamic>> allDoctors,
+  ) async {
+    try {
+      final specializationData = specDoc.data() as Map<String, dynamic>? ?? {};
+      final specializationName = specializationData['specName'] ?? specDoc.id;
+      
+      final doctorsSnapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .doc(specDoc.id)
+          .collection('doctors')
+          .get();
+      
+      for (var doctorDoc in doctorsSnapshot.docs) {
+        final doctorData = doctorDoc.data();
+        
+        // التحقق من أن الطبيب نشط (غير معطل)
+        final isActive = doctorData['isActive'] ?? true;
+        if (!isActive) {
+          continue; // تخطي الأطباء المعطلين
+        }
+        
+        // إضافة معلومات إضافية لكل طبيب
+        doctorData['specialization'] = specializationName;
+        doctorData['doctorId'] = doctorDoc.id;
+        doctorData['specializationId'] = specDoc.id;
+        allDoctors.add(doctorData);
+      }
+    } catch (e) {
+      print('Error loading doctors from specialization ${specDoc.id}: $e');
     }
   }
 
@@ -123,9 +172,14 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       final encodedData = jsonEncode(doctors);
-      await prefs.setString(_cacheKey, encodedData);
-      await prefs.setInt(_cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
-      print('Doctors schedule data cached successfully');
+      
+      // حفظ البيانات بالتوازي
+      await Future.wait([
+        prefs.setString(_cacheKey, encodedData),
+        prefs.setInt(_cacheTimestampKey, DateTime.now().millisecondsSinceEpoch),
+      ]);
+      
+      print('Doctors schedule data cached successfully - ${doctors.length} doctors');
     } catch (e) {
       print('Error saving to cache: $e');
     }
@@ -226,6 +280,36 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,
+          actions: [
+            IconButton(
+              onPressed: () async {
+                // إظهار رسالة تحديث
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('جاري تحديث البيانات...'),
+                    duration: Duration(seconds: 1),
+                  ),
+                );
+                
+                // حذف الكاش وإعادة تحميل البيانات
+                await _clearCache();
+                setState(() {
+                  // إعادة بناء الواجهة لتحميل البيانات الجديدة
+                });
+                
+                // إظهار رسالة نجاح
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('تم تحديث البيانات بنجاح'),
+                    backgroundColor: Colors.green,
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.refresh),
+              tooltip: 'تحديث البيانات',
+            ),
+          ],
         ),
         body: Column(
           children: [
@@ -399,6 +483,22 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
                         ),
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () => _exportDoctorScheduleToPDF(doctor),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2FBDAF).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Icon(
+                            Icons.picture_as_pdf,
+                            size: 12,
+                            color: Color(0xFF2FBDAF),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -742,6 +842,9 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
         'workingSchedule': doctor['workingSchedule'],
       });
 
+      // مسح Cache بعد التحديث لضمان البيانات الحديثة
+      await _clearCache();
+      
       // عرض رسالة نجاح فقط
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -756,6 +859,222 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('حدث خطأ في تحديث الجدول: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // دالة تصدير جدول الطبيب إلى PDF
+  Future<void> _exportDoctorScheduleToPDF(Map<String, dynamic> doctor) async {
+    try {
+      // إظهار مؤشر التحميل
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF2FBDAF),
+          ),
+        ),
+      );
+
+      // إنشاء مستند PDF جديد
+      final PdfDocument document = PdfDocument();
+      
+      // إضافة صفحة جديدة
+      final PdfPage page = document.pages.add();
+      final PdfGraphics graphics = page.graphics;
+      final Size pageSize = page.getClientSize();
+      
+      // تحميل صورة الشعار
+      final ByteData logoData = await rootBundle.load('assets/images/logo.png');
+      final PdfBitmap logoImage = PdfBitmap(logoData.buffer.asUint8List());
+      
+      // علامة مائية شفافة في منتصف الصفحة
+      graphics.save();
+      graphics.setTransparency(0.08);
+      final double watermarkWidth = pageSize.width * 0.8;
+      final double watermarkHeight = watermarkWidth; // مربع لتبسيط الوضع
+      final double watermarkX = (pageSize.width - watermarkWidth) / 2;
+      final double watermarkY = (pageSize.height - watermarkHeight) / 2;
+      graphics.drawImage(
+        logoImage,
+        Rect.fromLTWH(watermarkX, watermarkY, watermarkWidth, watermarkHeight),
+      );
+      graphics.restore();
+      
+      // تحميل خط Noto Naskh Arabic المحلي
+      final ByteData fontData = await rootBundle.load('assets/fonts/NotoNaskhArabic-Regular.ttf');
+      final List<int> fontBytes = fontData.buffer.asUint8List();
+      final PdfFont font = PdfTrueTypeFont(fontBytes, 16, style: PdfFontStyle.bold);
+      final PdfFont titleFont = PdfTrueTypeFont(fontBytes, 20, style: PdfFontStyle.bold);
+      final PdfFont headerFont = PdfTrueTypeFont(fontBytes, 18, style: PdfFontStyle.bold);
+      
+      // معلومات الطبيب
+      final doctorName = doctor['docName'] ?? 'طبيب غير معروف';
+      final specialization = doctor['specialization'] ?? 'تخصص غير معروف';
+      final centerName = widget.centerName ?? 'المركز الطبي';
+      
+      // العنوان الرئيسي - اسم المركز مع شعار أعلى يمين
+      // رسم الشعار أعلى يمين بمقاس صغير
+      const double topPadding = 20;
+      const double rightPadding = 20;
+      const double logoWidth = 40;
+      const double logoHeight = 40;
+      final double logoX = pageSize.width - rightPadding - logoWidth;
+      final double logoY = topPadding;
+      graphics.drawImage(logoImage, Rect.fromLTWH(logoX, logoY, logoWidth, logoHeight));
+
+      // اسم المركز في المنتصف
+      graphics.drawString(
+        centerName,
+        titleFont,
+        bounds: Rect.fromLTWH(0, 20, pageSize.width, 40),
+        format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+      );
+      
+      // معلومات الطبيب (اسم الطبيب وبجانبه التخصص بين قوسين)
+      graphics.drawString(
+        'الطبيب: $doctorName ($specialization)',
+        headerFont,
+        bounds: Rect.fromLTWH(0, 70, pageSize.width, 35),
+        format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+      );
+      
+      // إنشاء جدول الأيام
+      final workingSchedule = doctor['workingSchedule'] as Map<String, dynamic>? ?? {};
+      final days = [
+        'الأحد',
+        'الاثنين', 
+        'الثلاثاء',
+        'الأربعاء',
+        'الخميس',
+        'الجمعة',
+        'السبت',
+      ];
+      
+      // عنوان الجدول
+      graphics.drawString(
+        'جدول الدوام الأسبوعي',
+        headerFont,
+        bounds: Rect.fromLTWH(0, 115, pageSize.width, 35),
+        format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+      );
+      
+      // رسم الجدول - تكبير الجدول ليملأ الصفحة
+      double yPosition = 160;
+      const double rowHeight = 50;
+      const double dayColumnWidth = 120;
+      const double scheduleColumnWidth = 360;
+      
+      // رؤوس الجدول - الأيام في اليمين
+      graphics.drawRectangle(
+        bounds: Rect.fromLTWH(380, yPosition, dayColumnWidth, rowHeight),
+        pen: PdfPen(PdfColor(47, 189, 175)),
+      );
+      graphics.drawString(
+        'اليوم',
+        headerFont,
+        bounds: Rect.fromLTWH(380, yPosition + 15, dayColumnWidth, rowHeight),
+        format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+      );
+      
+      graphics.drawRectangle(
+        bounds: Rect.fromLTWH(20, yPosition, scheduleColumnWidth, rowHeight),
+        pen: PdfPen(PdfColor(47, 189, 175)),
+      );
+      graphics.drawString(
+        'أوقات الدوام',
+        headerFont,
+        bounds: Rect.fromLTWH(20, yPosition + 15, scheduleColumnWidth, rowHeight),
+        format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+      );
+      
+      yPosition += rowHeight;
+      
+      // بيانات الجدول
+      for (String day in days) {
+        final daySchedule = workingSchedule[day];
+        String scheduleText = 'لا يوجد دوام';
+
+        if (daySchedule != null) {
+          final morning = daySchedule['morning'];
+          final evening = daySchedule['evening'];
+          List<String> periods = [];
+
+          if (morning != null) {
+            periods.add('صباح');
+          }
+
+          if (evening != null) {
+            periods.add('مساء');
+          }
+
+          if (periods.isNotEmpty) {
+            scheduleText = periods.join(' - ');
+          }
+        }
+
+        // رسم صف الجدول - الأيام في اليمين
+        graphics.drawRectangle(
+          bounds: Rect.fromLTWH(380, yPosition, dayColumnWidth, rowHeight),
+          pen: PdfPen(PdfColor(200, 200, 200)),
+        );
+        graphics.drawString(
+          day,
+          font,
+          bounds: Rect.fromLTWH(380, yPosition + 15, dayColumnWidth, rowHeight),
+          format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+        );
+        
+        graphics.drawRectangle(
+          bounds: Rect.fromLTWH(20, yPosition, scheduleColumnWidth, rowHeight),
+          pen: PdfPen(PdfColor(200, 200, 200)),
+        );
+        graphics.drawString(
+          scheduleText,
+          font,
+          bounds: Rect.fromLTWH(20, yPosition + 15, scheduleColumnWidth, rowHeight),
+          format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+        );
+        
+        yPosition += rowHeight;
+      }
+      
+      // حفظ الملف
+      final directory = await getApplicationDocumentsDirectory();
+      final fileName = 'جدول_${doctorName.replaceAll(' ', '_')}_${specialization.replaceAll(' ', '_')}.pdf';
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(await document.save());
+      document.dispose();
+      
+      // إغلاق مؤشر التحميل
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+      
+      // فتح الملف
+      await OpenFilex.open(file.path);
+      
+      // عرض رسالة نجاح
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تم تصدير جدول $doctorName بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      
+    } catch (e) {
+      // إغلاق مؤشر التحميل في حالة الخطأ
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ في تصدير PDF: $e'),
             backgroundColor: Colors.red,
           ),
         );

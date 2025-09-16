@@ -6,6 +6,8 @@ import 'login_screen.dart';
 import 'package:http/http.dart' as http;
 import '../services/sms_service.dart';
 import 'doctor_bookings_screen.dart';
+import '../services/presence_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class DoctorUserScreen extends StatefulWidget {
   final String doctorId;
@@ -34,6 +36,37 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
   void initState() {
     super.initState();
     _loadTodayBookings();
+    // mark online when doctor screen opens
+    _markOnline();
+    _subscribeToDoctorTopic();
+  }
+
+  Future<void> _markOnline() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId') ?? '';
+      await PresenceService.setOnline(userId: userId, userType: 'doctor');
+    } catch (_) {}
+  }
+
+  Future<void> _subscribeToDoctorTopic() async {
+    try {
+      final topic = 'doctor_${widget.doctorId}';
+      await FirebaseMessaging.instance.subscribeToTopic(topic);
+      print('Doctor user subscribed to topic: $topic');
+    } catch (e) {
+      print('Error subscribing doctor to topic: $e');
+    }
+  }
+
+  Future<void> _unsubscribeFromDoctorTopic() async {
+    try {
+      final topic = 'doctor_${widget.doctorId}';
+      await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+      print('Doctor user unsubscribed from topic: $topic');
+    } catch (e) {
+      print('Error unsubscribing doctor from topic: $e');
+    }
   }
 
   Future<void> _loadTodayBookings() async {
@@ -170,6 +203,8 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
   Future<void> _logout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId') ?? '';
+      await PresenceService.setOffline(userId: userId);
       await prefs.clear();
       
       if (mounted && context.mounted) {

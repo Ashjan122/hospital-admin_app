@@ -28,7 +28,6 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
   bool _isInitialLoading = true; // متغير لتتبع التحميل الأولي
   int _currentPage = 0;
   static const int _pageSize = 10;
-  int _refreshKey = 0;
 
   // Cache keys and duration
   static const String _cacheKey = 'allDoctorsCache';
@@ -101,17 +100,6 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     }
   }
 
-  // دالة حذف Cache
-  Future<void> _clearCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey);
-      await prefs.remove(_cacheTimestampKey);
-      print('Cache cleared successfully');
-    } catch (e) {
-      print('Error clearing cache: $e');
-    }
-  }
 
   // دالة تحميل البيانات في الخلفية
   Future<void> _fetchDataInBackground() async {
@@ -341,6 +329,23 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,
+          actions: [
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddDoctorScreen(
+                      centerId: widget.centerId!,
+                      centerName: widget.centerName!,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              tooltip: 'إضافة طبيب جديد',
+            ),
+          ],
         ),
         body: SafeArea(
           child: Container(
@@ -373,26 +378,6 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
                             prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Add doctor button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            _showAddDoctorDialog(context);
-                          },
-                          icon: Icon(Icons.add),
-                          label: Text('إضافة طبيب جديد'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2FBDAF),
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
                           ),
                         ),
                       ),
@@ -503,20 +488,6 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
                 color: Colors.grey[600],
               ),
             ),
-            if (_searchQuery.isEmpty) ...[
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () {
-                  _showAddDoctorDialog(context);
-                },
-                icon: Icon(Icons.add),
-                label: Text('إضافة طبيب جديد'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2FBDAF),
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
           ],
         ),
       );
@@ -576,24 +547,38 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
           ),
           child: ListTile(
             contentPadding: EdgeInsets.all(16),
-            leading: CircleAvatar(
-              radius: 30,
-              backgroundImage: photoUrl.startsWith('http') 
-                  ? NetworkImage(photoUrl)
-                  : null,
-              backgroundColor: photoUrl.startsWith('http') 
-                  ? null 
-                  : Colors.grey[300],
-              child: photoUrl.startsWith('http') 
-                  ? null 
-                  : Icon(
-                      Icons.person,
-                      size: 30,
-                      color: Colors.grey[600],
-                    ),
-              onBackgroundImageError: (exception, stackTrace) {
-                // Handle image error
-              },
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${index + 1}',
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                CircleAvatar(
+                  radius: 30,
+                  backgroundImage: photoUrl.startsWith('http') 
+                      ? NetworkImage(photoUrl)
+                      : null,
+                  backgroundColor: photoUrl.startsWith('http') 
+                      ? null 
+                      : Colors.grey[300],
+                  child: photoUrl.startsWith('http') 
+                      ? null 
+                      : Icon(
+                          Icons.person,
+                          size: 30,
+                          color: Colors.grey[600],
+                        ),
+                  onBackgroundImageError: (exception, stackTrace) {
+                    // Handle image error
+                  },
+                ),
+              ],
             ),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,23 +637,4 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     );
   }
 
-  void _showAddDoctorDialog(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddDoctorScreen(
-          centerId: widget.centerId!,
-          centerName: widget.centerName,
-        ),
-      ),
-    ).then((result) {
-      // تحديث القائمة إذا تم إضافة طبيب جديد
-      if (result == true && mounted) {
-        setState(() {
-          _refreshKey++; // تحديث المفتاح لإعادة تشغيل القائمة
-        });
-        fetchAllDoctors(); // إعادة تحميل البيانات
-      }
-    });
-  }
 }

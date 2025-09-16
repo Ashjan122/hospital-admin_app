@@ -265,7 +265,7 @@ class _ReceptionStaffListScreenState extends State<ReceptionStaffListScreen> {
                             itemCount: _filteredReceptionStaff.length,
                             itemBuilder: (context, index) {
                               final staff = _filteredReceptionStaff[index];
-                              final confirmedCount = staff['confirmedBookingsCount'] ?? 0;
+                              // final confirmedCount = staff['confirmedBookingsCount'] ?? 0; // معلق مؤقتاً
 
                                                              return Card(
                                 margin: const EdgeInsets.only(bottom: 12),
@@ -311,7 +311,8 @@ class _ReceptionStaffListScreenState extends State<ReceptionStaffListScreen> {
                                                 ],
                                               ),
                                             ),
-                                            // Confirmed bookings count badge with label
+                                            // Confirmed bookings count badge with label - معلق مؤقتاً
+                                            /*
                                             Column(
                                               children: [
                                                 Container(
@@ -339,6 +340,7 @@ class _ReceptionStaffListScreenState extends State<ReceptionStaffListScreen> {
                                                 ),
                                               ],
                                             ),
+                                            */
                                           ],
                                         ),
                                      ],

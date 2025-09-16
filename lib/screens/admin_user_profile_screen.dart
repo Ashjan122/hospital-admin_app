@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class AdminUserProfileScreen extends StatefulWidget {
   final String userId;
@@ -25,6 +26,8 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
   String? _currentDoctorId;
   String? _currentDoctorName;
   String? _centerId;
+  String? _originalRole;
+  String? _originalDoctorId;
   List<Map<String, dynamic>> _centerDoctors = [];
   List<Map<String, dynamic>> _filteredDoctors = [];
   bool _loading = true;
@@ -50,9 +53,11 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
         _photoUrlController.text = (data['photoUrl'] ?? '').toString();
         final String existingRole = (data['userType'] ?? 'reception').toString();
         _selectedRole = _roles.contains(existingRole) ? existingRole : 'reception';
+        _originalRole = _selectedRole;
         
         // تحميل معلومات الطبيب إذا كان المستخدم من نوع طبيب
         _currentDoctorId = data['doctorId'];
+        _originalDoctorId = _currentDoctorId;
         _currentDoctorName = data['doctorName'];
         _centerId = data['centerId'];
         
@@ -155,10 +160,40 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
         update['userPassword'] = _passwordController.text.trim();
       }
       await FirebaseFirestore.instance.collection('users').doc(widget.userId).update(update);
+
+      // إدارة الاشتراك في توبيك الطبيب بناءً على الدور
+      try {
+        final FirebaseMessaging messaging = FirebaseMessaging.instance;
+        final String? newDoctorId = update['doctorId'] as String? ?? _currentDoctorId;
+        final bool wasDoctor = _originalRole == 'doctor' && (_originalDoctorId ?? '').isNotEmpty;
+        final bool isDoctorNow = _selectedRole == 'doctor' && (newDoctorId ?? '').isNotEmpty;
+
+        if (wasDoctor && (!isDoctorNow)) {
+          final topic = 'doctor_${_originalDoctorId}';
+          await messaging.unsubscribeFromTopic(topic);
+          print('Unsubscribed from topic after role change: $topic');
+        }
+
+        if (isDoctorNow) {
+          if (wasDoctor && _originalDoctorId != null && _originalDoctorId != newDoctorId) {
+            final oldTopic = 'doctor_${_originalDoctorId}';
+            await messaging.unsubscribeFromTopic(oldTopic);
+            print('Switched doctor, unsubscribed from: $oldTopic');
+          }
+          final newTopic = 'doctor_${newDoctorId}';
+          await messaging.subscribeToTopic(newTopic);
+          print('Subscribed to doctor topic: $newTopic');
+        }
+      } catch (e) {
+        print('Error managing doctor topic subscription: $e');
+      }
       if (mounted && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم حفظ التغييرات بنجاح'), backgroundColor: Colors.green),
         );
+        // حدث القيم الأصلية بعد الحفظ
+        _originalRole = _selectedRole;
+        _originalDoctorId = _currentDoctorId;
         Navigator.of(context).pop(true);
       }
     } catch (e) {

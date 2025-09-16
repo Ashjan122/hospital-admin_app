@@ -140,13 +140,6 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
     }
   }
 
-  void _updateAvailableDoctors() {
-    setState(() {
-      _availableDoctors = _allDoctors
-          .where((doctor) => !_centerDoctorIds.contains(doctor['id'] as String))
-          .toList();
-    });
-  }
 
 
 
@@ -425,9 +418,10 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,6 +647,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hospital_admin_app/services/presence_service.dart';
 import 'package:hospital_admin_app/screens/login_screen.dart';
 import 'package:hospital_admin_app/screens/admin_doctors_screen.dart';
 import 'package:hospital_admin_app/screens/admin_specialties_screen.dart';
@@ -10,6 +11,7 @@ import 'package:hospital_admin_app/screens/admin_insurance_companies_screen.dart
 import 'package:hospital_admin_app/screens/admin_reports_screen.dart';
 import 'package:hospital_admin_app/screens/admin_lab_results_screen.dart';
 import 'package:hospital_admin_app/screens/about_screen.dart';
+import 'package:hospital_admin_app/screens/control_panel_screen.dart';
 
 
 class DashboardScreen extends StatefulWidget {
@@ -42,17 +44,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
+    final savedUserId = prefs.getString('userId') ?? '';
+    final savedUserType = prefs.getString('userType') ?? '';
     setState(() {
       currentUserName = prefs.getString('userName');
-      userType = prefs.getString('userType');
+      userType = savedUserType;
       // استخدام widget.centerName أولاً، وإذا كان فارغاً استخدم القيمة المحفوظة
       displayCenterName = widget.centerName ?? prefs.getString('centerName') ?? 'مركز طبي';
       displayCenterId = widget.centerId ?? prefs.getString('centerId');
     });
+    // Mark online when main dashboard opens
+    await PresenceService.setOnline(userId: savedUserId, userType: savedUserType);
   }
 
   @override
   Widget build(BuildContext context) {
+    print('Dashboard build - fromControlPanel: ${widget.fromControlPanel}');
     return Scaffold(
       appBar: AppBar(
         title: Center(
@@ -85,10 +92,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () async {
-                  // حذف متغير fromControlPanel
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.remove('fromControlPanel');
-                  Navigator.of(context).pop();
+                  print('زر الرجوع تم الضغط عليه');
+                  try {
+                    // إعادة تعيين userType إلى control
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('userType', 'control');
+                    await prefs.setBool('isLoggedIn', true);
+                    // لا نحذف fromControlPanel، نتركه محفوظاً
+                    print('تم تعيين userType إلى control');
+                    
+                    // العودة إلى الكنترول مع إزالة جميع الشاشات السابقة
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(
+                        builder: (context) => const ControlPanelScreen(),
+                      ),
+                      (route) => false,
+                    );
+                    print('تم التنقل إلى الكنترول');
+                  } catch (e) {
+                    print('خطأ في التنقل: $e');
+                  }
                 },
                 tooltip: 'رجوع إلى صفحة الكنترول',
               )
@@ -107,6 +130,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () async {
               // إذا جاء من تسجيل الدخول العادي، امسح البيانات واذهب لصفحة تسجيل الدخول
               final prefs = await SharedPreferences.getInstance();
+              final savedUserId = prefs.getString('userId') ?? '';
+              await PresenceService.setOffline(userId: savedUserId);
               await prefs.clear();
               
               if (context.mounted) {

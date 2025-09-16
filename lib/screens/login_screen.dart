@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/dashboard_screen.dart';
 import 'package:hospital_admin_app/screens/control_panel_screen.dart';
 import 'package:hospital_admin_app/screens/reception_staff_screen.dart';
-import 'package:hospital_admin_app/screens/doctor_bookings_screen.dart';
+// import 'package:hospital_admin_app/screens/doctor_bookings_screen.dart';
 import 'package:hospital_admin_app/screens/doctor_user_screen.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -52,11 +52,13 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else if (userType == 'admin' && centerId != null && centerName != null) {
           // Admin is logged in
+          final fromControlPanel = prefs.getBool('fromControlPanel') ?? false;
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => DashboardScreen(
                 centerId: centerId,
                 centerName: centerName,
+                fromControlPanel: fromControlPanel,
               ),
             ),
           );
@@ -76,7 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else if (userType == 'doctor' && centerId != null && centerName != null) {
           // Doctor is logged in
-          final userId = prefs.getString('userId') ?? '';
           final userName = prefs.getString('userName') ?? '';
           final doctorId = prefs.getString('doctorId') ?? '';
           final doctorName = prefs.getString('doctorName') ?? userName;
@@ -136,7 +137,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
           if (controlPassword == _passwordController.text) {
             // Control login successful
-            await _saveLoginData('control');
+            final controlUserName = controlData['userName'] ?? _usernameController.text.trim();
+            await _saveLoginData('control', userName: controlUserName);
             
             if (mounted) {
               setState(() {
@@ -174,6 +176,19 @@ class _LoginScreenState extends State<LoginScreen> {
             final doctorId = userData['doctorId'] ?? '';
             final doctorName = userData['doctorName'] ?? '';
 
+            // Update user's last login/seen timestamps for stats
+            try {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userId)
+                  .set({
+                'lastLoginAt': FieldValue.serverTimestamp(),
+                'lastSeenAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+            } catch (e) {
+              // Non-fatal
+            }
+
             // Save user login data
             await _saveLoginData(userType, 
               centerId: centerId, 
@@ -192,11 +207,14 @@ class _LoginScreenState extends State<LoginScreen> {
               
               // Redirect based on user type
               if (userType == 'admin') {
+                final prefs = await SharedPreferences.getInstance();
+                final fromControlPanel = prefs.getBool('fromControlPanel') ?? false;
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder: (context) => DashboardScreen(
                       centerId: centerId,
                       centerName: centerName,
+                      fromControlPanel: fromControlPanel,
                     ),
                   ),
                 );
@@ -224,11 +242,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 );
               } else {
                 // Default to dashboard for other user types
+                final prefs = await SharedPreferences.getInstance();
+                final fromControlPanel = prefs.getBool('fromControlPanel') ?? false;
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder: (context) => DashboardScreen(
                       centerId: centerId,
                       centerName: centerName,
+                      fromControlPanel: fromControlPanel,
                     ),
                   ),
                 );
@@ -291,11 +312,14 @@ class _LoginScreenState extends State<LoginScreen> {
               setState(() {
                 _isLoading = false;
               });
+              final prefs = await SharedPreferences.getInstance();
+              final fromControlPanel = prefs.getBool('fromControlPanel') ?? false;
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => DashboardScreen(
                     centerId: centerId,
                     centerName: centerName,
+                    fromControlPanel: fromControlPanel,
                   ),
                 ),
               );

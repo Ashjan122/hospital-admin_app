@@ -235,6 +235,12 @@ class SMSService {
 
 class NotificationService {
   static const String _notificationsKey = 'reception_notifications';
+  static bool _internalEnabled = true;
+
+  static void setInternalEnabled(bool enabled) {
+    _internalEnabled = enabled;
+    print('Internal notifications enabled = $_internalEnabled');
+  }
 
   // حفظ إشعار جديد
   static Future<void> saveNotification({
@@ -248,6 +254,10 @@ class NotificationService {
     required String centerId,
   }) async {
     try {
+      if (!_internalEnabled) {
+        print('Internal notifications disabled. Skipping saveNotification for appointment: $appointmentId');
+        return;
+      }
       final prefs = await SharedPreferences.getInstance();
       final notifications = prefs.getStringList('${_notificationsKey}_$userId') ?? [];
       

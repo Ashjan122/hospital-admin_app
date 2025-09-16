@@ -39,18 +39,21 @@ class DoctorBookingsScreen extends StatefulWidget {
 
 class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _newPatientNameController = TextEditingController();
+  final TextEditingController _newPatientPhoneController = TextEditingController();
   String _searchQuery = '';
   String _selectedFilter = 'today'; // تغيير الافتراضي إلى اليوم
   DateTime? _selectedDate; // فلترة حسب تاريخ معين
-  Set<String> _confirmingBookings = {}; // لتتبع الحجوزات التي يتم تأكيدها
-  Set<String> _cancelingBookings = {}; // لتتبع الحجوزات التي يتم إلغاؤها
+  // Set<String> _confirmingBookings = {}; // لتتبع الحجوزات التي يتم تأكيدها - معطل مؤقتاً
+  // Set<String> _cancelingBookings = {}; // لتتبع الحجوزات التي يتم إلغاؤها - معطل مؤقتاً
   String? _userType; // نوع المستخدم (admin, doctor, etc.)
   List<Map<String, dynamic>> _allBookings = []; // جميع الحجوزات
+  bool _isCreatingBooking = false; // حالة إنشاء الحجز الجديد
   
   // متغيرات لتحسين الأداء
-  bool _isLoading = true;
+  // bool _isLoading = true; // معطل مؤقتاً
   bool _isInitializing = true;
-  String _loadingMessage = 'جاري تحميل البيانات...';
+  // String _loadingMessage = 'جاري تحميل البيانات...'; // معطل مؤقتاً
 
   @override
   void initState() {
@@ -80,7 +83,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
   // دالة تحميل البيانات بشكل متوازي
   Future<void> _initializeDataParallel() async {
     print('=== INITIALIZING DATA IN PARALLEL ===');
-    _updateLoadingState('جاري تهيئة البيانات...');
+    // _updateLoadingState('جاري تهيئة البيانات...'); // معطل مؤقتاً
     
     try {
       // تحميل نوع المستخدم والحجوزات في نفس الوقت
@@ -112,7 +115,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
 
   Future<void> _loadUserType() async {
     print('=== LOADING USER TYPE ===');
-    _updateLoadingState('جاري تحميل نوع المستخدم...');
+      // _updateLoadingState('جاري تحميل نوع المستخدم...'); // معطل مؤقتاً
     
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -132,7 +135,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
 
     Future<void> _loadBookings() async {
     print('=== LOADING BOOKINGS ===');
-    _updateLoadingState('جاري تحميل الحجوزات...');
+      // _updateLoadingState('جاري تحميل الحجوزات...'); // معطل مؤقتاً
     
     try {
       // تحميل الحجوزات مع timeout لتحسين الأداء
@@ -149,125 +152,119 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
       if (mounted) {
     setState(() {
       _allBookings = bookings;
-          _isLoading = false;
         });
       }
     } catch (e) {
       print('❌ Error loading bookings: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
-  // دالة تحديث حالة التحميل
-  void _updateLoadingState(String message) {
-    if (mounted) {
-      setState(() {
-        _loadingMessage = message;
-      });
-    }
-  }
+  // دالة تحديث حالة التحميل - معطلة مؤقتاً
+  // void _updateLoadingState(String message) {
+  //   if (mounted) {
+  //     setState(() {
+  //       _loadingMessage = message;
+  //     });
+  //   }
+  // }
 
-  // دالة زيادة عداد الحجوزات المؤكدة لموظف الاستقبال
-  Future<void> _incrementConfirmedBookingsCount() async {
-    print('=== ENTERING _incrementConfirmedBookingsCount ===');
-    print('User ID: ${widget.userId}');
-    print('User ID is null: ${widget.userId == null}');
-    print('User ID is empty: ${widget.userId?.isEmpty ?? true}');
-    
-    if (widget.userId == null) {
-      print('⚠️ No userId provided, skipping confirmed bookings count increment');
-      return;
-    }
+  // دالة زيادة عداد الحجوزات المؤكدة لموظف الاستقبال - معطلة مؤقتاً
+  // Future<void> _incrementConfirmedBookingsCount() async {
+  //   print('=== ENTERING _incrementConfirmedBookingsCount ===');
+  //   print('User ID: ${widget.userId}');
+  //   print('User ID is null: ${widget.userId == null}');
+  //   print('User ID is empty: ${widget.userId?.isEmpty ?? true}');
+  //   
+  //   if (widget.userId == null) {
+  //     print('⚠️ No userId provided, skipping confirmed bookings count increment');
+  //     return;
+  //   }
 
-    if (widget.userId!.isEmpty) {
-      print('⚠️ User ID is empty, skipping confirmed bookings count increment');
-      return;
-    }
+  //   if (widget.userId!.isEmpty) {
+  //     print('⚠️ User ID is empty, skipping confirmed bookings count increment');
+  //     return;
+  //   }
 
-    try {
-      print('=== INCREMENTING CONFIRMED BOOKINGS COUNT ===');
-      print('User ID: ${widget.userId}');
-      print('Center ID: ${widget.centerId}');
+  //   try {
+  //     print('=== INCREMENTING CONFIRMED BOOKINGS COUNT ===');
+  //     print('User ID: ${widget.userId}');
+  //     print('Center ID: ${widget.centerId}');
 
-      // التحقق من وجود المستخدم وإنشاء حقل confirmedBookingsCount إذا لم يكن موجوداً
-      print('🔍 Fetching user document...');
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .get();
+  //     // التحقق من وجود المستخدم وإنشاء حقل confirmedBookingsCount إذا لم يكن موجوداً
+  //     print('🔍 Fetching user document...');
+  //     final userDoc = await FirebaseFirestore.instance
+  //         .collection('users')
+  //         .doc(widget.userId)
+  //         .get();
 
-      print('📄 User document exists: ${userDoc.exists}');
+  //     print('📄 User document exists: ${userDoc.exists}');
 
-      if (!userDoc.exists) {
-        print('❌ User document not found, creating new user document');
-        // إنشاء مستخدم جديد مع عداد الحجوزات المؤكدة
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.userId)
-            .set({
-          'confirmedBookingsCount': 1,
-          'lastUpdated': FieldValue.serverTimestamp(),
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-        print('✅ New user document created with confirmedBookingsCount: 1');
-        return;
-      }
+  //     if (!userDoc.exists) {
+  //       print('❌ User document not found, creating new user document');
+  //       // إنشاء مستخدم جديد مع عداد الحجوزات المؤكدة
+  //       await FirebaseFirestore.instance
+  //           .collection('users')
+  //           .doc(widget.userId)
+  //           .set({
+  //         'confirmedBookingsCount': 1,
+  //         'lastUpdated': FieldValue.serverTimestamp(),
+  //         'createdAt': FieldValue.serverTimestamp(),
+  //       });
+  //       print('✅ New user document created with confirmedBookingsCount: 1');
+  //       return;
+  //     }
 
-      // التحقق من وجود حقل confirmedBookingsCount
-      final userData = userDoc.data();
-      print('📊 User data: $userData');
-      print('🔢 Current confirmedBookingsCount: ${userData?['confirmedBookingsCount']}');
-      
-      if (userData == null || userData['confirmedBookingsCount'] == null) {
-        print('⚠️ confirmedBookingsCount field not found, initializing to 1');
-        // إنشاء حقل confirmedBookingsCount إذا لم يكن موجوداً
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.userId)
-            .update({
-          'confirmedBookingsCount': 1,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
-        print('✅ confirmedBookingsCount field initialized to 1');
-        return;
-      }
+  //     // التحقق من وجود حقل confirmedBookingsCount
+  //     final userData = userDoc.data();
+  //     print('📊 User data: $userData');
+  //     print('🔢 Current confirmedBookingsCount: ${userData?['confirmedBookingsCount']}');
+  //     
+  //     if (userData == null || userData['confirmedBookingsCount'] == null) {
+  //       print('⚠️ confirmedBookingsCount field not found, initializing to 1');
+  //       // إنشاء حقل confirmedBookingsCount إذا لم يكن موجوداً
+  //       await FirebaseFirestore.instance
+  //           .collection('users')
+  //           .doc(widget.userId)
+  //           .update({
+  //         'confirmedBookingsCount': 1,
+  //         'lastUpdated': FieldValue.serverTimestamp(),
+  //       });
+  //       print('✅ confirmedBookingsCount field initialized to 1');
+  //       return;
+  //     }
 
-      // زيادة عداد الحجوزات المؤكدة في قاعدة البيانات
-      print('🔄 Updating confirmedBookingsCount with increment...');
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .update({
-        'confirmedBookingsCount': FieldValue.increment(1),
-        'lastUpdated': FieldValue.serverTimestamp(),
-      });
+  //     // زيادة عداد الحجوزات المؤكدة في قاعدة البيانات
+  //     print('🔄 Updating confirmedBookingsCount with increment...');
+  //     await FirebaseFirestore.instance
+  //         .collection('users')
+  //         .doc(widget.userId)
+  //         .update({
+  //       'confirmedBookingsCount': FieldValue.increment(1),
+  //       'lastUpdated': FieldValue.serverTimestamp(),
+  //     });
 
-      print('✅ Confirmed bookings count incremented successfully');
-      
-      // التحقق من التحديث
-      print('🔍 Verifying update...');
-      final updatedDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .get();
-      
-      if (updatedDoc.exists) {
-        final updatedData = updatedDoc.data();
-        print('📊 Updated user data: $updatedData');
-        print('🔢 New confirmedBookingsCount: ${updatedData?['confirmedBookingsCount']}');
-      }
-      
-    } catch (e) {
-      print('❌ Error incrementing confirmed bookings count: $e');
-      print('Error details: ${e.toString()}');
-      print('Stack trace: ${StackTrace.current}');
-      // لا نريد إيقاف عملية تأكيد الحجز بسبب فشل تحديث العداد
-    }
-  }
+  //     print('✅ Confirmed bookings count incremented successfully');
+  //     
+  //     // التحقق من التحديث
+  //     print('🔍 Verifying update...');
+  //     final updatedDoc = await FirebaseFirestore.instance
+  //         .collection('users')
+  //         .doc(widget.userId)
+  //         .get();
+  //     
+  //     if (updatedDoc.exists) {
+  //       final updatedData = updatedDoc.data();
+  //       print('📊 Updated user data: $updatedData');
+  //       print('🔢 New confirmedBookingsCount: ${updatedData?['confirmedBookingsCount']}');
+  //     }
+  //     
+  //   } catch (e) {
+  //     print('❌ Error incrementing confirmed bookings count: $e');
+  //     print('Error details: ${e.toString()}');
+  //     print('Stack trace: ${StackTrace.current}');
+  //     // لا نريد إيقاف عملية تأكيد الحجز بسبب فشل تحديث العداد
+  //   }
+  // }
 
   // دالة بناء شاشة التحميل الأولية
   Widget _buildInitialLoadingScreen() {
@@ -283,6 +280,311 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
     );
   }
 
+  Future<void> _onAddBookingPressed() async {
+    try {
+      if (_userType != 'reception') {
+        return; // حماية إضافية: الخاصية لموظف الاستقبال فقط
+      }
+      final bool isWorkingToday = await _isDoctorWorkingToday();
+      if (!isWorkingToday) {
+        if (mounted && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('ليس متاح اليوم'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+
+      _newPatientNameController.clear();
+      _newPatientPhoneController.clear();
+
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        barrierDismissible: true, // السماح بالإغلاق بالضغط خارج الديالوق
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('إضافة حجز اليوم'),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'إغلاق',
+                    ),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: _newPatientNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'اسم المريض',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _newPatientPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'رقم الهاتف',
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  ElevatedButton(
+                    onPressed: _isCreatingBooking ? null : () async {
+                      final name = _newPatientNameController.text.trim();
+                      final phone = _newPatientPhoneController.text.trim();
+                      
+                      if (name.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('يرجى إدخال اسم المريض'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setState(() {
+                        _isCreatingBooking = true;
+                      });
+
+                      try {
+                        await _createTodayBooking(name: name, phone: phone);
+                        
+                        // رسالة نجاح
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('تم إضافة الحجز بنجاح'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                        
+                        // لا نغلق الحوار: نفرغ الحقول للسماح بحجز آخر
+                        _newPatientNameController.clear();
+                        _newPatientPhoneController.clear();
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('خطأ في إنشاء الحجز: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            _isCreatingBooking = false;
+                          });
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2FBDAF),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isCreatingBooking
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Text('جاري الحجز...'),
+                            ],
+                          )
+                        : const Text('حجز الآن'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      print('Error in _onAddBookingPressed: $e');
+    }
+  }
+
+  Future<bool> _isDoctorWorkingToday() async {
+    try {
+      final today = DateTime.now();
+      final arabicDays = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
+      final todayName = arabicDays[today.weekday - 1];
+
+      final specializationsSnapshot = await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .get();
+
+      for (var specDoc in specializationsSnapshot.docs) {
+        final doctorDoc = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(specDoc.id)
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .get();
+
+        if (!doctorDoc.exists) continue;
+        final data = doctorDoc.data();
+        final workingSchedule = data?['workingSchedule'] as Map<String, dynamic>?;
+        if (workingSchedule == null) return false;
+
+        final daySchedule = workingSchedule[todayName];
+        if (daySchedule == null) return false;
+
+        final hasMorning = daySchedule['morning'] != null;
+        final hasEvening = daySchedule['evening'] != null;
+        return hasMorning || hasEvening;
+      }
+      return false;
+    } catch (e) {
+      print('Error checking doctor working today: $e');
+      return false;
+    }
+  }
+
+  Future<void> _createTodayBooking({required String name, required String phone}) async {
+    final now = DateTime.now();
+    final todayDate = DateTime(now.year, now.month, now.day);
+    final dateStr = intl.DateFormat('yyyy-MM-dd').format(todayDate);
+
+    final specializationsSnapshot = await FirebaseFirestore.instance
+        .collection('medicalFacilities')
+        .doc(widget.centerId)
+        .collection('specializations')
+        .get();
+
+    for (var specDoc in specializationsSnapshot.docs) {
+      final doctorRef = FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .doc(specDoc.id)
+          .collection('doctors')
+          .doc(widget.doctorId);
+
+      final doctorDoc = await doctorRef.get();
+      if (!doctorDoc.exists) continue;
+
+      // تحقق من عدم تكرار الحجز لنفس المريض (نفس الرقم) في نفس اليوم
+      final duplicateSnapshot = await doctorRef
+          .collection('appointments')
+          .where('date', isEqualTo: dateStr)
+          .where('patientName', isEqualTo: name)
+          .limit(1)
+          .get();
+
+      if (duplicateSnapshot.docs.isNotEmpty) {
+        throw Exception('هذا المريض لديه حجز بالفعل اليوم');
+      }
+
+      // اجلب حجوزات اليوم للتحقق من التعارض الزمني
+      final todayAppointmentsSnapshot = await doctorRef
+          .collection('appointments')
+          .where('date', isEqualTo: dateStr)
+          .get();
+
+      // ابنِ مجموعة أوقات اليوم المحجوزة بالدقائق منذ منتصف الليل
+      final Set<int> usedMinutesFromMidnight = {};
+      for (var d in todayAppointmentsSnapshot.docs) {
+        final timeRaw = d.data()['time'];
+        if (timeRaw == null) continue;
+        final timeStr = timeRaw.toString().trim();
+        if (timeStr.isEmpty) continue;
+        final parts = timeStr.split(':');
+        if (parts.length != 2) continue;
+        final hh = int.tryParse(parts[0]);
+        final mm = int.tryParse(parts[1]);
+        if (hh == null || mm == null) continue;
+        usedMinutesFromMidnight.add(hh * 60 + mm);
+      }
+
+      // احسب آخر وقت محجوز اليوم (إن وُجد) من خلال الدقائق
+      DateTime? lastBookedDateTime;
+      if (usedMinutesFromMidnight.isNotEmpty) {
+        final lastMinutes = usedMinutesFromMidnight.reduce((a, b) => a > b ? a : b);
+        final hh = lastMinutes ~/ 60;
+        final mm = lastMinutes % 60;
+        lastBookedDateTime = DateTime(todayDate.year, todayDate.month, todayDate.day, hh, mm);
+      }
+
+      // المرشح الأول: إن وجِد آخر حجز فابدأ من (آخر وقت + 30 دقيقة)، وإلا من أقرب نصف ساعة قادمة من الآن
+      DateTime candidate;
+      if (lastBookedDateTime != null) {
+        candidate = lastBookedDateTime.add(const Duration(minutes: 30));
+      } else {
+        DateTime roundedNow = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+        if (roundedNow.minute % 30 != 0) {
+          final int addMinutes = 30 - (roundedNow.minute % 30);
+          roundedNow = roundedNow.add(Duration(minutes: addMinutes));
+        }
+        candidate = roundedNow;
+      }
+
+      String selectedTime = intl.DateFormat('HH:mm').format(candidate);
+      int attempts = 0;
+      while (usedMinutesFromMidnight.contains(candidate.hour * 60 + candidate.minute)) {
+        candidate = candidate.add(const Duration(minutes: 30));
+        if (DateTime(candidate.year, candidate.month, candidate.day) != todayDate) {
+          break; // خرجنا من اليوم
+        }
+        selectedTime = intl.DateFormat('HH:mm').format(candidate);
+        attempts++;
+        if (attempts > 48) break; // حد أمان
+      }
+
+      if (usedMinutesFromMidnight.contains(candidate.hour * 60 + candidate.minute)) {
+        throw Exception('لا يوجد وقت متاح اليوم بدون تعارض');
+      }
+
+      final String computedPeriod = candidate.hour < 15 ? 'morning' : 'evening';
+
+      final appointmentRef = doctorRef.collection('appointments').doc();
+      await appointmentRef.set({
+        'patientName': name,
+        'patientPhone': phone,
+        'date': dateStr,
+        'time': selectedTime,
+        'period': computedPeriod,
+        'isConfirmed': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': widget.userId ?? 'reception',
+        'createdByType': 'reception',
+      });
+
+      await _loadBookings();
+      if (mounted) setState(() {});
+      return;
+    }
+
+    throw Exception('تعذر العثور على الطبيب لإضافة الحجز');
+  }
+
   // دالة لحساب عدد الحجوزات حسب الفلتر
   int _getBookingsCount() {
     final filteredBookings = filterBookings(_allBookings);
@@ -291,16 +593,24 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
 
   // دالة لحساب رقم الحجز للمريض
   int _getBookingNumber(Map<String, dynamic> booking) {
-    final today = DateTime.now();
-    final todayBookings = _allBookings.where((b) {
+    // تحديد التاريخ المستهدف
+    DateTime targetDate;
+    if (_selectedDate != null) {
+      targetDate = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
+    } else {
+      final now = DateTime.now();
+      targetDate = DateTime(now.year, now.month, now.day);
+    }
+    
+    final targetDateBookings = _allBookings.where((b) {
       final bookingDate = DateTime.tryParse(b['date'] ?? '');
-      return bookingDate != null && 
-             DateTime(bookingDate.year, bookingDate.month, bookingDate.day) == 
-             DateTime(today.year, today.month, today.day);
+      if (bookingDate == null) return false;
+      final bookingDay = DateTime(bookingDate.year, bookingDate.month, bookingDate.day);
+      return bookingDay == targetDate;
     }).toList();
     
     // ترتيب الحجوزات حسب وقت الإنشاء
-    todayBookings.sort((a, b) {
+    targetDateBookings.sort((a, b) {
       final createdAtA = a['createdAt'];
       final createdAtB = b['createdAt'];
       
@@ -329,8 +639,8 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
     });
     
     // البحث عن رقم الحجز للمريض الحالي
-    for (int i = 0; i < todayBookings.length; i++) {
-      if (todayBookings[i]['appointmentId'] == booking['appointmentId']) {
+    for (int i = 0; i < targetDateBookings.length; i++) {
+      if (targetDateBookings[i]['appointmentId'] == booking['appointmentId']) {
         return i + 1;
       }
     }
@@ -637,217 +947,221 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
     }
   }
 
-  Future<void> _sendConfirmationSMS(Map<String, dynamic> booking) async {
-    try {
-      final patientPhone = booking['patientPhone'] ?? '';
-      
-      if (patientPhone.isEmpty) {
-        print('No phone number available for SMS');
-        return;
-      }
-      
-      final date = formatDate(booking['date']);
-      final time = formatTime(booking['time']);
-      final period = getPeriodText(booking['period'] ?? '');
-      
-      final message = 'تم تأكيد حجزك في ${booking['specialization']} مع د. ${widget.doctorName} في $date الساعة $time $period';
-      
-      print('Sending confirmation SMS to: $patientPhone');
-      print('Message: $message');
-      
-      final result = await SMSService.sendSimpleSMS(patientPhone, message);
-      
-      if (result['success'] == true) {
-        print('SMS sent successfully');
-      } else {
-        print('Failed to send SMS: ${result['message']}');
-      }
-    } catch (e) {
-      print('Error sending confirmation SMS: $e');
-    }
-  }
+  // دالة إرسال رسالة تأكيد - معطلة مؤقتاً
+  // Future<void> _sendConfirmationSMS(Map<String, dynamic> booking) async {
+  //   try {
+  //     final patientPhone = booking['patientPhone'] ?? '';
+  //     
+  //     if (patientPhone.isEmpty) {
+  //       print('No phone number available for SMS');
+  //       return;
+  //     }
+  //     
+  //     final date = formatDate(booking['date']);
+  //     final time = formatTime(booking['time']);
+  //     final period = getPeriodText(booking['period'] ?? '');
+  //     
+  //     final message = 'تم تأكيد حجزك في ${booking['specialization']} مع د. ${widget.doctorName} في $date الساعة $time $period';
+  //     
+  //     print('Sending confirmation SMS to: $patientPhone');
+  //     print('Message: $message');
+  //     
+  //     final result = await SMSService.sendSimpleSMS(patientPhone, message);
+  //     
+  //     if (result['success'] == true) {
+  //       print('SMS sent successfully');
+  //     } else {
+  //       print('Failed to send SMS: ${result['message']}');
+  //     }
+  //   } catch (e) {
+  //     print('Error sending confirmation SMS: $e');
+  //   }
+  // }
 
-  Future<void> _confirmBooking(Map<String, dynamic> booking) async {
-    final appointmentId = booking['appointmentId'];
-    
-    // إضافة loading محلي للحجز المحدد
-    setState(() {
-      _confirmingBookings.add(appointmentId);
-    });
+  // دالة تأكيد الحجز - معطلة مؤقتاً
+  // Future<void> _confirmBooking(Map<String, dynamic> booking) async {
+  //   final appointmentId = booking['appointmentId'];
+  //   
+  //   // إضافة loading محلي للحجز المحدد
+  //   setState(() {
+  //     _confirmingBookings.add(appointmentId);
+  //   });
 
-    try {
-      print('=== CONFIRMING BOOKING ===');
-      print('Appointment ID: $appointmentId');
-      print('Center ID: ${widget.centerId}');
-      print('Doctor ID: ${widget.doctorId}');
-      print('User ID: ${widget.userId}'); // تسجيل معرف المستخدم
-      print('User ID is null: ${widget.userId == null}'); // التحقق من null
-      
-      final specializationId = booking['specializationId'];
-      
-      await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .doc(specializationId)
-          .collection('doctors')
-          .doc(widget.doctorId)
-          .collection('appointments')
-          .doc(appointmentId)
-          .update({
-        'isConfirmed': true,
-        'confirmedAt': FieldValue.serverTimestamp(),
-      });
+  //   try {
+  //     print('=== CONFIRMING BOOKING ===');
+  //     print('Appointment ID: $appointmentId');
+  //     print('Center ID: ${widget.centerId}');
+  //     print('Doctor ID: ${widget.doctorId}');
+  //     print('User ID: ${widget.userId}'); // تسجيل معرف المستخدم
+  //     print('User ID is null: ${widget.userId == null}'); // التحقق من null
+  //     
+  //     final specializationId = booking['specializationId'];
+  //     
+  //     await FirebaseFirestore.instance
+  //         .collection('medicalFacilities')
+  //         .doc(widget.centerId)
+  //         .collection('specializations')
+  //         .doc(specializationId)
+  //         .collection('doctors')
+  //         .doc(widget.doctorId)
+  //         .collection('appointments')
+  //         .doc(appointmentId)
+  //         .update({
+  //       'isConfirmed': true,
+  //       'confirmedAt': FieldValue.serverTimestamp(),
+  //     });
 
-      print('✅ Booking confirmed successfully in database');
+  //     print('✅ Booking confirmed successfully in database');
 
-      // إرسال رسالة تأكيد للمريض
-      await _sendConfirmationSMS(booking);
+  //     // إرسال رسالة تأكيد للمريض
+  //     await _sendConfirmationSMS(booking);
 
-      // زيادة عداد الحجوزات المؤكدة لموظف الاستقبال
-      print('🔄 Calling _incrementConfirmedBookingsCount...');
-      print('🔄 User ID when calling: ${widget.userId}');
-      print('🔄 User ID is null when calling: ${widget.userId == null}');
-      
-      if (widget.userId != null && widget.userId!.isNotEmpty) {
-        await _incrementConfirmedBookingsCount();
-        print('✅ _incrementConfirmedBookingsCount completed successfully');
-      } else {
-        print('❌ Cannot call _incrementConfirmedBookingsCount - userId is null or empty');
-      }
+  //     // زيادة عداد الحجوزات المؤكدة لموظف الاستقبال
+  //     print('🔄 Calling _incrementConfirmedBookingsCount...');
+  //     print('🔄 User ID when calling: ${widget.userId}');
+  //     print('🔄 User ID is null when calling: ${widget.userId == null}');
+  //     
+  //     if (widget.userId != null && widget.userId!.isNotEmpty) {
+  //       await _incrementConfirmedBookingsCount();
+  //       print('✅ _incrementConfirmedBookingsCount completed successfully');
+  //     } else {
+  //       print('❌ Cannot call _incrementConfirmedBookingsCount - userId is null or empty');
+  //     }
 
-      if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم تأكيد الحجز وإرسال رسالة للمريض'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        setState(() {}); // تحديث الواجهة
-      }
-    } catch (e) {
-      if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في تأكيد الحجز: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      // إزالة loading المحلي
-      setState(() {
-        _confirmingBookings.remove(appointmentId);
-      });
-    }
-  }
+  //     if (mounted && context.mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('تم تأكيد الحجز وإرسال رسالة للمريض'),
+  //           backgroundColor: Colors.green,
+  //         ),
+  //       );
+  //       setState(() {}); // تحديث الواجهة
+  //     }
+  //   } catch (e) {
+  //     if (mounted && context.mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text('خطأ في تأكيد الحجز: $e'),
+  //           backgroundColor: Colors.red,
+  //         ),
+  //       );
+  //     }
+  //   } finally {
+  //     // إزالة loading المحلي
+  //     setState(() {
+  //       _confirmingBookings.remove(appointmentId);
+  //     });
+  //   }
+  // }
 
 
 
-  Future<void> _sendCancellationSMS(Map<String, dynamic> booking) async {
-    try {
-      final patientPhone = booking['patientPhone'] ?? '';
-      
-      if (patientPhone.isEmpty) {
-        print('No phone number available for cancellation SMS');
-        return;
-      }
-      
-      final date = formatDate(booking['date']);
-      final time = formatTime(booking['time']);
-      final period = getPeriodText(booking['period'] ?? '');
-      
-      final message = 'تم إلغاء حجزك في ${booking['specialization']} مع د. ${widget.doctorName} في $date الساعة $time $period';
-      
-      print('Sending cancellation SMS to: $patientPhone');
-      print('Message: $message');
-      
-      final result = await SMSService.sendSimpleSMS(patientPhone, message);
-      
-      if (result['success'] == true) {
-        print('Cancellation SMS sent successfully');
-      } else {
-        print('Failed to send cancellation SMS: ${result['message']}');
-      }
-    } catch (e) {
-      print('Error sending cancellation SMS: $e');
-    }
-  }
+  // دالة إرسال رسالة إلغاء - معطلة مؤقتاً
+  // Future<void> _sendCancellationSMS(Map<String, dynamic> booking) async {
+  //   try {
+  //     final patientPhone = booking['patientPhone'] ?? '';
+  //     
+  //     if (patientPhone.isEmpty) {
+  //       print('No phone number available for cancellation SMS');
+  //       return;
+  //     }
+  //     
+  //     final date = formatDate(booking['date']);
+  //     final time = formatTime(booking['time']);
+  //     final period = getPeriodText(booking['period'] ?? '');
+  //     
+  //     final message = 'تم إلغاء حجزك في ${booking['specialization']} مع د. ${widget.doctorName} في $date الساعة $time $period';
+  //     
+  //     print('Sending cancellation SMS to: $patientPhone');
+  //     print('Message: $message');
+  //     
+  //     final result = await SMSService.sendSimpleSMS(patientPhone, message);
+  //     
+  //     if (result['success'] == true) {
+  //       print('Cancellation SMS sent successfully');
+  //     } else {
+  //       print('Failed to send cancellation SMS: ${result['message']}');
+  //     }
+  //   } catch (e) {
+  //     print('Error sending cancellation SMS: $e');
+  //   }
+  // }
 
-  Future<void> _cancelBooking(Map<String, dynamic> booking) async {
-    final appointmentId = booking['appointmentId'];
-    
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد إلغاء الحجز'),
-        content: Text('هل أنت متأكد من إلغاء حجز المريض "${booking['patientName']}"؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('إلغاء الحجز'),
-          ),
-        ],
-      ),
-    );
+  // دالة إلغاء الحجز - معطلة مؤقتاً
+  // Future<void> _cancelBooking(Map<String, dynamic> booking) async {
+  //   final appointmentId = booking['appointmentId'];
+  //   
+  //   final confirmed = await showDialog<bool>(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('تأكيد إلغاء الحجز'),
+  //       content: Text('هل أنت متأكد من إلغاء حجز المريض "${booking['patientName']}"؟'),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context, false),
+  //           child: const Text('إلغاء'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () => Navigator.pop(context, true),
+  //           style: ElevatedButton.styleFrom(
+  //             backgroundColor: Colors.red,
+  //             foregroundColor: Colors.white,
+  //           ),
+  //           child: const Text('إلغاء الحجز'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
 
-    if (confirmed == true) {
-      // إضافة loading محلي للحجز المحدد
-      setState(() {
-        _cancelingBookings.add(appointmentId);
-      });
+  //   if (confirmed == true) {
+  //     // إضافة loading محلي للحجز المحدد
+  //     setState(() {
+  //       _cancelingBookings.add(appointmentId);
+  //     });
 
-      try {
-        final specializationId = booking['specializationId'];
-        
-        // إرسال رسالة إلغاء للمريض قبل حذف الحجز
-        await _sendCancellationSMS(booking);
-        
-        await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specializationId)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .collection('appointments')
-            .doc(appointmentId)
-            .delete();
+  //     try {
+  //       final specializationId = booking['specializationId'];
+  //       
+  //       // إرسال رسالة إلغاء للمريض قبل حذف الحجز
+  //       await _sendCancellationSMS(booking);
+  //       
+  //       await FirebaseFirestore.instance
+  //           .collection('medicalFacilities')
+  //           .doc(widget.centerId)
+  //           .collection('specializations')
+  //           .doc(specializationId)
+  //           .collection('doctors')
+  //           .doc(widget.doctorId)
+  //           .collection('appointments')
+  //           .doc(appointmentId)
+  //           .delete();
 
-        if (mounted && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم إلغاء الحجز وإرسال رسالة للمريض'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-          setState(() {}); // تحديث الواجهة
-        }
-      } catch (e) {
-        if (mounted && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطأ في إلغاء الحجز: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
-        // إزالة loading المحلي
-        setState(() {
-          _cancelingBookings.remove(appointmentId);
-        });
-      }
-    }
-  }
+  //       if (mounted && context.mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(
+  //             content: Text('تم إلغاء الحجز وإرسال رسالة للمريض'),
+  //             backgroundColor: Colors.orange,
+  //           ),
+  //         );
+  //         setState(() {}); // تحديث الواجهة
+  //       }
+  //     } catch (e) {
+  //       if (mounted && context.mounted) {
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           SnackBar(
+  //             content: Text('خطأ في إلغاء الحجز: $e'),
+  //             backgroundColor: Colors.red,
+  //           ),
+  //         );
+  //       }
+  //     } finally {
+  //       // إزالة loading المحلي
+  //       setState(() {
+  //         _cancelingBookings.remove(appointmentId);
+  //       });
+  //     }
+  //   }
+  // }
 
 
 
@@ -883,7 +1197,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'حجوزات د. ${widget.doctorName}',
+            widget.doctorName,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -893,6 +1207,12 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
+            if (_userType == 'reception')
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: _onAddBookingPressed,
+                tooltip: 'إضافة حجز جديد',
+              ),
             IconButton(
               icon: const Icon(Icons.calendar_today),
               onPressed: _pickDate,
@@ -1279,36 +1599,35 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
                                           const SizedBox(height: 4),
                                         ],
                                         // Status badge
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: getStatusColor(date, isConfirmed: isConfirmed).withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: getStatusColor(date, isConfirmed: isConfirmed).withOpacity(0.3),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            getStatusText(date, isConfirmed: isConfirmed),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: getStatusColor(date, isConfirmed: isConfirmed),
-                                              fontWeight: FontWeight.bold,
-                                            ),
+                                        // Status badge - معطل مؤقتاً
+                                        // Container(
+                                        //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        //   decoration: BoxDecoration(
+                                        //     color: getStatusColor(date, isConfirmed: isConfirmed).withOpacity(0.1),
+                                        //     borderRadius: BorderRadius.circular(12),
+                                        //     border: Border.all(
+                                        //       color: getStatusColor(date, isConfirmed: isConfirmed).withOpacity(0.3),
+                                        //     ),
+                                        //   ),
+                                        //   child: Text(
+                                        //     getStatusText(date, isConfirmed: isConfirmed),
+                                        //     style: TextStyle(
+                                        //       fontSize: 10,
+                                        //       color: getStatusColor(date, isConfirmed: isConfirmed),
+                                        //       fontWeight: FontWeight.bold,
+                                        //     ),
+                                        //   ),
+                                        // ),
+                                        // Booking number
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '$bookingNumber من ${_getBookingsCount()}',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.grey[600],
+                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                        // Booking number
-                                        if (bookingNumber > 0) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            '$bookingNumber من ${_getBookingsCount()}',
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              color: Colors.grey[600],
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
                                       ],
                                     ),
                                   ],
@@ -1317,65 +1636,66 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
                                 // Action buttons (only for unconfirmed bookings and admin/reception users)
                                 if (!isConfirmed && (_userType == 'admin' || _userType == 'reception')) ...[
                                   const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton.icon(
-                                          onPressed: _confirmingBookings.contains(booking['appointmentId'])
-                                              ? null
-                                              : () => _confirmBooking(booking),
-                                          icon: _confirmingBookings.contains(booking['appointmentId'])
-                                              ? const SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: Colors.white,
-                                                  ),
-                                                )
-                                              : const Icon(Icons.check, size: 16),
-                                          label: Text(
-                                            _confirmingBookings.contains(booking['appointmentId'])
-                                                ? 'جاري التأكيد...'
-                                                : 'تأكيد الحجز',
-                                          ),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green,
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: ElevatedButton.icon(
-                                          onPressed: _cancelingBookings.contains(booking['appointmentId'])
-                                              ? null
-                                              : () => _cancelBooking(booking),
-                                          icon: _cancelingBookings.contains(booking['appointmentId'])
-                                              ? const SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: Colors.white,
-                                                  ),
-                                                )
-                                              : const Icon(Icons.cancel, size: 16),
-                                          label: Text(
-                                            _cancelingBookings.contains(booking['appointmentId'])
-                                                ? 'جاري الإلغاء...'
-                                                : 'إلغاء الحجز',
-                                          ),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red,
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(vertical: 8),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  // أزرار التأكيد والإلغاء معطلة مؤقتاً
+                                  // Row(
+                                  //   children: [
+                                  //     Expanded(
+                                  //       child: ElevatedButton.icon(
+                                  //         onPressed: _confirmingBookings.contains(booking['appointmentId'])
+                                  //             ? null
+                                  //             : () => _confirmBooking(booking),
+                                  //         icon: _confirmingBookings.contains(booking['appointmentId'])
+                                  //             ? const SizedBox(
+                                  //                 width: 16,
+                                  //                 height: 16,
+                                  //                 child: CircularProgressIndicator(
+                                  //                   strokeWidth: 2,
+                                  //                   color: Colors.white,
+                                  //                 ),
+                                  //               )
+                                  //             : const Icon(Icons.check, size: 16),
+                                  //         label: Text(
+                                  //           _confirmingBookings.contains(booking['appointmentId'])
+                                  //               ? 'جاري التأكيد...'
+                                  //               : 'تأكيد الحجز',
+                                  //         ),
+                                  //         style: ElevatedButton.styleFrom(
+                                  //           backgroundColor: Colors.green,
+                                  //           foregroundColor: Colors.white,
+                                  //           padding: const EdgeInsets.symmetric(vertical: 8),
+                                  //         ),
+                                  //       ),
+                                  //     ),
+                                  //     const SizedBox(width: 8),
+                                  //     Expanded(
+                                  //       child: ElevatedButton.icon(
+                                  //         onPressed: _cancelingBookings.contains(booking['appointmentId'])
+                                  //             ? null
+                                  //             : () => _cancelBooking(booking),
+                                  //         icon: _cancelingBookings.contains(booking['appointmentId'])
+                                  //             ? const SizedBox(
+                                  //                 width: 16,
+                                  //                 height: 16,
+                                  //                 child: CircularProgressIndicator(
+                                  //                   strokeWidth: 2,
+                                  //                   color: Colors.white,
+                                  //                 ),
+                                  //               )
+                                  //             : const Icon(Icons.cancel, size: 16),
+                                  //         label: Text(
+                                  //           _cancelingBookings.contains(booking['appointmentId'])
+                                  //               ? 'جاري الإلغاء...'
+                                  //               : 'إلغاء الحجز',
+                                  //         ),
+                                  //         style: ElevatedButton.styleFrom(
+                                  //           backgroundColor: Colors.red,
+                                  //           foregroundColor: Colors.white,
+                                  //           padding: const EdgeInsets.symmetric(vertical: 8),
+                                  //         ),
+                                  //       ),
+                                  //     ),
+                                  //   ],
+                                  // ),
                                 ],
                               ],
                             ),

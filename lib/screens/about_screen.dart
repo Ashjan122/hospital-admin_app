@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 // إزالة http لعدم الحاجة بعد حذف اختبار الرابط
 import 'package:hospital_admin_app/services/app_update_service.dart';
 
@@ -276,7 +278,23 @@ class _AboutScreenState extends State<AboutScreen> {
                       // Support (expandable)
                       ExpandableSection(
                         title: 'الدعم الفني ووسائل التواصل',
-                        child: Text('قريباً', style: TextStyle(color: Colors.grey[600])),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'للشكاوى والمقترحات:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _SimplePhoneNumber(phoneNumber: '0116319563'),
+                            const SizedBox(height: 8),
+                            _SimplePhoneNumber(phoneNumber: '0963069664'),
+                          ],
+                        ),
                       ),
 
                       const SizedBox(height: 16),
@@ -377,3 +395,55 @@ class _ExpandableSectionState extends State<ExpandableSection> {
     );
   }
 }
+
+class _SimplePhoneNumber extends StatelessWidget {
+  final String phoneNumber;
+
+  const _SimplePhoneNumber({required this.phoneNumber});
+
+  Future<void> _makePhoneCall() async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        throw 'Could not launch phone call';
+      }
+    } catch (e) {
+      // Fallback: copy to clipboard
+      await Clipboard.setData(ClipboardData(text: phoneNumber));
+    }
+  }
+
+  Future<void> _copyToClipboard(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: phoneNumber));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تم نسخ الرقم: $phoneNumber'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF2FBDAF),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _makePhoneCall,
+      onLongPress: () => _copyToClipboard(context),
+      child: Text(
+        phoneNumber,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF2FBDAF),
+          decoration: TextDecoration.underline,
+          decorationColor: Color(0xFF2FBDAF),
+        ),
+      ),
+    );
+  }
+}
+

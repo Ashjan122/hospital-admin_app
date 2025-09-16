@@ -17,7 +17,6 @@ class AdminInsuranceCompaniesScreen extends StatefulWidget {
 }
 
 class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesScreen> {
-  final _formKey = GlobalKey<FormState>();
   String _searchQuery = '';
   bool _isLoading = false;
   List<Map<String, dynamic>> _allInsuranceCompanies = [];
@@ -287,6 +286,13 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,
+          actions: [
+            IconButton(
+              onPressed: _isLoading ? null : _showAddDialog,
+              icon: const Icon(Icons.add),
+              tooltip: 'إضافة شركة تأمين جديدة',
+            ),
+          ],
         ),
         body: Column(
             children: [
@@ -313,24 +319,6 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
                       fillColor: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  // Add insurance company button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _showAddDialog,
-                      icon: const Icon(Icons.add),
-                      label: Text(_isLoading ? 'جاري الإضافة...' : 'إضافة شركة تأمين جديدة'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2FBDAF),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                    ),
                   ],
                 ),
               ),
@@ -381,10 +369,14 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
-                                leading: Icon(
-                                  Icons.business,
-                                  color: isActive ? Colors.green : Colors.grey,
-                            ),
+                                leading: Text(
+                                  '${index + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
                             title: Text(
                                   insurance['name'],
                               style: TextStyle(
