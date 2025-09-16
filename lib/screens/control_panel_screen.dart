@@ -19,6 +19,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:hospital_admin_app/screens/users_stats_screen.dart';
 import 'package:hospital_admin_app/screens/sample_requests_screen.dart';
+import 'package:hospital_admin_app/screens/support_numbers_screen.dart';
 
 class ControlPanelScreen extends StatefulWidget {
   const ControlPanelScreen({super.key});
@@ -1115,6 +1116,42 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                           ),
                           child: const Text(
                             ' طلبات العينات',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Support Numbers Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const SupportNumbersScreen(),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF2FBDAF),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: const BorderSide(
+                              color: Color(0xFF2FBDAF),
+                              width: 2,
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            'أرقام الدعم الفني',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
