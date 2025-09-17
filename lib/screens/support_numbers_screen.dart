@@ -131,14 +131,14 @@ class _SupportNumbersScreenState extends State<SupportNumbersScreen> {
           backgroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF2FBDAF)),
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: const Text(
             'أرقام الدعم الفني',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2FBDAF),
+              color: Color(0xFF0D47A1),
               fontSize: 24,
             ),
           ),
@@ -147,7 +147,7 @@ class _SupportNumbersScreenState extends State<SupportNumbersScreen> {
             IconButton(
               tooltip: 'إضافة رقم',
               onPressed: _saving ? null : _promptAddNumber,
-              icon: const Icon(Icons.add, color: Color(0xFF2FBDAF)),
+              icon: const Icon(Icons.add, color: Color(0xFF0D47A1)),
             ),
           ],
         ),
@@ -196,7 +196,7 @@ class _SupportNumbersScreenState extends State<SupportNumbersScreen> {
                                     '${index + 1} -',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF2FBDAF),
+                                      color: Color(0xFF0D47A1),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -212,7 +212,7 @@ class _SupportNumbersScreenState extends State<SupportNumbersScreen> {
                                   IconButton(
                                     tooltip: 'تعديل',
                                     onPressed: () => _editNumber(numbers, index),
-                                    icon: const Icon(Icons.edit, color: Color(0xFF2FBDAF)),
+                                    icon: const Icon(Icons.edit, color: Color(0xFF0D47A1)),
                                   ),
                                   IconButton(
                                     tooltip: 'حذف',

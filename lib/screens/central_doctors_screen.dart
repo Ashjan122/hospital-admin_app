@@ -26,7 +26,7 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color(0xFF0D47A1),
           foregroundColor: Colors.white,
           elevation: 0,
         ),
@@ -137,12 +137,12 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
                             leading: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2FBDAF).withAlpha(26),
+                                color: const Color(0xFF0D47A1).withAlpha(26),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Icon(
                                 Icons.person,
-                                color: Color(0xFF2FBDAF),
+                                color: Color(0xFF0D47A1),
                               ),
                             ),
                             title: Text(
@@ -205,7 +205,7 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _showAddDoctorDialog(),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color(0xFF0D47A1),
           foregroundColor: Colors.white,
           child: const Icon(Icons.add),
         ),
@@ -403,7 +403,7 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2FBDAF),
+                backgroundColor: const Color(0xFF0D47A1),
                 foregroundColor: Colors.white,
               ),
               child: const Text('إضافة'),
@@ -507,7 +507,7 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2FBDAF),
+                backgroundColor: const Color(0xFF0D47A1),
                 foregroundColor: Colors.white,
               ),
               child: const Text('تحديث'),

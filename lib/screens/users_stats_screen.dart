@@ -190,7 +190,7 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const SizedBox(
                       height: 260,
-                      child: Center(child: CircularProgressIndicator(color: Color(0xFF2FBDAF))),
+                      child: Center(child: CircularProgressIndicator(color: Color(0xFF0D47A1))),
                     );
                   }
                   if (snapshot.hasError) {
@@ -223,9 +223,9 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
                         ),
                         const SizedBox(height: 8),
                         const TabBar(
-                          labelColor: Color(0xFF2FBDAF),
+                          labelColor: Color(0xFF0D47A1),
                           unselectedLabelColor: Colors.grey,
-                          indicatorColor: Color(0xFF2FBDAF),
+                          indicatorColor: Color(0xFF0D47A1),
                           tabs: [
                             Tab(text: 'المتصلون الآن'),
                             Tab(text: 'تسجيلات اليوم'),
@@ -235,7 +235,7 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
                         SizedBox(
                           height: 420,
                           child: TabBarView(
-                            children: [
+                                children: [
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -249,7 +249,7 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  _SectionHeader(title: 'تسجيلات اليوم (${data.logins.length})', color: Color(0xFF2FBDAF)),
+                                      _SectionHeader(title: 'تسجيلات اليوم (${data.logins.length})', color: Color(0xFF0D47A1)),
                                   const SizedBox(height: 8),
                                   const Divider(height: 1),
                                   const SizedBox(height: 8),
@@ -284,7 +284,7 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color(0xFF0D47A1),
           elevation: 0,
           actions: [
             IconButton(
@@ -296,7 +296,7 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
         ),
         body: SafeArea(
           child: _loading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF2FBDAF)))
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D47A1)))
               : GridView.count(
                   padding: const EdgeInsets.all(16),
                   crossAxisCount: 2,
@@ -305,35 +305,35 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
                   children: [
                     _RoleCard(
                       title: 'الكل',
-                      color: const Color(0xFF2FBDAF),
+                      color: const Color(0xFF0D47A1),
                       online: _onlineAll,
                       logins: _loginsAll,
                       onTap: () => _showRoleDetails(title: 'الكل', roleKey: 'all'),
                     ),
                     _RoleCard(
                       title: 'المرضى',
-                      color: const Color(0xFF2FBDAF),
+                      color: const Color(0xFF0D47A1),
                       online: _onlinePatient,
                       logins: _loginsPatient,
                       onTap: () => _showRoleDetails(title: 'المرضى', roleKey: 'patient'),
                     ),
                     _RoleCard(
                       title: 'موظف الاستقبال',
-                      color: const Color(0xFF2FBDAF),
+                      color: const Color(0xFF0D47A1),
                       online: _onlineReception,
                       logins: _loginsReception,
                       onTap: () => _showRoleDetails(title: 'موظف الاستقبال', roleKey: 'reception'),
                     ),
                     _RoleCard(
                       title: 'الأطباء',
-                      color: const Color(0xFF2FBDAF),
+                      color: const Color(0xFF0D47A1),
                       online: _onlineDoctor,
                       logins: _loginsDoctor,
                       onTap: () => _showRoleDetails(title: 'الأطباء', roleKey: 'doctor'),
                     ),
                     _RoleCard(
                       title: 'الادمن',
-                      color: const Color(0xFF2FBDAF),
+                      color: const Color(0xFF0D47A1),
                       online: _onlineAdmin,
                       logins: _loginsAdmin,
                       onTap: () => _showRoleDetails(title: 'الادمن', roleKey: 'admin'),

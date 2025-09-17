@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class ReceptionStaffListScreen extends StatefulWidget {
   const ReceptionStaffListScreen({super.key});
@@ -123,19 +122,7 @@ class _ReceptionStaffListScreenState extends State<ReceptionStaffListScreen> {
     });
   }
 
-  String _formatDate(dynamic timestamp) {
-    if (timestamp == null) return 'غير محدد';
-    
-    try {
-      if (timestamp is Timestamp) {
-        final date = timestamp.toDate();
-        return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
-      }
-      return timestamp.toString();
-    } catch (e) {
-      return 'غير محدد';
-    }
-  }
+  // _formatDate غير مستخدمة حالياً وتمت إزالتها لتفادي تحذيرات اللينتر
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +137,7 @@ class _ReceptionStaffListScreenState extends State<ReceptionStaffListScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color(0xFF0D47A1),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -208,7 +195,7 @@ class _ReceptionStaffListScreenState extends State<ReceptionStaffListScreen> {
                             'نتائج البحث: ${_filteredReceptionStaff.length}',
                             style: TextStyle(
                               fontSize: 14,
-                              color: const Color(0xFF2FBDAF),
+                              color: const Color(0xFF0D47A1),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -223,7 +210,7 @@ class _ReceptionStaffListScreenState extends State<ReceptionStaffListScreen> {
                 child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                                color: Color(0xFF2FBDAF),
+                                color: Color(0xFF0D47A1),
                         ),
                       )
                     : _filteredReceptionStaff.isEmpty

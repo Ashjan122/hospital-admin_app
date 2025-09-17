@@ -43,7 +43,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   bool _showAddForm = false;
   String? _editingCenterId;
   String _searchQuery = '';
-  bool _showSearchField = false;
+  bool _showHomeGrid = true; // عرض شبكة الأيقونات في الشاشة الرئيسية
   
   // Image handling variables
   String _selectedImageUrl = '';
@@ -58,6 +58,20 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     super.initState();
     print('ControlPanelScreen initState');
     _checkLoginStatus();
+    _restoreLastView();
+  }
+
+  Future<void> _restoreLastView() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastView = prefs.getString('controlPanelLastView');
+      if (!mounted) return;
+      if (lastView == 'centers') {
+        setState(() {
+          _showHomeGrid = false;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkLoginStatus() async {
@@ -215,6 +229,51 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     }
   }
 
+  // عنصر بطاقة أيقونة في الشاشة الرئيسية
+  Widget _buildHomeCard({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color color = const Color(0xFF0D47A1),
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: color),
+              const SizedBox(height: 12),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _addCenter() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -320,7 +379,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
         barrierDismissible: false,
         builder: (context) => const Center(
           child: CircularProgressIndicator(
-            color: Color(0xFF2FBDAF),
+            color: Color(0xFF0D47A1),
           ),
         ),
       );
@@ -869,16 +928,25 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     await prefs.setBool('fromControlPanel', true);  // إضافة هذا المتغير
     
     if (mounted) {
-      Navigator.push(  // تغيير من pushReplacement إلى push
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => DashboardScreen(
             centerId: centerId,
             centerName: centerName,
-            fromControlPanel: true,  // إضافة هذا المعامل
+            fromControlPanel: true,
           ),
         ),
       );
+      if (!mounted) return;
+      setState(() {
+        _showHomeGrid = false; // الرجوع إلى عرض المراكز عند العودة من الداشبورد
+        _showAddForm = false;
+        _searchQuery = '';
+        _searchController.clear();
+      });
+      // persist last view as centers
+      SharedPreferences.getInstance().then((p) => p.setString('controlPanelLastView', 'centers'));
     }
   }
 
@@ -896,26 +964,33 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color(0xFF0D47A1),
           elevation: 0,
-          leading: Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-              tooltip: 'القائمة الجانبية',
-            ),
+          centerTitle: true,
+          leading: _showHomeGrid
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  tooltip: 'الرجوع',
+                  onPressed: () {
+                    setState(() {
+                      _showHomeGrid = true;
+                      _showAddForm = false;
+                      _searchQuery = '';
+                      _searchController.clear();
+                    });
+                    // persist last view as home
+                    SharedPreferences.getInstance().then((p) => p.setString('controlPanelLastView', 'home'));
+                  },
           ),
           actions: [
+            if (_showHomeGrid)
             IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const UsersStatsScreen()),
-                );
-              },
-              icon: const Icon(Icons.query_stats, color: Colors.white),
-              tooltip: 'إحصائيات المستخدمين',
-            ),
+                onPressed: _logout,
+                icon: const Icon(Icons.logout, color: Colors.white),
+                tooltip: 'تسجيل الخروج',
+              ),
+            if (!_showHomeGrid)
             IconButton(
               onPressed: () => setState(() => _showAddForm = !_showAddForm),
               icon: Icon(
@@ -924,212 +999,69 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
               ),
               tooltip: _showAddForm ? 'إغلاق النموذج' : 'إضافة مركز جديد',
             ),
-            IconButton(
-              onPressed: _logout,
-              icon: const Icon(Icons.logout, color: Colors.white),
-            ),
           ],
         ),
-        drawer: Drawer(
-          child: SafeArea(
-            child: Column(
-              children: [
-                // Central Data Management Section
-                Padding(
+        body: _showHomeGrid
+            ? Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  childAspectRatio: 1.2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.storage,
-                            color: const Color(0xFF2FBDAF),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'إدارة البيانات المركزية',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // Specialties Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
+                    _buildHomeCard(
+                      icon: Icons.business,
+                      title: 'المراكز الطبية',
+                      onTap: () {
+                        setState(() {
+                          _showHomeGrid = false;
+                          _showAddForm = false;
+                          _searchQuery = '';
+                          _searchController.clear();
+                        });
+                        SharedPreferences.getInstance().then((p) => p.setString('controlPanelLastView', 'centers'));
+                      },
+                    ),
+                    _buildHomeCard(
+                      icon: Icons.storage,
+                      title: 'التخصصات',
+                      onTap: () {
                             _showSpecialtiesList();
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF2FBDAF),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: const BorderSide(
-                              color: Color(0xFF2FBDAF),
-                              width: 2,
-                            ),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            'التخصصات',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      // Doctors Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
+                    ),
+                    _buildHomeCard(
+                      icon: Icons.medical_services,
+                      title: 'الأطباء',
+                      onTap: () {
                             _showDoctorsList();
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF2FBDAF),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: const BorderSide(
-                              color: Color(0xFF2FBDAF),
-                              width: 2,
-                            ),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            'الأطباء',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      // Insurance Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
+                    ),
+                    _buildHomeCard(
+                      icon: Icons.verified_user,
+                      title: 'التأمين',
+                      onTap: () {
                             _showInsuranceList();
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF2FBDAF),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: const BorderSide(
-                              color: Color(0xFF2FBDAF),
-                              width: 2,
-                            ),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            'التأمين',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      
-                      // Divider
-                      const SizedBox(height: 20),
-                      const Divider(
-                        color: Color(0xFF2FBDAF),
-                        thickness: 2,
-                      ),
-                      const SizedBox(height: 20),
-                      
-                      // Reception Staff Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
+                    ),
+                    _buildHomeCard(
+                      icon: Icons.people_alt,
+                      title: 'موظفي الاستقبال',
+                      onTap: () {
                             _showReceptionStaffList();
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF2FBDAF),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: const BorderSide(
-                              color: Color(0xFF2FBDAF),
-                              width: 2,
-                            ),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            'موظفي الاستقبال',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      // Sample Requests Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
+                    ),
+                    _buildHomeCard(
+                      icon: Icons.biotech,
+                      title: 'طلبات العينات',
+                      onTap: () {
                             _showSampleRequests();
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF2FBDAF),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: const BorderSide(
-                              color: Color(0xFF2FBDAF),
-                              width: 2,
-                            ),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            ' طلبات العينات',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // Support Numbers Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
+                    ),
+                    _buildHomeCard(
+                      icon: Icons.support_agent,
+                      title: 'أرقام الدعم الفني',
+                      onTap: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -1137,36 +1069,23 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                               ),
                             );
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF2FBDAF),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            side: const BorderSide(
-                              color: Color(0xFF2FBDAF),
-                              width: 2,
-                            ),
-                            elevation: 2,
+                    ),
+                    _buildHomeCard(
+                      icon: Icons.query_stats,
+                      title: 'إحصائيات المستخدمين',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const UsersStatsScreen(),
                           ),
-                          child: const Text(
-                            'أرقام الدعم الفني',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
+                        );
+                      },
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        body: Column(
+              )
+            : Column(
           children: [
             // Add Center Section
             if (_showAddForm)
@@ -1183,7 +1102,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                           children: [
                             Icon(
                               _editingCenterId != null ? Icons.edit : Icons.add_business,
-                              color: const Color(0xFF2FBDAF),
+                              color: const Color(0xFF0D47A1),
                             ),
                             const SizedBox(width: 8),
                             Text(
@@ -1212,7 +1131,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: const Color(0xFF2FBDAF),
+                                            color: const Color(0xFF0D47A1),
                                             width: 3,
                                           ),
                                         ),
@@ -1245,7 +1164,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                                       icon: const Icon(Icons.camera_alt),
                                       label: const Text('اختيار صورة المركز'),
                                       style: TextButton.styleFrom(
-                                        foregroundColor: const Color(0xFF2FBDAF),
+                                        foregroundColor: const Color(0xFF0D47A1),
                                       ),
                                     ),
                                   ],
@@ -1344,7 +1263,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                                     child: ElevatedButton(
                                       onPressed: _isAddingCenter ? null : (_editingCenterId != null ? _updateCenter : _addCenter),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF2FBDAF),
+                                        backgroundColor: const Color(0xFF0D47A1),
                                         foregroundColor: Colors.white,
                                         padding: const EdgeInsets.symmetric(vertical: 12),
                                       ),
@@ -1383,59 +1302,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                 ),
               ),
             
-            // Centers List Section Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: _showSearchField
-                  ? TextField(
-                      controller: _searchController,
-                      onChanged: (value) {
-                        setState(() {
-                          _searchQuery = value;
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'البحث باسم المركز...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _showSearchField = false;
-                              _searchQuery = '';
-                              _searchController.clear();
-                            });
-                          },
-                          icon: const Icon(Icons.close),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      ),
-                      autofocus: true,
-                    )
-                  : Row(
-                      children: [
-                        const Text(
-                          'المراكز الطبية',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          onPressed: () {
-                            setState(() {
-                              _showSearchField = true;
-                            });
-                          },
-                          icon: const Icon(Icons.search),
-                          tooltip: 'البحث في المراكز',
-                        ),
-                      ],
-                    ),
-            ),
+            // تم إزالة شريط البحث حسب الطلب
             
             // Centers List - Takes full remaining space
             Expanded(
@@ -1489,7 +1356,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                           ElevatedButton(
                             onPressed: () => setState(() => _showAddForm = true),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2FBDAF),
+                              backgroundColor: const Color(0xFF0D47A1),
                               foregroundColor: Colors.white,
                             ),
                             child: const Text('إضافة مركز جديد'),
@@ -1515,7 +1382,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           onTap: () => _navigateToCenterDashboard(centerId, centerName),
-                          leading: const Icon(Icons.business, color: Color(0xFF2FBDAF)),
+                          leading: const Icon(Icons.business, color: Color(0xFF0D47A1)),
                           title: Text(
                             centerName,
                             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1543,14 +1410,14 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                                   const SizedBox(width: 16),
                                   Icon(
                                     Icons.sort,
-                                    color: const Color(0xFF2FBDAF),
+                                    color: const Color(0xFF0D47A1),
                                     size: 16,
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
                                     'ترتيب: ${centerData['order'] ?? 999}',
                                     style: const TextStyle(
-                                      color: Color(0xFF2FBDAF),
+                                      color: Color(0xFF0D47A1),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -1590,7 +1457,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                                     value: 'edit',
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.edit, color: Color(0xFF2FBDAF), size: 20),
+                                        const Icon(Icons.edit, color: Color(0xFF0D47A1), size: 20),
                                         const SizedBox(width: 8),
                                         const Text('تعديل المركز'),
                                       ],
@@ -1625,7 +1492,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                                     value: 'export_pdf',
                                     child: Row(
                                       children: [
-                                        Icon(Icons.picture_as_pdf, color: Color(0xFF2FBDAF), size: 20),
+                                        Icon(Icons.picture_as_pdf, color: Color(0xFF0D47A1), size: 20),
                                         SizedBox(width: 8),
                                         Text('جدول الأطباء PDF'),
                                       ],

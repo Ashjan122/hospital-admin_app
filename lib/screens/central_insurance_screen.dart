@@ -26,7 +26,7 @@ class _CentralInsuranceScreenState extends State<CentralInsuranceScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color(0xFF0D47A1),
           foregroundColor: Colors.white,
           elevation: 0,
         ),
@@ -137,12 +137,12 @@ class _CentralInsuranceScreenState extends State<CentralInsuranceScreen> {
                             leading: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2FBDAF).withOpacity(0.1),
+                                color: const Color(0xFF0D47A1).withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Icon(
                                 Icons.business,
-                                color: Color(0xFF2FBDAF),
+                                color: Color(0xFF0D47A1),
                               ),
                             ),
                             title: Text(
@@ -192,7 +192,7 @@ class _CentralInsuranceScreenState extends State<CentralInsuranceScreen> {
         ),
         floatingActionButton: FloatingActionButton(
           onPressed: () => _showAddInsuranceDialog(),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color(0xFF0D47A1),
           foregroundColor: Colors.white,
           child: const Icon(Icons.add),
         ),
@@ -275,7 +275,7 @@ class _CentralInsuranceScreenState extends State<CentralInsuranceScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2FBDAF),
+              backgroundColor: const Color(0xFF0D47A1),
               foregroundColor: Colors.white,
             ),
             child: const Text('إضافة'),
@@ -342,7 +342,7 @@ class _CentralInsuranceScreenState extends State<CentralInsuranceScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2FBDAF),
+              backgroundColor: const Color(0xFF0D47A1),
               foregroundColor: Colors.white,
             ),
             child: const Text('تحديث'),
@@ -358,6 +358,29 @@ class _CentralInsuranceScreenState extends State<CentralInsuranceScreen> {
     });
 
     try {
+      // Prevent duplicates (case-insensitive)
+      final existingSnap = await FirebaseFirestore.instance
+          .collection('insuranceCompanies')
+          .get();
+      final lower = name.trim().toLowerCase();
+      final bool exists = existingSnap.docs.any((d) {
+        final data = d.data() as Map<String, dynamic>;
+        final existingName = (data['name']?.toString() ?? '').trim().toLowerCase();
+        return existingName == lower;
+      });
+
+      if (exists) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('شركة التأمين موجودة بالفعل'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
       final id = await _getNextNumericId('insuranceCompanies');
       
       await FirebaseFirestore.instance

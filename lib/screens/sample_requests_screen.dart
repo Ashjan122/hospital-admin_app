@@ -178,7 +178,7 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color(0xFF0D47A1),
           elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -400,7 +400,7 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                               : ElevatedButton(
                                   onPressed: () => _receiveRequest(requestId),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2FBDAF),
+                                    backgroundColor: const Color(0xFF0D47A1),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(

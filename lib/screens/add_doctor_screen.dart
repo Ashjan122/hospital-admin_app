@@ -530,45 +530,17 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Specialization (auto-filled)
-                      TextFormField(
-                        readOnly: true,
-                        decoration: InputDecoration(
-                          labelText: 'التخصص',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          prefixIcon: const Icon(Icons.medical_services),
-                        ),
-                        controller: TextEditingController(
-                          text: _selectedDoctorSpecName,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Phone (auto-filled)
-                      TextFormField(
-                        readOnly: true,
-                        decoration: InputDecoration(
-                          labelText: 'رقم الهاتف',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          prefixIcon: const Icon(Icons.phone),
-                        ),
-                        controller: TextEditingController(
-                          text: _selectedDoctorPhone,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      // تم إخفاء حقول التخصص ورقم الهاتف من نموذج الإضافة حسب الطلب
 
                       // Morning patient limit
                       TextFormField(
                         controller: _morningLimitController,
                         decoration: InputDecoration(
                           labelText: 'الحد الأقصى للمرضى في الفترة الصباحية',
+                          floatingLabelBehavior: FloatingLabelBehavior.always,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
+                            gapPadding: 8,
                           ),
                           prefixIcon: Icon(Icons.wb_sunny),
                         ),
@@ -591,8 +563,10 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
                         controller: _eveningLimitController,
                         decoration: InputDecoration(
                           labelText: 'الحد الأقصى للمرضى في الفترة المسائية',
+                          floatingLabelBehavior: FloatingLabelBehavior.always,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
+                            gapPadding: 8,
                           ),
                           prefixIcon: Icon(Icons.nightlight),
                         ),
