@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.notifyNewAppointment = void 0;
+exports.sendTomorrowReminders = exports.notifyNewAppointment = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const https = require("https");
 admin.initializeApp();
 exports.notifyNewAppointment = functions.firestore
     .document('medicalFacilities/{centerId}/specializations/{specId}/doctors/{doctorId}/appointments/{appointmentId}')
@@ -129,4 +130,117 @@ exports.notifyNewAppointment = functions.firestore
         return null;
     }
 });
+// Scheduled function: send reminders 24h before scheduled appointments
+exports.sendTomorrowReminders = functions.pubsub
+    .schedule('0 8 * * *') // daily at 08:00
+    .timeZone('Africa/Khartoum')
+    .onRun(async () => {
+    const db = admin.firestore();
+    // Compute tomorrow (Riyadh timezone assumed by schedule). We compare by date only.
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const tomorrowY = tomorrow.getFullYear();
+    const tomorrowM = tomorrow.getMonth();
+    const tomorrowD = tomorrow.getDate();
+    try {
+        // Query all scheduled appointments where reminder not yet sent
+        const snap = await db
+            .collectionGroup('scheduledAppointments')
+            .where('status', '==', 'scheduled')
+            .where('reminderSent', '==', false)
+            .get();
+        if (snap.empty) {
+            console.log('No scheduled appointments pending reminders.');
+            return null;
+        }
+        console.log(`Found ${snap.size} scheduled appointments to evaluate`);
+        const results = [];
+        for (const doc of snap.docs) {
+            const data = doc.data();
+            const appointmentDateStr = String(data.appointmentDate || '');
+            const patientPhone = String(data.patientPhone || '');
+            const doctorName = String(data.doctorName || '');
+            // Parse appointment date regardless of timezone in ISO string
+            let appointmentDate = null;
+            try {
+                if (appointmentDateStr) {
+                    const d = new Date(appointmentDateStr);
+                    if (!isNaN(d.getTime()))
+                        appointmentDate = d;
+                }
+            }
+            catch { }
+            if (!appointmentDate) {
+                results.push({ id: doc.id, sent: false, reason: 'Invalid appointmentDate' });
+                continue;
+            }
+            const isTomorrow = appointmentDate.getFullYear() === tomorrowY &&
+                appointmentDate.getMonth() === tomorrowM &&
+                appointmentDate.getDate() === tomorrowD;
+            if (!isTomorrow) {
+                results.push({ id: doc.id, sent: false, reason: 'Not tomorrow' });
+                continue;
+            }
+            if (!patientPhone) {
+                results.push({ id: doc.id, sent: false, reason: 'Missing patientPhone' });
+                continue;
+            }
+            const messageBody = `لديك موعد مع د. ${doctorName} غداً يرجى الحجز`;
+            try {
+                // Send WhatsApp reminder via UltraMsg
+                await sendWhatsAppUsingUltraMsg(patientPhone, messageBody);
+                // Optionally: Integrate SMS provider here if needed
+                await doc.ref.update({
+                    reminderSent: true,
+                    reminderSentAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                results.push({ id: doc.id, sent: true });
+            }
+            catch (e) {
+                console.error('Failed sending reminder for', doc.ref.path, e);
+                results.push({ id: doc.id, sent: false, reason: String(e?.message || e) });
+            }
+        }
+        const sentCount = results.filter(r => r.sent).length;
+        console.log(`Reminders processed. Sent: ${sentCount}/${results.length}`);
+        return null;
+    }
+    catch (e) {
+        console.error('sendTomorrowReminders failed', e);
+        return null;
+    }
+});
+function sendWhatsAppUsingUltraMsg(to, body) {
+    return new Promise((resolve, reject) => {
+        const cfg = functions.config() || {};
+        const instance = cfg.ultramsg?.instance || process.env.ULTRAMSG_INSTANCE;
+        const token = cfg.ultramsg?.token || process.env.ULTRAMSG_TOKEN;
+        if (!instance || !token) {
+            return reject(new Error('UltraMsg config missing (ultramsg.instance/token)'));
+        }
+        const url = new URL(`https://api.ultramsg.com/${instance}/messages/chat`);
+        const postData = new URLSearchParams({ token, to, body }).toString();
+        const req = https.request(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(postData).toString(),
+            },
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk) => (data += chunk));
+            res.on('end', () => {
+                if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                    resolve();
+                }
+                else {
+                    reject(new Error(`UltraMsg HTTP ${res.statusCode}: ${data}`));
+                }
+            });
+        });
+        req.on('error', (err) => reject(err));
+        req.write(postData);
+        req.end();
+    });
+}
 //# sourceMappingURL=index.js.map
