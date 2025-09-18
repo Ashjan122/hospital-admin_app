@@ -55,6 +55,12 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
   bool _isInitializing = true;
   // String _loadingMessage = 'جاري تحميل البيانات...'; // معطل مؤقتاً
 
+  bool _isAlroomyMedicalCenter(String? name) {
+    if (name == null) return false;
+    final normalized = name.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+    return normalized == 'مركز الرومي الطبي';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1487,11 +1493,8 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
                                                                   );
                                                                 },
                                                               ),
-                                                              // إظهار نتيجة المختبر فقط في مركز الرومي الطبي
-                                                              if (widget.centerName?.toLowerCase().contains('رومي') == true ||
-                                                                  widget.centerName?.toLowerCase().contains('الرومي') == true ||
-                                                                  widget.centerName?.toLowerCase().contains('roomy') == true ||
-                                                                  widget.centerName?.toLowerCase().contains('alroomy') == true)
+                                                              // إظهار نتيجة المختبر فقط إذا كان المركز هو "مركز الرومي الطبي" تحديداً
+                                                              if (_isAlroomyMedicalCenter(widget.centerName))
                                                                 _buildGridItem(
                                                                   icon: Icons.science,
                                                                   title: 'نتيجة المختبر',

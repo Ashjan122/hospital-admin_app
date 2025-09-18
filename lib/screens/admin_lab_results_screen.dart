@@ -1198,7 +1198,7 @@ class _AdminLabResultsScreenState extends State<AdminLabResultsScreen> {
                                   const SizedBox(height: 16),
                                   Text(
                                     _selectedSearchMethod == 0
-                                        ? 'اضغط على "الاستعلام عن النتيجة" للعثور على نتائج المختبر المرتبطة برقم هاتفك'
+                                        ? ' ادخل رقم الهاتف ثم اضغط على الاستعلام عن النتيجة'
                                         : 'أدخل رقم الإيصال ثم اضغط "البحث برقم الإيصال" لعرض النتائج',
                                     style: const TextStyle(
                                       fontSize: 16,
