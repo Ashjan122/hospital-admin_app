@@ -51,9 +51,14 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
 
   Future<void> _subscribeToDoctorTopic() async {
     try {
-      final topic = 'doctor_${widget.doctorId}';
-      await FirebaseMessaging.instance.subscribeToTopic(topic);
-      print('Doctor user subscribed to topic: $topic');
+      final prefs = await SharedPreferences.getInstance();
+      final isSubscribed = prefs.getBool('doctor_notifications_enabled') ?? true;
+      
+      if (isSubscribed) {
+        final topic = 'doctor_${widget.doctorId}';
+        await FirebaseMessaging.instance.subscribeToTopic(topic);
+        print('Doctor user subscribed to topic: $topic');
+      }
     } catch (e) {
       print('Error subscribing doctor to topic: $e');
     }
@@ -66,6 +71,53 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
       print('Doctor user unsubscribed from topic: $topic');
     } catch (e) {
       print('Error unsubscribing doctor from topic: $e');
+    }
+  }
+
+  Future<void> _toggleNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isCurrentlyEnabled = prefs.getBool('doctor_notifications_enabled') ?? true;
+      final newStatus = !isCurrentlyEnabled;
+      
+      await prefs.setBool('doctor_notifications_enabled', newStatus);
+      
+      // تحديث الواجهة فوراً
+      if (mounted) {
+        setState(() {});
+      }
+      
+      if (newStatus) {
+        await _subscribeToDoctorTopic();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم تفعيل الإشعارات'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        await _unsubscribeFromDoctorTopic();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم تعطيل الإشعارات'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error toggling notifications: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تغيير حالة الإشعارات: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -244,6 +296,21 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
+            FutureBuilder<bool>(
+              future: SharedPreferences.getInstance().then((prefs) => 
+                prefs.getBool('doctor_notifications_enabled') ?? true),
+              builder: (context, snapshot) {
+                final isEnabled = snapshot.data ?? true;
+                return IconButton(
+                  icon: Icon(
+                    isEnabled ? Icons.notifications_active : Icons.notifications_off,
+                    color: isEnabled ? Colors.white : Colors.orange[300],
+                  ),
+                  onPressed: _toggleNotifications,
+                  tooltip: isEnabled ? 'تعطيل الإشعارات' : 'تفعيل الإشعارات',
+                );
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _refreshing ? null : _refreshBookings,

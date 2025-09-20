@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 
 import 'package:hospital_admin_app/screens/central_specialties_screen.dart';
@@ -20,6 +21,8 @@ import 'package:open_filex/open_filex.dart';
 import 'package:hospital_admin_app/screens/users_stats_screen.dart';
 import 'package:hospital_admin_app/screens/sample_requests_screen.dart';
 import 'package:hospital_admin_app/screens/support_numbers_screen.dart';
+import 'package:hospital_admin_app/screens/control_notifications_screen.dart';
+import 'package:hospital_admin_app/screens/home_clinic_centers_screen.dart';
 
 class ControlPanelScreen extends StatefulWidget {
   const ControlPanelScreen({super.key});
@@ -91,6 +94,31 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
       // حذف fromControlPanel عند الوصول للكنترول
       await prefs.remove('fromControlPanel');
       print('تم حذف fromControlPanel عند الوصول للكنترول');
+      
+      // إعادة الاشتراك في الإشعارات إذا كان مشترك سابقاً
+      await _restoreNotificationSubscription();
+    }
+  }
+
+  Future<void> _restoreNotificationSubscription() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isSubscribed = prefs.getBool('subscribed_to_new_signup') ?? false;
+      
+      if (isSubscribed) {
+        // استيراد Firebase Messaging
+        final FirebaseMessaging messaging = FirebaseMessaging.instance;
+        await messaging.subscribeToTopic('new_signup');
+        print('تم إعادة الاشتراك في إشعارات الحسابات الجديدة');
+      } else {
+        // إذا لم يكن مشترك، اشترك تلقائياً
+        final FirebaseMessaging messaging = FirebaseMessaging.instance;
+        await messaging.subscribeToTopic('new_signup');
+        await prefs.setBool('subscribed_to_new_signup', true);
+        print('تم الاشتراك التلقائي في إشعارات الحسابات الجديدة');
+      }
+    } catch (e) {
+      print('خطأ في إعادة الاشتراك في الإشعارات: $e');
     }
   }
 
@@ -257,13 +285,13 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 40, color: color),
+              Icon(icon, size: 32, color: color),
               const SizedBox(height: 12),
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1005,8 +1033,8 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
             ? Padding(
                   padding: const EdgeInsets.all(16.0),
                 child: GridView.count(
-                  crossAxisCount: 2,
-                  childAspectRatio: 1.2,
+                  crossAxisCount: 3,
+                  childAspectRatio: 0.9,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                     children: [
@@ -1053,7 +1081,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                     ),
                     _buildHomeCard(
                       icon: Icons.biotech,
-                      title: 'طلبات العينات',
+                      title: 'طلبات العيادة المنزلية',
                       onTap: () {
                             _showSampleRequests();
                           },
@@ -1078,6 +1106,30 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => const UsersStatsScreen(),
+                          ),
+                        );
+                      },
+                      ),
+                    _buildHomeCard(
+                      icon: Icons.notifications,
+                      title: 'الإشعارات',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ControlNotificationsScreen(),
+                          ),
+                        );
+                      },
+                      ),
+                    _buildHomeCard(
+                      icon: Icons.home_work,
+                      title: 'مراكز العيادة المنزلية',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const HomeClinicCentersScreen(),
                           ),
                         );
                       },

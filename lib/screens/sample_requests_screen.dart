@@ -172,7 +172,7 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text(
-            'استلام الطلبات',
+            'طلبات العيادة المنزلية',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -246,7 +246,7 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'لم يتم العثور على أي طلبات في النظام',
+                      'لم يتم العثور على أي طلبات للعيادة المنزلية',
                       style: TextStyle(fontSize: 14, color: Colors.grey),
                       textAlign: TextAlign.center,
                     ),
@@ -280,7 +280,7 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                 print('Request ID: $requestId');
                 print('Request Data: $requestData');
                 
-                // محاولة أسماء حقول مختلفة
+                // البيانات المطلوبة
                 final name = requestData['patientName'] ?? 
                            requestData['name'] ?? 
                            requestData['fullName'] ?? 
@@ -294,11 +294,15 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                             requestData['contact'] ?? 
                             'غير محدد';
                             
-                final address = requestData['patientAddress'] ?? 
-                              requestData['address'] ?? 
-                              requestData['location'] ?? 
-                              requestData['homeAddress'] ?? 
-                              'غير محدد';
+                final serviceType = requestData['serviceType'] ?? 
+                                  requestData['service'] ?? 
+                                  requestData['type'] ?? 
+                                  'غير محدد';
+                                  
+                final centerName = requestData['centerName'] ?? 
+                                 requestData['center'] ?? 
+                                 requestData['facilityName'] ?? 
+                                 'غير محدد';
                               
                 final createdAt = requestData['createdAt'] as Timestamp?;
                 final status = requestData['status']?.toString() ?? 'pending';
@@ -340,9 +344,9 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                           ),
                         ),
                         
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         
-                        // رقم الهاتف كـ subtitle
+                        // رقم الهاتف
                         Text(
                           phone,
                           style: const TextStyle(
@@ -351,11 +355,22 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                           ),
                         ),
                         
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 4),
                         
-                        // العنوان بدون كلمة "العنوان"
+                        // نوع الطلب
                         Text(
-                          address,
+                          'نوع الطلب: $serviceType',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 4),
+                        
+                        // اسم المركز
+                        Text(
+                          'المركز: $centerName',
                           style: const TextStyle(
                             fontSize: 13,
                             color: Colors.black87,

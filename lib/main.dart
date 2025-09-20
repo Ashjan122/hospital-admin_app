@@ -11,6 +11,11 @@ import 'package:hospital_admin_app/firebase_options.dart';
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   print('Handling a background message: ${message.messageId}');
+  print('Message data: ${message.data}');
+  
+  if (message.notification != null) {
+    print('Background notification: ${message.notification?.title} - ${message.notification?.body}');
+  }
 }
 
 Future<void> main() async {
@@ -39,6 +44,18 @@ Future<void> main() async {
   String? token = await messaging.getToken();
   print('FCM Token: $token');
   
+  // Note: Subscription to new_signup topic is handled in ControlNotificationsScreen
+  
+  // Set up auto-initialization for better background handling
+  await messaging.setAutoInitEnabled(true);
+  
+  // Configure notification channel for Android
+  await messaging.setForegroundNotificationPresentationOptions(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+  
   // Handle foreground messages
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     print('Got a message whilst in the foreground!');
@@ -47,6 +64,12 @@ Future<void> main() async {
     if (message.notification != null) {
       print('Message also contained a notification: ${message.notification}');
     }
+  });
+  
+  // Handle messages when app is opened from background
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+    print('A new onMessageOpenedApp event was published!');
+    print('Message data: ${message.data}');
   });
   
   runApp(HospitalAdminApp());

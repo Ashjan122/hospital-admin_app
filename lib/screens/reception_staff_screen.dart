@@ -39,6 +39,7 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
   bool _listenersActive = false; // لمنع الازدواجية مع المؤقت
   bool _internalNotificationsEnabled = false; // إيقاف/تشغيل الإشعارات الداخلية مؤقتاً
   bool _savingFavorites = false; // حالة حفظ الأطباء المفضلين
+  bool _notificationsEnabled = true; // حالة الإشعارات العامة
 
   // تتبع الإشعارات التي تم معالجتها لتجنب التكرار
   final Set<String> _notifiedAppointmentIds = <String>{};
@@ -63,6 +64,9 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
     
     // تحميل البيانات بشكل متوازي لتحسين الأداء
     _initializeData();
+    
+    // تحميل حالة الإشعارات
+    _loadNotificationStatus();
     
     // تحديث عدد الإشعارات كل 30 ثانية
     _startNotificationTimer();
@@ -105,7 +109,7 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
   }
 
   void _startMonitoringNewBookings() {
-    if (!_internalNotificationsEnabled) return; // موقوفة مؤقتاً
+    if (!_internalNotificationsEnabled || !_notificationsEnabled) return; // موقوفة مؤقتاً أو الإشعارات معطلة
     // مراقبة الحجوزات الجديدة كل دقيقة
     Future.delayed(const Duration(minutes: 1), () {
       if (mounted) {
@@ -120,7 +124,7 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
 
   Future<void> _checkForNewBookings() async {
     try {
-      if (!_internalNotificationsEnabled) return; // موقوفة مؤقتاً
+      if (!_internalNotificationsEnabled || !_notificationsEnabled) return; // موقوفة مؤقتاً أو الإشعارات معطلة
       if (_listenersActive) return; // حماية إضافية
       // التحقق من الحجوزات الجديدة للأطباء المفضلين
       for (String doctorId in _selectedDoctorIds) {
@@ -133,7 +137,7 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
 
   Future<void> _checkDoctorNewBookings(String doctorId) async {
     try {
-      if (!_internalNotificationsEnabled) return; // موقوفة مؤقتاً
+      if (!_internalNotificationsEnabled || !_notificationsEnabled) return; // موقوفة مؤقتاً أو الإشعارات معطلة
       if (_listenersActive) return; // إذا المراقبة الفورية فعالة نتجنب الازدواجية
       // البحث عن الطبيب في جميع التخصصات
       final specializationsSnapshot = await FirebaseFirestore.instance
@@ -231,10 +235,10 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
   // إعادة بناء المستمعين لكل طبيب مفضل لمراقبة الحجوزات الجديدة
   Future<void> _refreshAppointmentListeners() async {
     try {
-      if (!_internalNotificationsEnabled) {
+      if (!_internalNotificationsEnabled || !_notificationsEnabled) {
         _detachAllAppointmentListeners();
         _listenersActive = false;
-        return; // موقوفة مؤقتاً
+        return; // موقوفة مؤقتاً أو الإشعارات معطلة
       }
       _detachAllAppointmentListeners();
       // فعّل العلم مبكراً لتوقيف الفحص الدوري فوراً وتجنب الازدواجية
@@ -562,37 +566,39 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
           
           print('✅ Local state updated with: $_selectedDoctorIds');
 
-          // إدارة الاشتراك في مواضيع التنبيهات لكل طبيب
-          try {
-            final FirebaseMessaging messaging = FirebaseMessaging.instance;
-            final Set<String> newDoctorIds = {...validIds.map((e) => e.toString())};
-            final Set<String> toSubscribe = newDoctorIds.difference(previousDoctorIds);
-            final Set<String> toUnsubscribe = previousDoctorIds.difference(newDoctorIds);
+          // إدارة الاشتراك في مواضيع التنبيهات لكل طبيب (فقط إذا كانت الإشعارات مفعلة)
+          if (_notificationsEnabled) {
+            try {
+              final FirebaseMessaging messaging = FirebaseMessaging.instance;
+              final Set<String> newDoctorIds = {...validIds.map((e) => e.toString())};
+              final Set<String> toSubscribe = newDoctorIds.difference(previousDoctorIds);
+              final Set<String> toUnsubscribe = previousDoctorIds.difference(newDoctorIds);
 
-            // الاشتراك في الأطباء الجدد
-            for (final docId in toSubscribe) {
-              final topic = 'doctor_${docId}';
-              print('🔔 Subscribing to topic: $topic');
-              await messaging.subscribeToTopic(topic);
-            }
-
-            // في حالة عدم وجود تغيير فعلي، أعد الاشتراك في جميع المواضيع للتأكيد
-            if (toSubscribe.isEmpty && toUnsubscribe.isEmpty) {
-              for (final docId in newDoctorIds) {
+              // الاشتراك في الأطباء الجدد
+              for (final docId in toSubscribe) {
                 final topic = 'doctor_${docId}';
-                print('🔁 Re-subscribing to topic (no changes detected): $topic');
+                print('🔔 Subscribing to topic: $topic');
                 await messaging.subscribeToTopic(topic);
               }
-            }
 
-            // إلغاء الاشتراك من الأطباء المحذوفين
-            for (final docId in toUnsubscribe) {
-              final topic = 'doctor_${docId}';
-              print('🔕 Unsubscribing from topic: $topic');
-              await messaging.unsubscribeFromTopic(topic);
+              // في حالة عدم وجود تغيير فعلي، أعد الاشتراك في جميع المواضيع للتأكيد
+              if (toSubscribe.isEmpty && toUnsubscribe.isEmpty) {
+                for (final docId in newDoctorIds) {
+                  final topic = 'doctor_${docId}';
+                  print('🔁 Re-subscribing to topic (no changes detected): $topic');
+                  await messaging.subscribeToTopic(topic);
+                }
+              }
+
+              // إلغاء الاشتراك من الأطباء المحذوفين
+              for (final docId in toUnsubscribe) {
+                final topic = 'doctor_${docId}';
+                print('🔕 Unsubscribing from topic: $topic');
+                await messaging.unsubscribeFromTopic(topic);
+              }
+            } catch (e) {
+              print('❌ Error managing FCM topic subscriptions: $e');
             }
-          } catch (e) {
-            print('❌ Error managing FCM topic subscriptions: $e');
           }
 
           // إعادة بناء مستمعي الحجوزات بعد التحديث
@@ -764,6 +770,68 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
       }
     } catch (e) {
       print('❌ Error loading confirmed bookings count: $e');
+    }
+  }
+
+  Future<void> _loadNotificationStatus() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isEnabled = prefs.getBool('reception_notifications_enabled') ?? true;
+      
+      if (mounted) {
+        setState(() {
+          _notificationsEnabled = isEnabled;
+        });
+      }
+    } catch (e) {
+      print('Error loading notification status: $e');
+    }
+  }
+
+  Future<void> _toggleNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final newStatus = !_notificationsEnabled;
+      
+      await prefs.setBool('reception_notifications_enabled', newStatus);
+      
+      if (mounted) {
+        setState(() {
+          _notificationsEnabled = newStatus;
+        });
+      }
+      
+      // إدارة الاشتراك في مواضيع الأطباء المفضلين
+      final messaging = FirebaseMessaging.instance;
+      for (String doctorId in _selectedDoctorIds) {
+        final topic = 'doctor_${doctorId}';
+        if (newStatus) {
+          await messaging.subscribeToTopic(topic);
+          print('Subscribed to topic: $topic');
+        } else {
+          await messaging.unsubscribeFromTopic(topic);
+          print('Unsubscribed from topic: $topic');
+        }
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(newStatus ? 'تم تفعيل الإشعارات' : 'تم تعطيل الإشعارات'),
+            backgroundColor: newStatus ? Colors.green : Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error toggling notifications: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تغيير حالة الإشعارات: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -1181,6 +1249,14 @@ class _ReceptionStaffScreenState extends State<ReceptionStaffScreen> {
           foregroundColor: Colors.white,
           elevation: 0,
                     actions: [
+            IconButton(
+              icon: Icon(
+                _notificationsEnabled ? Icons.notifications_active : Icons.notifications_off,
+                color: _notificationsEnabled ? Colors.white : Colors.orange[300],
+              ),
+              onPressed: _toggleNotifications,
+              tooltip: _notificationsEnabled ? 'تعطيل الإشعارات' : 'تفعيل الإشعارات',
+            ),
             IconButton(
               icon: const Icon(Icons.add),
               tooltip: 'إضافة أطباء مفضلين',

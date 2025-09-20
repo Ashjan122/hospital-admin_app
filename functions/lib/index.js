@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendTomorrowReminders = exports.notifyNewAppointment = void 0;
+exports.sendTomorrowReminders = exports.notifyNewHomeClinicRequest = exports.notifyNewPatientSignup = exports.notifyNewAppointment = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const https = require("https");
@@ -131,6 +131,72 @@ exports.notifyNewAppointment = functions.firestore
     }
 });
 // Scheduled function: send reminders 24h before scheduled appointments
+// Notification for new patient signup
+exports.notifyNewPatientSignup = functions.firestore
+    .document('patients/{patientId}')
+    .onCreate(async (snap, context) => {
+    const data = snap.data() || {};
+    const patientName = data.name || 'مريض جديد';
+    const patientPhone = data.phone || 'غير محدد';
+    const message = {
+        notification: {
+            title: 'تم إنشاء حساب جديد',
+            body: `الاسم: ${patientName} - الهاتف: ${patientPhone}`,
+        },
+        data: {
+            type: 'new_patient_signup',
+            patientId: context.params.patientId,
+            patientName,
+            patientPhone,
+            timestamp: new Date().toISOString(),
+        },
+        topic: 'new_signup',
+    };
+    try {
+        await admin.messaging().send(message);
+        console.log('New patient signup notification sent successfully');
+        return null;
+    }
+    catch (e) {
+        console.error('Error sending new patient signup notification:', e);
+        return null;
+    }
+});
+// Notification for new home clinic request
+exports.notifyNewHomeClinicRequest = functions.firestore
+    .document('homeSampleRequests/{requestId}')
+    .onCreate(async (snap, context) => {
+    const data = snap.data() || {};
+    const patientName = data.patientName || data.name || 'مريض جديد';
+    const patientPhone = data.patientPhone || data.phone || 'غير محدد';
+    const serviceType = data.serviceType || data.service || 'خدمة طبية';
+    const centerName = data.centerName || data.center || 'مركز طبي';
+    const message = {
+        notification: {
+            title: 'طلب جديد للعيادة المنزلية',
+            body: `الاسم: ${patientName} - الهاتف: ${patientPhone} - النوع: ${serviceType} - المركز: ${centerName}`,
+        },
+        data: {
+            type: 'new_home_clinic_request',
+            requestId: context.params.requestId,
+            patientName,
+            patientPhone,
+            serviceType,
+            centerName,
+            timestamp: new Date().toISOString(),
+        },
+        topic: 'home_clinic_requests',
+    };
+    try {
+        await admin.messaging().send(message);
+        console.log('New home clinic request notification sent successfully');
+        return null;
+    }
+    catch (e) {
+        console.error('Error sending new home clinic request notification:', e);
+        return null;
+    }
+});
 exports.sendTomorrowReminders = functions.pubsub
     .schedule('0 8 * * *') // daily at 08:00
     .timeZone('Africa/Khartoum')
