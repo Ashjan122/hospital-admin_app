@@ -4,9 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 
-import 'package:hospital_admin_app/screens/central_specialties_screen.dart';
-import 'package:hospital_admin_app/screens/central_doctors_screen.dart';
-import 'package:hospital_admin_app/screens/central_insurance_screen.dart';
+import 'package:hospital_admin_app/screens/central_data_screen.dart';
 import 'package:hospital_admin_app/screens/dashboard_screen.dart';
 import 'package:hospital_admin_app/screens/reception_staff_list_screen.dart';
 import 'package:image_picker/image_picker.dart';
@@ -857,32 +855,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     }
   }
 
-  void _showSpecialtiesList() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CentralSpecialtiesScreen(),
-      ),
-    );
-  }
-
-  void _showDoctorsList() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CentralDoctorsScreen(),
-      ),
-    );
-  }
-
-  void _showInsuranceList() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CentralInsuranceScreen(),
-      ),
-    );
-  }
+  // Removed local navigation helpers for specialties/doctors/insurance.
 
   void _showReceptionStaffList() {
     Navigator.push(
@@ -982,12 +955,43 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
+      child: WillPopScope(
+        onWillPop: () async {
+          if (!_showHomeGrid) {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CentralDataScreen(),
+              ),
+            );
+            if (!mounted) return false;
+            if (result == 'centers') {
+              setState(() {
+                _showHomeGrid = false;
+                _showAddForm = false;
+                _searchQuery = '';
+                _searchController.clear();
+              });
+              SharedPreferences.getInstance().then((p) => p.setString('controlPanelLastView', 'centers'));
+            } else {
+              setState(() {
+                _showHomeGrid = true;
+                _showAddForm = false;
+                _searchQuery = '';
+                _searchController.clear();
+              });
+              SharedPreferences.getInstance().then((p) => p.setString('controlPanelLastView', 'home'));
+            }
+            return false; // prevent popping the app
+          }
+          return true;
+        },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         appBar: AppBar(
-          title: const Text(
-            'لوحة تحكم الكنترول',
-            style: TextStyle(
+          title: Text(
+            _showHomeGrid ? 'لوحة تحكم الكنترول' : 'المراكز الطبية',
+            style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
@@ -1000,15 +1004,31 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
               : IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
                   tooltip: 'الرجوع',
-                  onPressed: () {
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CentralDataScreen(),
+                      ),
+                    );
+                    if (!mounted) return;
+                    if (result == 'centers') {
+                      setState(() {
+                        _showHomeGrid = false;
+                        _showAddForm = false;
+                        _searchQuery = '';
+                        _searchController.clear();
+                      });
+                      SharedPreferences.getInstance().then((p) => p.setString('controlPanelLastView', 'centers'));
+                    } else {
                     setState(() {
                       _showHomeGrid = true;
                       _showAddForm = false;
                       _searchQuery = '';
                       _searchController.clear();
                     });
-                    // persist last view as home
                     SharedPreferences.getInstance().then((p) => p.setString('controlPanelLastView', 'home'));
+                    }
                   },
           ),
           actions: [
@@ -1039,9 +1059,17 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                   mainAxisSpacing: 12,
                     children: [
                     _buildHomeCard(
-                      icon: Icons.business,
-                      title: 'المراكز الطبية',
-                      onTap: () {
+                      icon: Icons.hub,
+                      title: 'البيانات المركزية',
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CentralDataScreen(),
+                          ),
+                        );
+                        if (!mounted) return;
+                        if (result == 'centers') {
                         setState(() {
                           _showHomeGrid = false;
                           _showAddForm = false;
@@ -1049,27 +1077,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                           _searchController.clear();
                         });
                         SharedPreferences.getInstance().then((p) => p.setString('controlPanelLastView', 'centers'));
-                      },
-                    ),
-                    _buildHomeCard(
-                      icon: Icons.storage,
-                      title: 'التخصصات',
-                      onTap: () {
-                            _showSpecialtiesList();
-                          },
-                    ),
-                    _buildHomeCard(
-                      icon: Icons.medical_services,
-                      title: 'الأطباء',
-                      onTap: () {
-                            _showDoctorsList();
-                          },
-                    ),
-                    _buildHomeCard(
-                      icon: Icons.verified_user,
-                      title: 'التأمين',
-                      onTap: () {
-                            _showInsuranceList();
+                        }
                           },
                     ),
                     _buildHomeCard(
@@ -1563,7 +1571,9 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
 }
+

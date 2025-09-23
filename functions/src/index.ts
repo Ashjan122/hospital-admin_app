@@ -176,11 +176,12 @@ export const notifyNewHomeClinicRequest = functions.firestore
     const patientPhone = data.patientPhone || data.phone || 'غير محدد';
     const serviceType = data.serviceType || data.service || 'خدمة طبية';
     const centerName = data.centerName || data.center || 'مركز طبي';
+    const providerName = data.providerName || centerName;
     
     const message: admin.messaging.Message = {
       notification: {
         title: 'طلب جديد للعيادة المنزلية',
-        body: `الاسم: ${patientName} - الهاتف: ${patientPhone} - النوع: ${serviceType} - المركز: ${centerName}`,
+        body: `الاسم: ${patientName}\nالهاتف: ${patientPhone}\nالنوع: ${serviceType}\nمقدم الخدمة: ${providerName}`,
       },
       data: {
         type: 'new_home_clinic_request',
@@ -188,7 +189,8 @@ export const notifyNewHomeClinicRequest = functions.firestore
         patientName,
         patientPhone,
         serviceType,
-        centerName,
+        providerName,
+        centerName, // backward compatibility
         timestamp: new Date().toISOString(),
       },
       topic: 'home_clinic_requests',

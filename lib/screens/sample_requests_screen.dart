@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SampleRequestsScreen extends StatefulWidget {
   const SampleRequestsScreen({super.key});
@@ -19,6 +20,23 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
     print('SampleRequestsScreen initState called');
     _getCurrentControlId();
   }
+  Future<void> _callPhoneNumber(String phone) async {
+    final String sanitized = phone.replaceAll(RegExp(r'[^0-9+]+'), '');
+    final Uri uri = Uri(scheme: 'tel', path: sanitized);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تعذّر فتح تطبيق الهاتف: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
 
   Future<void> _getCurrentControlId() async {
     print('_getCurrentControlId() called');
@@ -346,12 +364,16 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                         
                         const SizedBox(height: 4),
                         
-                        // رقم الهاتف
-                        Text(
-                          phone,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey,
+                        // رقم الهاتف (قابل للنقر للاتصال)
+                        InkWell(
+                          onTap: () => _callPhoneNumber(phone.toString()),
+                          child: Text(
+                            phone,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF0D47A1),
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
                         
@@ -368,9 +390,9 @@ class _SampleRequestsScreenState extends State<SampleRequestsScreen> {
                         
                         const SizedBox(height: 4),
                         
-                        // اسم المركز
+                        // مقدم الخدمة
                         Text(
-                          'المركز: $centerName',
+                          'مقدم الخدمة: $centerName',
                           style: const TextStyle(
                             fontSize: 13,
                             color: Colors.black87,

@@ -61,8 +61,19 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
           'id': doc.id,
           'name': data['specName'] ?? doc.id,
           'isActive': data['isActive'] ?? true,
+          'order': (data['order'] is int)
+              ? data['order'] as int
+              : int.tryParse('${data['order']}') ?? 999,
         };
       }).toList();
+
+      // ترتيب القائمة حسب order ثم بالاسم
+      centerSpecialties.sort((a, b) {
+        final ao = (a['order'] as int?) ?? 999;
+        final bo = (b['order'] as int?) ?? 999;
+        if (ao != bo) return ao.compareTo(bo);
+        return (a['name'] as String).toLowerCase().compareTo((b['name'] as String).toLowerCase());
+      });
 
       setState(() {
         _allSpecialties = allSpecialties;
@@ -86,6 +97,15 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
         .toList();
   }
 
+  int _getNextOrder() {
+    int maxOrder = 0;
+    for (final s in _centerSpecialties) {
+      final o = (s['order'] as int?) ?? 0;
+      if (o > maxOrder) maxOrder = o;
+    }
+    return maxOrder + 1;
+  }
+
   Future<void> addSpecialty(String specialtyId) async {
     setState(() {
       _isLoading = true;
@@ -93,6 +113,14 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
 
     try {
       await CentralDataService.addSpecialtyToCenter(widget.centerId, specialtyId);
+      // عيّن ترتيباً افتراضياً للتخصص المضاف (أعلى من الموجود)
+      final nextOrder = _getNextOrder();
+      await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .doc(specialtyId)
+          .set({'order': nextOrder}, SetOptions(merge: true));
       
       // إعادة تحميل البيانات
       await _loadData();
@@ -157,6 +185,121 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _editSpecialtyOrder(String specialtyId, int currentOrder) async {
+    final TextEditingController orderController = TextEditingController(text: currentOrder > 0 ? '$currentOrder' : '');
+    final formKey = GlobalKey<FormState>();
+    final result = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('تعديل ترتيب التخصص'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: orderController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'الترتيب (رقم موجب)',
+              border: OutlineInputBorder(),
+              hintText: 'مثال: 1 للمركز الأول'
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'يرجى إدخال ترتيب';
+              final n = int.tryParse(v.trim());
+              if (n == null || n <= 0) return 'يرجى إدخال رقم صحيح موجب';
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() == true) {
+                Navigator.of(context).pop(int.parse(orderController.text.trim()));
+              }
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _isLoading = true;
+      });
+      try {
+        // بناء ترتيب جديد بدون تكرارات عبر إدراج العنصر في الموضع المطلوب وإعادة ترقيم الجميع
+        final List<Map<String, dynamic>> newOrderList = List<Map<String, dynamic>>.from(_centerSpecialties);
+        // تأكد من ترتيب القائمة الحالية بحسب order ثم الاسم
+        newOrderList.sort((a, b) {
+          final ao = (a['order'] as int?) ?? 999;
+          final bo = (b['order'] as int?) ?? 999;
+          if (ao != bo) return ao.compareTo(bo);
+          return (a['name'] as String).toLowerCase().compareTo((b['name'] as String).toLowerCase());
+        });
+
+        final int maxIndex = newOrderList.length - 1;
+        int targetIndex = (result - 1).clamp(0, maxIndex);
+
+        final int currentIndex = newOrderList.indexWhere((s) => s['id'] == specialtyId);
+        if (currentIndex != -1) {
+          final item = Map<String, dynamic>.from(newOrderList.removeAt(currentIndex));
+          newOrderList.insert(targetIndex, item);
+        }
+
+        // إعادة ترقيم order ابتداءً من 1 (يمنع التكرار ويضبط الترتيب بالتتابع)
+        for (int i = 0; i < newOrderList.length; i++) {
+          newOrderList[i]['order'] = i + 1;
+        }
+
+        // تحديث قاعدة البيانات بدفعة واحدة
+        final batch = FirebaseFirestore.instance.batch();
+        final centerRef = FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations');
+        for (final spec in newOrderList) {
+          final docRef = centerRef.doc(spec['id'] as String);
+          batch.set(docRef, {'order': spec['order'] as int}, SetOptions(merge: true));
+        }
+        await batch.commit();
+
+        // تحديث الحالة المحلية
+        setState(() {
+          _centerSpecialties = newOrderList;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('تم تحديث ترتيب التخصصات'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('حدث خطأ في تحديث الترتيب: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 
@@ -389,17 +532,37 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                                     color: isActive ? Colors.black : Colors.grey,
                                   ),
                                 ),
-                                subtitle: Text(
-                                  isActive ? 'نشط' : 'غير نشط',
-                                  style: TextStyle(
-                                    color: isActive ? Colors.green : Colors.grey,
-                                  ),
+                                subtitle: Row(
+                                  children: [
+                                    Text(
+                                      isActive ? 'نشط' : 'غير نشط',
+                                      style: TextStyle(
+                                        color: isActive ? Colors.green : Colors.grey,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    const Icon(Icons.sort, size: 16, color: Color(0xFF0D47A1)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'ترتيب: ${(specialty['order'] as int?) ?? 999}',
+                                      style: const TextStyle(
+                                        color: Color(0xFF0D47A1),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 trailing: PopupMenuButton<String>(
                                   onSelected: (value) async {
                                     switch (value) {
                                       case 'toggle':
                                         await toggleSpecialtyStatus(specialty['id'], isActive);
+                                        break;
+                                      case 'edit_order':
+                                        await _editSpecialtyOrder(
+                                          specialty['id'],
+                                          (specialty['order'] as int?) ?? 999,
+                                        );
                                         break;
                                       case 'delete':
                                         await deleteSpecialty(specialty['id']);
@@ -417,6 +580,16 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                                           ),
                                           const SizedBox(width: 8),
                                           Text(isActive ? 'تعطيل' : 'تفعيل'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'edit_order',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.sort, color: Color(0xFF0D47A1)),
+                                          SizedBox(width: 8),
+                                          Text('تعديل الترتيب'),
                                         ],
                                       ),
                                     ),

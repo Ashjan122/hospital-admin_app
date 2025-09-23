@@ -2,6 +2,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hospital_admin_app/screens/sample_requests_screen.dart';
 
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:hospital_admin_app/screens/login_screen.dart';
@@ -15,6 +17,26 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   
   if (message.notification != null) {
     print('Background notification: ${message.notification?.title} - ${message.notification?.body}');
+  }
+}
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> _handleNotificationNavigation(RemoteMessage message) async {
+  try {
+    final type = message.data['type']?.toString();
+    if (type == 'new_home_clinic_request') {
+      final prefs = await SharedPreferences.getInstance();
+      final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+      final userType = prefs.getString('userType');
+      if (isLoggedIn && userType == 'control') {
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (context) => const SampleRequestsScreen()),
+        );
+      }
+    }
+  } catch (e) {
+    // ignore navigation errors
   }
 }
 
@@ -67,12 +89,21 @@ Future<void> main() async {
   });
   
   // Handle messages when app is opened from background
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
     print('A new onMessageOpenedApp event was published!');
     print('Message data: ${message.data}');
+    await _handleNotificationNavigation(message);
   });
+
+  // Handle messages when app is opened from terminated state
+  final RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
   
   runApp(HospitalAdminApp());
+
+  if (initialMessage != null) {
+    // Delay to ensure navigator is ready
+    Future.microtask(() => _handleNotificationNavigation(initialMessage));
+  }
 }
 
 class HospitalAdminApp extends StatelessWidget {
@@ -81,6 +112,7 @@ class HospitalAdminApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'تطبيق إدارة المراكز الطبية',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar', 'SA'),
