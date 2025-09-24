@@ -67,53 +67,7 @@ class _HomeClinicCentersScreenState extends State<HomeClinicCentersScreen> {
     }
   }
 
-  Future<void> _removeCenterFromHomeClinic(String docId, String centerName) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد الحذف'),
-        content: Text('هل أنت متأكد من حذف "$centerName" من العيادة المنزلية؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await FirebaseFirestore.instance
-            .collection('homeClinic')
-            .doc(docId)
-            .delete();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم حذف المركز من العيادة المنزلية'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطأ في حذف المركز: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
-  }
+  
 
   Future<void> _toggleCenterStatus(String docId, bool currentStatus) async {
     try {
@@ -435,9 +389,7 @@ class _HomeClinicCentersScreenState extends State<HomeClinicCentersScreen> {
                                 case 'toggle':
                                   _toggleCenterStatus(docId, isActive);
                                   break;
-                                case 'delete':
-                                  _removeCenterFromHomeClinic(docId, centerName);
-                                  break;
+                                
                               }
                             },
                             itemBuilder: (context) => [
@@ -455,16 +407,7 @@ class _HomeClinicCentersScreenState extends State<HomeClinicCentersScreen> {
                                   ],
                                 ),
                               ),
-                              PopupMenuItem<String>(
-                                value: 'delete',
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.delete, color: Colors.red, size: 20),
-                                    const SizedBox(width: 8),
-                                    const Text('حذف من العيادة المنزلية'),
-                                  ],
-                                ),
-                              ),
+                              
                             ],
                           ),
                         ),

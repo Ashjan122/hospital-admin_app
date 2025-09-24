@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/dashboard_screen.dart';
 import 'package:hospital_admin_app/screens/control_panel_screen.dart';
 import 'package:hospital_admin_app/screens/reception_staff_screen.dart';
+import 'package:hospital_admin_app/screens/lab_dashboard_screen.dart';
 // import 'package:hospital_admin_app/screens/doctor_bookings_screen.dart';
 import 'package:hospital_admin_app/screens/doctor_user_screen.dart';
 
@@ -337,16 +338,52 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
         } else {
-          // Not a valid center, show error
-          setState(() {
-            _isLoading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('اسم المركز غير موجود أو غير مفعل'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          // Try lab login: by lab name and password (default 123456)
+          final labQuery = await FirebaseFirestore.instance
+              .collection('labToLap')
+              .where('name', isEqualTo: _usernameController.text.trim())
+              .limit(1)
+              .get();
+
+          if (labQuery.docs.isNotEmpty) {
+            final labDoc = labQuery.docs.first;
+            final labData = labDoc.data();
+            final labPassword = labData['password']?.toString() ?? '123456';
+
+            if (_passwordController.text == labPassword) {
+              // Save session as lab
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('isLoggedIn', true);
+              await prefs.setString('userType', 'lab');
+              await prefs.setString('labId', labDoc.id);
+              await prefs.setString('labName', labData['name']?.toString() ?? '');
+
+              if (mounted) {
+                setState(() { _isLoading = false; });
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => LabDashboardScreen(
+                      labId: labDoc.id,
+                      labName: labData['name']?.toString() ?? '',
+                    ),
+                  ),
+                );
+              }
+              return;
+            } else {
+              setState(() { _isLoading = false; });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('كلمة المرور غير صحيحة'), backgroundColor: Colors.red),
+              );
+              return;
+            }
+          } else {
+            // Not a valid center or lab, show error
+            setState(() { _isLoading = false; });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('الاسم غير موجود'), backgroundColor: Colors.red),
+            );
+          }
         }
       } catch (e) {
         setState(() {

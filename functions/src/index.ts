@@ -108,7 +108,7 @@ export const notifyNewAppointment = functions.firestore
     const message: admin.messaging.Message = {
       notification: {
         title: doctorName ? `حجز جديد لدى د. ${doctorName}` : 'حجز جديد',
-        body: `المريض ${patientName} - ${relative ? relative + ' - ' : ''}${dateOut} - ${timeOut} (${period})`,
+        body: `${patientName} - ${relative ? relative + ' - ' : ''}${dateOut} - ${timeOut} (${period})`,
       },
       data: {
         type: 'new_appointment',

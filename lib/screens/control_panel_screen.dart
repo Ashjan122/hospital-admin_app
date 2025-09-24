@@ -21,6 +21,7 @@ import 'package:hospital_admin_app/screens/sample_requests_screen.dart';
 import 'package:hospital_admin_app/screens/support_numbers_screen.dart';
 import 'package:hospital_admin_app/screens/control_notifications_screen.dart';
 import 'package:hospital_admin_app/screens/home_clinic_centers_screen.dart';
+import 'package:hospital_admin_app/screens/lab_to_lab_screen.dart';
 
 class ControlPanelScreen extends StatefulWidget {
   const ControlPanelScreen({super.key});
@@ -1142,6 +1143,18 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                         );
                       },
                       ),
+                    _buildHomeCard(
+                      icon: Icons.science,
+                      title: 'المعامل',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const LabToLabScreen(),
+                          ),
+                        );
+                      },
+                    ),
                     ],
                   ),
               )
