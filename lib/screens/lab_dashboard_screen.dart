@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'lab_new_sample_screen.dart';
+import 'lab_results_patients_screen.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import 'lab_price_list_screen.dart';
+import 'lab_users_screen.dart';
 
 class LabDashboardScreen extends StatelessWidget {
   final String labId;
@@ -35,6 +38,8 @@ class LabDashboardScreen extends StatelessWidget {
     );
   }
 
+  //
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -52,12 +57,12 @@ class LabDashboardScreen extends StatelessWidget {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.remove('lab_id');
                 await prefs.remove('labName');
-                // إذا كان المستخدمType مسجل كـ lab، أعد ضبط تسجيل الدخول للمختبر فقط
-                final userType = prefs.getString('userType');
-                if (userType == 'lab') {
-                  await prefs.setBool('isLoggedIn', false);
-                  await prefs.remove('userType');
-                }
+                // تسجيل خروج كامل حتى لو كان الدخول من الكنترول
+                await prefs.setBool('isLoggedIn', false);
+                await prefs.remove('userType');
+                await prefs.remove('centerId');
+                await prefs.remove('centerName');
+                await prefs.remove('fromControlPanel');
                 if (context.mounted) {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -76,9 +81,42 @@ class LabDashboardScreen extends StatelessWidget {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             children: [
-              _buildCard(icon: FontAwesomeIcons.syringe, title: 'عينة جديدة', onTap: () {}),
-              _buildCard(icon: Icons.print, title: 'النتائج', onTap: () {}),
-              _buildCard(icon: Icons.people, title: 'المستخدمون', onTap: () {}),
+              _buildCard(
+                icon: FontAwesomeIcons.syringe,
+                title: 'عينة جديدة',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LabNewSampleScreen(labId: labId, labName: labName),
+                    ),
+                  );
+                },
+              ),
+              _buildCard(
+                icon: Icons.print,
+                title: 'النتائج',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LabResultsPatientsScreen(labId: labId, labName: labName),
+                    ),
+                  );
+                },
+              ),
+              _buildCard(
+                icon: Icons.people,
+                title: 'المستخدمين',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LabUsersScreen(labId: labId, labName: labName),
+                    ),
+                  );
+                },
+              ),
               _buildCard(
                 icon: Icons.price_change,
                 title: 'قائمة الأسعار',

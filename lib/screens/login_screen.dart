@@ -92,6 +92,16 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           );
+        } else if (userType == 'lab' || userType == 'labUser') {
+          final labId = prefs.getString('labId');
+          final labName = prefs.getString('labName');
+          if (labId != null && labName != null) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => LabDashboardScreen(labId: labId, labName: labName),
+              ),
+            );
+          }
         }
     }
   }
@@ -176,6 +186,8 @@ class _LoginScreenState extends State<LoginScreen> {
             final userType = userData['userType'] ?? 'user';
             final doctorId = userData['doctorId'] ?? '';
             final doctorName = userData['doctorName'] ?? '';
+            final labIdFromUser = userData['labId']?.toString();
+            final labNameFromUser = userData['labName']?.toString();
 
             // Update user's last login/seen timestamps for stats
             try {
@@ -200,6 +212,12 @@ class _LoginScreenState extends State<LoginScreen> {
               doctorId: doctorId,
               doctorName: doctorName,
             );
+            // Persist lab info if labUser
+            if (userType == 'labUser' && labIdFromUser != null && labNameFromUser != null) {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('labId', labIdFromUser);
+              await prefs.setString('labName', labNameFromUser);
+            }
 
             if (mounted) {
               setState(() {
@@ -238,6 +256,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       centerId: centerId,
                       centerName: centerName,
                       doctorName: doctorName.isNotEmpty ? doctorName : userName,
+                    ),
+                  ),
+                );
+              } else if (userType == 'labUser' && labIdFromUser != null && labNameFromUser != null) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => LabDashboardScreen(
+                      labId: labIdFromUser,
+                      labName: labNameFromUser,
                     ),
                   ),
                 );
