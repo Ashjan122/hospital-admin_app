@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'lab_request_summary_screen.dart';
+import 'lab_patient_result_detail_screen.dart';
 
 class LabResultsPatientsScreen extends StatefulWidget {
   final String labId;
@@ -55,7 +55,7 @@ class _LabResultsPatientsScreenState extends State<LabResultsPatientsScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('نتائج المرضى - ${widget.labName}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text('نتائج ${widget.labName}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           backgroundColor: const Color(0xFF0D47A1),
           centerTitle: true,
           actions: [
@@ -96,6 +96,7 @@ class _LabResultsPatientsScreenState extends State<LabResultsPatientsScreen> {
               return const Center(child: Text('لا توجد عينات لليوم المحدد'));
             }
 
+            final perDayTotal = filtered.length;
             return ListView.separated(
               itemCount: filtered.length,
               padding: const EdgeInsets.all(16),
@@ -104,12 +105,24 @@ class _LabResultsPatientsScreenState extends State<LabResultsPatientsScreen> {
                 final d = filtered[i];
                 final data = d.data();
                 final name = data['name']?.toString() ?? '';
-                final dynamicId = data['id'];
-                final intId = (dynamicId is int)
-                    ? dynamicId
-                    : int.tryParse('${dynamicId ?? ''}') ?? 0;
-                final idLabel = intId > 0 ? '$intId-' : '${d.id}-';
-                final labReqCol = col.doc(d.id).collection('lab_request');
+                final dayNumber = perDayTotal - i; // رقم اليوم يبدأ من 1 لكل يوم
+                // final labReqCol = col.doc(d.id).collection('lab_request');
+                final status = (data['status']?.toString() ?? 'pending').toLowerCase();
+                Color chipColor;
+                switch (status) {
+                  case 'received':
+                    chipColor = Colors.blue;
+                    break;
+                  case 'inprocess':
+                    chipColor = Colors.orange;
+                    break;
+                  case 'comlated':
+                  case 'completed':
+                    chipColor = Colors.green;
+                    break;
+                  default:
+                    chipColor = Colors.grey;
+                }
                 return Card(
                   child: ListTileTheme(
                     data: const ListTileThemeData(
@@ -120,49 +133,61 @@ class _LabResultsPatientsScreenState extends State<LabResultsPatientsScreen> {
                     child: ListTile(
                       minLeadingWidth: 0,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      leading: Text(
-                        idLabel,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0D47A1),
+                      leading: Container(
+                        width: 38,
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(color: const Color(0xFF0D47A1), width: 2),
+                        ),
+                        child: Text(
+                          '$dayNumber',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0D47A1),
+                          ),
                         ),
                       ),
                       title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                        future: labReqCol.get(),
-                        builder: (context, snapCount) {
-                          final count = (snapCount.data?.docs.length ?? 0);
-                          return Text(
-                            'عدد الفحوصات: $count',
-                            style: const TextStyle(color: Colors.black54),
-                          );
-                        },
-                      ),
-                      onTap: () async {
-                        // جلب الفحوصات المحفوظة للمريض
-                        final labReqSnapshot = await labReqCol.get();
-                        final selectedTests = labReqSnapshot.docs.map((doc) {
-                          final data = doc.data();
-                          return {
-                            'name': data['name'],
-                            'price': data['price'],
-                            'container_id': data['container_id'],
-                          };
-                        }).toList();
-                        
-                        if (context.mounted) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => LabRequestSummaryScreen(
-                                labId: widget.labId,
-                                labName: widget.labName,
-                                patientId: d.id,
-                                selectedTests: selectedTests,
-                              ),
+                      trailing: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: chipColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: chipColor, width: 1),
                             ),
-                          );
-                        }
+                            child: Text(
+                              status == 'comlated' ? 'completed' : status,
+                              style: TextStyle(color: chipColor, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            ((data['id'] is int) ? data['id'] as int : (int.tryParse('${data['id'] ?? ''}') ?? 0)) > 0
+                                ? '${(data['id'] is int) ? data['id'] as int : (int.tryParse('${data['id'] ?? ''}') ?? 0)}'
+                                : d.id,
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black54),
+                          ),
+                        ],
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => LabPatientResultDetailScreen(
+                              labId: widget.labId,
+                              labName: widget.labName,
+                              patientDocId: d.id,
+                            ),
+                          ),
+                        );
                       },
                     ),
                   ),

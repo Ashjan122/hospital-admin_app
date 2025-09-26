@@ -46,6 +46,7 @@ class _LabNewSampleScreenState extends State<LabNewSampleScreen> {
         'name': _fullNameController.text.trim(),
         'labId': widget.labId,
         'createdAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
       });
       if (!mounted) return;
       _fullNameController.clear();
