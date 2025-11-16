@@ -1112,13 +1112,21 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            widget.centerName != null ? 'الحجوزات - ${widget.centerName}' : 'الحجوزات',
+          title:Column(children: [ Text(
+            widget.centerName != null ? 'الحجوزات ' : 'الحجوزات',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
+          Text('${widget.centerName}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+            ),
+            ),
+          ]),
+          centerTitle: true,
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,

@@ -146,10 +146,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: Container(
-        color: Colors.white,
+  decoration: BoxDecoration(
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        const Color(0xFF2FBDAF).withOpacity(0.25), // لون التطبيق بخفة
+        Colors.grey[200]!, // الرمادي الفاتح
+      ],
+    ),
+  ),
+  
+
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(5),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -158,10 +169,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 // Grid section
                 Expanded(
                   child: GridView.count(
-                    crossAxisCount: 3,
-                    childAspectRatio: 0.9,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
+                    crossAxisCount: 1,
+                    childAspectRatio: 4.5,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
                     children: [
                       _buildDashboardCard(
                         context,
@@ -402,43 +413,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF2FBDAF), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+      child:Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+
+      
+      border: null,
+
+      
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          spreadRadius: 2,
+          offset: const Offset(0, 4),
+        ),
+      ],
         ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, size: 28, color: const Color(0xFF2FBDAF)),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 36,
-                child: Center(
-                  child: Text(
+               
+              
+                  Text(
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     softWrap: true,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      
                       color: Colors.black,
                     ),
                   ),
-                ),
-              ),
+                
+              
+              Icon(icon, size: 25, color: const Color(0xFF2FBDAF)),
             ],
           ),
         ),

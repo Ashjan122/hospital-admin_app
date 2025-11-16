@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ControlNotificationsScreen extends StatefulWidget {
   const ControlNotificationsScreen({super.key});
@@ -34,6 +35,21 @@ class _ControlNotificationsScreenState extends State<ControlNotificationsScreen>
         sound: true,
       );
       print('Notification permission status: ${settings.authorizationStatus}');
+      
+        // الاشتراك في توبك new_signup (نفس توبك الحسابات الجديدة)
+        try {
+          await messaging.subscribeToTopic('new_signup');
+          print('Successfully subscribed to new_signup topic');
+          
+          // حفظ حالة الاشتراك
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('subscribed_to_new_signup', true);
+          
+        } catch (e) {
+          print('Error subscribing to new_signup topic: $e');
+        }
+        
+        // تم إلغاء الاشتراك التلقائي في إشعارات المعامل
     } catch (e) {
       print('Error requesting notification permissions: $e');
     }
@@ -44,6 +60,7 @@ class _ControlNotificationsScreenState extends State<ControlNotificationsScreen>
       final prefs = await SharedPreferences.getInstance();
       final isSubscribed = prefs.getBool('subscribed_to_new_signup') ?? false;
       final isHomeClinicSubscribed = prefs.getBool('subscribed_to_home_clinic_requests') ?? false;
+      // لم نعد ندير اشتراك إشعارات المعامل
       
       // إذا كان مشترك محلياً، تأكد من الاشتراك في Firebase
       if (isSubscribed) {
@@ -73,6 +90,8 @@ class _ControlNotificationsScreenState extends State<ControlNotificationsScreen>
           print('Error re-subscribing to home_clinic_requests topic: $e');
         }
       }
+      
+      // تم إلغاء إدارة اشتراك إشعارات المعامل
       
       setState(() {
         _isSubscribed = true; // دائماً مشترك في إشعارات الحسابات
@@ -207,6 +226,7 @@ class _ControlNotificationsScreenState extends State<ControlNotificationsScreen>
     }
   }
 
+  // تم إزالة ميزة إشعارات المعامل
 
   @override
   Widget build(BuildContext context) {
@@ -413,6 +433,8 @@ class _ControlNotificationsScreenState extends State<ControlNotificationsScreen>
                 ),
               ),
               
+              // تم إلغاء بطاقة إشعارات المعامل
+              
               // تم إلغاء عرض الإشعارات السابقة
             ],
           ),
@@ -420,4 +442,6 @@ class _ControlNotificationsScreenState extends State<ControlNotificationsScreen>
       ),
     );
   }
+
+
 }

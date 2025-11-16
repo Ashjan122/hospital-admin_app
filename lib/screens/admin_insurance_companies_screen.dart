@@ -276,13 +276,21 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            widget.centerName != null ? 'إدارة شركات التأمين - ${widget.centerName}' : 'إدارة شركات التأمين',
+          title:Column(children: [ Text(
+            'إدارة شركات التأمين',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
+          Text('${widget.centerName}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+            ),
+            ),
+          ]),
+          centerTitle: true,
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,

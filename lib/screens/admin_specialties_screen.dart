@@ -409,6 +409,118 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
     }).toList();
   }
 
+  Widget _buildSubSpecialtyDropdown(String specialtyId, Set<String> centerSubIds) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('medicalSpecialties')
+          .doc(specialtyId)
+          .collection('subSpecialties')
+          .snapshots(),
+      builder: (context, availableSubSnapshot) {
+        if (availableSubSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final availableSubs = availableSubSnapshot.data?.docs ?? [];
+
+        // التخصصات الفرعية المتاحة (غير مضافة في المركز)
+        final availableSubsList = availableSubs
+            .where((doc) => !centerSubIds.contains(doc.id))
+            .map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return {
+                'id': doc.id,
+                'name': data['name'] ?? '',
+              };
+            })
+            .toList();
+
+        if (availableSubsList.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              'لا توجد تخصصات فرعية متاحة للإضافة',
+              style: TextStyle(color: Colors.grey),
+            ),
+          );
+        }
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            String? selectedValue;
+            return DropdownButtonFormField<String>(
+              decoration: const InputDecoration(
+                labelText: 'اختر تخصص فرعي لإضافته',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.add),
+              ),
+              value: selectedValue,
+              hint: const Text('اختر تخصص فرعي'),
+              items: availableSubsList.map((sub) {
+                return DropdownMenuItem<String>(
+                  value: sub['id'] as String,
+                  child: Text(sub['name'] as String),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    selectedValue = null; // إعادة تعيين القيمة
+                  });
+                  _addSubSpecialty(specialtyId, value, availableSubsList.firstWhere((s) => s['id'] == value)['name'] as String);
+                }
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _addSubSpecialty(String specialtyId, String subSpecialtyId, String subSpecialtyName) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .doc(specialtyId)
+          .collection('subSpecialties')
+          .doc(subSpecialtyId)
+          .set({
+        'name': subSpecialtyName,
+        'addedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تم إضافة التخصص الفرعي "$subSpecialtyName" بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ في إضافة التخصص الفرعي: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingData) {
@@ -423,13 +535,21 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            widget.centerName != null ? 'إدارة التخصصات - ${widget.centerName}' : 'إدارة التخصصات',
+          title:Column(children: [ Text(
+            'إدارة التخصصات',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
+          Text('${widget.centerName}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+            ),
+            ),
+          ]),
+          centerTitle: true,
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,
@@ -513,10 +633,11 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                           itemBuilder: (context, index) {
                             final specialty = filteredCenterSpecialties[index];
                             final isActive = specialty['isActive'] ?? true;
+                            final specialtyId = specialty['id'] as String;
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
+                              child: ExpansionTile(
                                 leading: Text(
                                   '${index + 1}',
                                   style: const TextStyle(
@@ -605,6 +726,50 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                                     ),
                                   ],
                                 ),
+                                children: [
+                                  // التخصصات الفرعية المضافة في المركز
+                                  StreamBuilder<QuerySnapshot>(
+                                    stream: FirebaseFirestore.instance
+                                        .collection('medicalFacilities')
+                                        .doc(widget.centerId)
+                                        .collection('specializations')
+                                        .doc(specialtyId)
+                                        .collection('subSpecialties')
+                                        .snapshots(),
+                                    builder: (context, subSnapshot) {
+                                      if (subSnapshot.connectionState == ConnectionState.waiting) {
+                                        return const Padding(
+                                          padding: EdgeInsets.all(16.0),
+                                          child: Center(child: CircularProgressIndicator()),
+                                        );
+                                      }
+
+                                      final subSpecialties = subSnapshot.data?.docs ?? [];
+                                      final centerSubIds = subSpecialties.map((doc) => doc.id).toSet();
+                                      
+                                      return Column(
+                                        children: [
+                                          // قائمة التخصصات الفرعية المضافة
+                                          if (subSpecialties.isNotEmpty)
+                                            ...subSpecialties.map((subDoc) {
+                                              final subData = subDoc.data() as Map<String, dynamic>;
+                                              return ListTile(
+                                                dense: true,
+                                                leading: const Icon(Icons.arrow_left, size: 16),
+                                                title: Text(subData['name'] ?? ''),
+                                              );
+                                            }).toList(),
+                                          
+                                          // Dropdown لإضافة تخصص فرعي جديد
+                                          Padding(
+                                            padding: const EdgeInsets.all(16.0),
+                                            child: _buildSubSpecialtyDropdown(specialtyId, centerSubIds),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
                             );
                           },

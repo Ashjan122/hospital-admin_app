@@ -268,15 +268,23 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
+          title:Column(children: [ Text(
             widget.selectedDoctorId != null 
                 ? 'جدول الطبيب'
-                : (widget.centerName != null ? 'جدول الأطباء - ${widget.centerName}' : 'جدول الأطباء'),
+                : (widget.centerName != null ? 'جدول الأطباء' : 'جدول الأطباء'),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
+          Text('${widget.centerName}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+            ),
+            ),
+          ]),
+          centerTitle: true,
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,

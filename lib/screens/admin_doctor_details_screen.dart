@@ -34,6 +34,8 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
   bool _isEditing = false;
   bool _isLoading = false;
   bool _isUploadingImage = false;
+  bool _isTogglingStatus = false; // للتحميل في زر التفعيل/التعطيل
+  bool _isTogglingBooking = false; // للتحميل في زر الحجز
   File? _selectedImageFile;
   final ImagePicker _picker = ImagePicker();
   String? _currentPhotoUrl;
@@ -53,57 +55,125 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
 
   Future<Map<String, dynamic>?> fetchDoctorDetails() async {
     try {
-      // البحث عن الطبيب في جميع التخصصات
+      // جلب التخصصات والطبيب بشكل متوازي لتحسين الأداء
       final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get()
-          .timeout(const Duration(seconds: 8));
-
-      for (var specDoc in specializationsSnapshot.docs) {
-        final doctorDoc = await FirebaseFirestore.instance
             .collection('medicalFacilities')
             .doc(widget.centerId)
             .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .get()
-            .timeout(const Duration(seconds: 8));
+          .get();
 
-        if (doctorDoc.exists) {
-          final doctorData = doctorDoc.data()!;
-          
-          // جلب معلومات الطبيب من قاعدة البيانات المركزية
-          try {
-            final centralDoctorDoc = await FirebaseFirestore.instance
-                .collection('allDoctors')
-                .doc(widget.doctorId)
-                .get();
-            
-            if (centralDoctorDoc.exists) {
-              final centralDoctorData = centralDoctorDoc.data()!;
-              doctorData['name'] = centralDoctorData['name'] ?? 'طبيب غير معروف';
-              doctorData['phoneNumber'] = centralDoctorData['phoneNumber'] ?? '';
-              doctorData['photoUrl'] = centralDoctorData['photoUrl'] ?? 
-                  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
-            }
-          } catch (e) {
-            // إذا فشل في جلب البيانات من المركزية، استخدم المعرف
-            doctorData['name'] = widget.doctorId;
+      // جلب بيانات الطبيب من قاعدة البيانات المركزية بشكل متوازي
+      final centralDoctorFuture = FirebaseFirestore.instance
+          .collection('allDoctors')
+          .doc(widget.doctorId)
+          .get();
+
+      // البحث عن الطبيب في جميع التخصصات بشكل متوازي
+      final doctorFutures = specializationsSnapshot.docs.map((specDoc) async {
+          final doctorDoc = await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .doc(widget.doctorId)
+            .get();
+
+          if (doctorDoc.exists) {
+            return {
+              'doctorData': doctorDoc.data()!,
+              'specDoc': specDoc,
+            };
+        }
+        return null;
+      }).toList();
+
+      // انتظار جميع الطلبات بشكل متوازي
+      final results = await Future.wait(doctorFutures);
+      final doctorResult = results.firstWhere((r) => r != null, orElse: () => null);
+
+      if (doctorResult == null) {
+        return null;
+      }
+
+      final doctorData = Map<String, dynamic>.from(doctorResult['doctorData'] as Map);
+      final specDoc = doctorResult['specDoc'] as QueryDocumentSnapshot;
+
+      // جلب البيانات المركزية (إذا كانت متاحة)
+      String? centralSpecializationId;
+      try {
+        final centralDoctorDoc = await centralDoctorFuture;
+        if (centralDoctorDoc.exists) {
+          final centralDoctorData = centralDoctorDoc.data()!;
+          doctorData['name'] = centralDoctorData['name'] ?? doctorData['docName'] ?? 'طبيب غير معروف';
+          doctorData['phoneNumber'] = centralDoctorData['phoneNumber'] ?? doctorData['phoneNumber'] ?? '';
+          doctorData['photoUrl'] = centralDoctorData['photoUrl'] ?? 
+                doctorData['photoUrl'] ?? 
+                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
+          // حفظ التخصص الرئيسي من البيانات المركزية
+          centralSpecializationId = centralDoctorData['specialization']?.toString();
+          // جلب التخصص الفرعي من البيانات المركزية إذا كان متوفراً
+          if (centralDoctorData['subSpecialization'] != null) {
+            doctorData['subSpecializationId'] = centralDoctorData['subSpecialization'];
+          }
+          } else {
+          // استخدام البيانات المحلية إذا لم تكن موجودة في المركزية
+          doctorData['name'] = doctorData['docName'] ?? doctorData['name'] ?? widget.doctorId;
+          doctorData['phoneNumber'] = doctorData['phoneNumber'] ?? '';
+          doctorData['photoUrl'] = doctorData['photoUrl'] ?? 
+              'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
+        }
+      } catch (e) {
+        // استخدام البيانات المحلية في حالة الخطأ
+            doctorData['name'] = doctorData['docName'] ?? doctorData['name'] ?? widget.doctorId;
+            doctorData['phoneNumber'] = doctorData['phoneNumber'] ?? '';
+            doctorData['photoUrl'] = doctorData['photoUrl'] ?? 
+                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
           }
           
-          // إضافة اسم التخصص للبيانات
-          final specializationData = specDoc.data();
-          doctorData['specialization'] = specializationData['specName'] ?? specDoc.id;
+      // إضافة اسم التخصص للبيانات
+      final specializationData = specDoc.data() as Map<String, dynamic>;
+      doctorData['specialization'] = specializationData['specName'] ?? specDoc.id;
           doctorData['specializationId'] = specDoc.id;
-          _doctorData = doctorData; // تخزين البيانات في المتغير
-          return doctorData;
+      // جلب التخصص الفرعي (id) من البيانات
+      final subSpecializationId = doctorData['subSpecializationId'] ?? 
+                                  doctorData['subSpecialization'] ?? 
+                                  specializationData['subSpecialization'] ?? 
+                                  null;
+      
+      // إذا كان هناك تخصص فرعي، جلب اسمه من medicalSpecialties
+      if (subSpecializationId != null && subSpecializationId.toString().isNotEmpty) {
+        try {
+          // استخدام centralSpecializationId من البيانات المركزية إذا كان متوفراً، وإلا استخدام centralSpecialtyId من بيانات التخصص
+          final centralSpecialtyId = centralSpecializationId ?? 
+                                     specializationData['centralSpecialtyId']?.toString() ?? 
+                                     specDoc.id;
+          
+          // جلب اسم التخصص الفرعي من medicalSpecialties
+          final subSpecialtyDoc = await FirebaseFirestore.instance
+              .collection('medicalSpecialties')
+              .doc(centralSpecialtyId.toString())
+              .collection('subSpecialties')
+              .doc(subSpecializationId.toString())
+              .get();
+          
+          if (subSpecialtyDoc.exists) {
+            final subSpecialtyData = subSpecialtyDoc.data() as Map<String, dynamic>;
+            doctorData['subSpecialization'] = subSpecialtyData['name'] ?? subSpecializationId.toString();
+          } else {
+            // إذا لم يتم العثور على التخصص الفرعي، استخدم الـ id
+            doctorData['subSpecialization'] = subSpecializationId.toString();
+          }
+        } catch (e) {
+          // في حالة الخطأ، استخدم الـ id
+          doctorData['subSpecialization'] = subSpecializationId.toString();
         }
+      } else {
+        doctorData['subSpecialization'] = null;
       }
       
-      return null;
+      _doctorData = doctorData; // تخزين البيانات في المتغير
+      return doctorData;
     } catch (e) {
       // Error loading doctor details
       return null;
@@ -345,8 +415,8 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
               .collection('doctors')
               .doc(widget.doctorId)
               .update({
-            'morningPatientLimit': int.tryParse(_morningLimitController.text) ?? 20,
-            'eveningPatientLimit': int.tryParse(_eveningLimitController.text) ?? 20,
+            'morningPatientLimit': int.tryParse(_morningLimitController.text) ?? 5,
+            'eveningPatientLimit': int.tryParse(_eveningLimitController.text) ?? 5,
           });
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -692,7 +762,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
 
   Future<void> toggleDoctorStatus(bool isActive) async {
     setState(() {
-      _isLoading = true;
+      _isTogglingStatus = true;
     });
 
     try {
@@ -726,32 +796,45 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
             'isActive': isActive,
           });
 
+          // تحديث البيانات المحلية
+          if (_doctorData != null) {
+            _doctorData!['isActive'] = isActive;
+          }
+
+          if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(isActive ? 'تم تفعيل الطبيب' : 'تم تعطيل الطبيب'),
               backgroundColor: Colors.green,
             ),
           );
+            // إعادة بناء الصفحة لتحديث الحالة
+            setState(() {});
+          }
           break;
         }
       }
     } catch (e) {
+      if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ في تحديث حالة الطبيب'),
           backgroundColor: Colors.red,
         ),
       );
+      }
     } finally {
+      if (mounted) {
       setState(() {
-        _isLoading = false;
+          _isTogglingStatus = false;
       });
+      }
     }
   }
 
   Future<void> toggleDoctorBooking(bool isEnabled) async {
     setState(() {
-      _isLoading = true;
+      _isTogglingBooking = true;
     });
 
     try {
@@ -790,26 +873,34 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
             _doctorData!['isBookingEnabled'] = isEnabled;
           }
 
+          if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(isEnabled ? 'تم تفعيل الحجز للطبيب' : 'تم إيقاف الحجز للطبيب'),
               backgroundColor: Colors.green,
             ),
           );
+            // إعادة بناء الصفحة لتحديث الحالة
+            setState(() {});
+          }
           break;
         }
       }
     } catch (e) {
+      if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('حدث خطأ في تحديث حالة الحجز'),
           backgroundColor: Colors.red,
         ),
       );
+      }
     } finally {
+      if (mounted) {
       setState(() {
-        _isLoading = false;
+          _isTogglingBooking = false;
       });
+      }
     }
   }
 
@@ -840,7 +931,16 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
           elevation: 0,
           actions: [
             IconButton(
-              icon: Icon(_isEditing ? Icons.save : Icons.settings),
+              icon: _isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Icon(_isEditing ? Icons.save : Icons.settings),
               onPressed: _isLoading ? null : () {
                 if (_isEditing) {
                   updateDoctorData();
@@ -911,11 +1011,13 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
               );
             }
 
-            final doctorData = snapshot.data!;
+            // استخدام البيانات المحلية المحدثة إذا كانت متاحة، وإلا استخدام البيانات من snapshot
+            final doctorData = _doctorData ?? snapshot.data!;
             
             // استخراج بيانات الطبيب من قاعدة البيانات
-            final doctorName = doctorData['docName'] ?? 'طبيب غير معروف';
+            final doctorName = doctorData['name'] ?? doctorData['docName'] ?? 'طبيب غير معروف';
             final specialization = doctorData['specialization'] ?? 'غير محدد';
+            final subSpecialization = doctorData['subSpecialization'];
             final photoUrl = doctorData['photoUrl'] ?? 
                 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
             final phoneNumber = doctorData['phoneNumber'] ?? 'غير متوفر';
@@ -926,8 +1028,8 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
             if (!_isEditing) {
               _nameController.text = doctorName;
               _phoneController.text = phoneNumber;
-              _morningLimitController.text = (doctorData['morningPatientLimit'] ?? 20).toString();
-              _eveningLimitController.text = (doctorData['eveningPatientLimit'] ?? 20).toString();
+              _morningLimitController.text = (doctorData['morningPatientLimit'] ?? 5).toString();
+              _eveningLimitController.text = (doctorData['eveningPatientLimit'] ?? 5).toString();
               _currentPhotoUrl = photoUrl;
             }
 
@@ -959,12 +1061,59 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                           children: [
                             CircleAvatar(
                               radius: 60,
-                              backgroundImage: _selectedImageFile != null
-                                  ? FileImage(_selectedImageFile!)
-                                  : NetworkImage(_currentPhotoUrl ?? photoUrl) as ImageProvider,
-                              onBackgroundImageError: (exception, stackTrace) {
-                                // Handle image error
-                              },
+                              backgroundColor: Colors.grey[200],
+                              child: ClipOval(
+                                child: _selectedImageFile != null
+                                    ? Image.file(
+                                        _selectedImageFile!,
+                                        width: 120,
+                                        height: 120,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.network(
+                                        _currentPhotoUrl ?? photoUrl,
+                                        width: 120,
+                                        height: 120,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, loadingProgress) {
+                                          if (loadingProgress == null) return child;
+                                          return Container(
+                                            width: 120,
+                                            height: 120,
+                                            color: Colors.grey[200],
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                value: loadingProgress.expectedTotalBytes != null
+                                                    ? loadingProgress.cumulativeBytesLoaded /
+                                                        loadingProgress.expectedTotalBytes!
+                                                    : null,
+                                                color: const Color(0xFF2FBDAF),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Image.network(
+                                            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s',
+                                            width: 120,
+                                            height: 120,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: 120,
+                                                height: 120,
+                                                color: Colors.grey[200],
+                                                child: const Icon(
+                                                  Icons.person,
+                                                  size: 60,
+                                                  color: Colors.grey,
+                                                ),
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+                              ),
                             ),
                             if (_isUploadingImage)
                               Positioned.fill(
@@ -1025,25 +1174,28 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            specialization,
+                            subSpecialization != null && subSpecialization.toString().isNotEmpty
+                                ? '$specialization - $subSpecialization'
+                                : specialization,
                             style: TextStyle(
                               fontSize: 16,
                               color: const Color(0xFF2FBDAF),
                               fontWeight: FontWeight.w600,
                             ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Phone number
+                        Text(
+                          phoneNumber,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Contact information
-                  _buildInfoSection(
-                    'معلومات التواصل',
-                    [
-                      _buildInfoRow(Icons.phone, 'رقم الهاتف', phoneNumber),
-                    ],
                   ),
                   const SizedBox(height: 24),
 
@@ -1080,95 +1232,6 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Status indicator
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isActive ? Colors.green[50] : Colors.red[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isActive ? Colors.green[200]! : Colors.red[200]!,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isActive ? Icons.check_circle : Icons.cancel,
-                          color: isActive ? Colors.green : Colors.red,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          isActive ? 'الطبيب نشط' : 'الطبيب معطل',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: isActive ? Colors.green[700] : Colors.red[700],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Booking status indicator (tappable toggle)
-                  InkWell(
-                    onTap: _isLoading ? null : () {
-                      toggleDoctorBooking(!isBookingEnabled);
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: isBookingEnabled ? Colors.green[50] : Colors.orange[50],
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isBookingEnabled ? Colors.green[200]! : Colors.orange[200]!,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isBookingEnabled ? Icons.play_circle : Icons.pause_circle,
-                            color: isBookingEnabled ? Colors.green : Colors.orange,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isBookingEnabled ? 'الحجز مُفعّل' : 'الحجز متوقف',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: isBookingEnabled ? Colors.green[700] : Colors.orange[700],
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'اضغط للتبديل',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (_isLoading)
-                            const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
                   // Action buttons
                   Column(
                     children: [
@@ -1176,13 +1239,22 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                         children: [
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: _isLoading ? null : () {
+                              onPressed: _isTogglingStatus ? null : () {
                                 toggleDoctorStatus(!isActive);
                               },
-                              icon: Icon(isActive ? Icons.block : Icons.check_circle),
+                              icon: _isTogglingStatus
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : Icon(isActive ? Icons.block : Icons.check_circle),
                               label: Text(isActive ? 'تعطيل الطبيب' : 'تفعيل الطبيب'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isActive ? Colors.red : Colors.green,
+                                backgroundColor: const Color(0xFF2FBDAF),
                                 foregroundColor: Colors.white,
                                 padding: EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
@@ -1241,7 +1313,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                               icon: const Icon(Icons.schedule),
                               label: const Text('جدول الطبيب'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.purple,
+                                backgroundColor: const Color(0xFF2FBDAF),
                                 foregroundColor: Colors.white,
                                 padding: EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
@@ -1257,9 +1329,9 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                 _showBlockBookingDialog();
                               },
                               icon: const Icon(Icons.block),
-                              label: const Text('إيقاف الحجز'),
+                              label: const Text('حظر الحجز'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
+                                backgroundColor: const Color(0xFF2FBDAF),
                                 foregroundColor: Colors.white,
                                 padding: EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(
@@ -1281,7 +1353,34 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                               icon: const Icon(Icons.list),
                               label: const Text('الأيام المحظورة'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
+                                backgroundColor: const Color(0xFF2FBDAF),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _isTogglingBooking ? null : () {
+                                toggleDoctorBooking(!isBookingEnabled);
+                              },
+                              icon: _isTogglingBooking
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : Icon(isBookingEnabled ? Icons.pause_circle : Icons.play_circle),
+                              label: Text(isBookingEnabled ? 'الحجز مفعل' : 'الحجز متوقف'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2FBDAF),
                                 foregroundColor: Colors.white,
                                 padding: EdgeInsets.symmetric(vertical: 12),
                                 shape: RoundedRectangleBorder(

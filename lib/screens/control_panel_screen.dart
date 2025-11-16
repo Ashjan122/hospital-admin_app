@@ -21,7 +21,7 @@ import 'package:hospital_admin_app/screens/sample_requests_screen.dart';
 import 'package:hospital_admin_app/screens/support_numbers_screen.dart';
 import 'package:hospital_admin_app/screens/control_notifications_screen.dart';
 import 'package:hospital_admin_app/screens/home_clinic_centers_screen.dart';
-import 'package:hospital_admin_app/screens/lab_to_lab_screen.dart';
+
 
 class ControlPanelScreen extends StatefulWidget {
   const ControlPanelScreen({super.key});
@@ -263,37 +263,44 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     required VoidCallback onTap,
     Color color = const Color(0xFF0D47A1),
   }) {
-    return InkWell(
-      onTap: onTap,
+   return InkWell(
+  onTap: onTap,
+  borderRadius: BorderRadius.circular(16),
+  child: Ink(
+    decoration: BoxDecoration(
+      color: const Color(0xFFFFFFFF),   // ← أبيض 100% ثابت
       borderRadius: BorderRadius.circular(16),
-      child: Ink(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+
+      // بدون حدود
+      border: null,
+
+      // ظل لطيف
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          spreadRadius: 2,
+          offset: const Offset(0, 4),
+        ),
+      ],
+      
         ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, size: 32, color: color),
-              const SizedBox(height: 12),
+              
+              
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  
                 ),
               ),
+              Icon(icon, size: 25, color: color),
             ],
           ),
         ),
@@ -858,6 +865,80 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
 
   // Removed local navigation helpers for specialties/doctors/insurance.
 
+  void _showCenterDetailsDialog(String centerName, String centerAddress, String centerPhone, bool isAvailable) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            
+            Expanded(
+              child: Text(
+                centerName,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                
+                
+                Expanded(
+                  child: Text(
+                    'العنوان: $centerAddress',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                
+                Expanded(
+                  child: Text(
+                    'الهاتف: $centerPhone',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  isAvailable ? Icons.check_circle : Icons.cancel,
+                  color: isAvailable ? Colors.green : Colors.red,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  ' ${isAvailable ? 'مفعل' : 'غير مفعل'}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isAvailable ? Colors.green : Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إغلاق'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showReceptionStaffList() {
     Navigator.push(
       context,
@@ -1050,14 +1131,14 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
             ),
           ],
         ),
-        body: _showHomeGrid
+        body:  _showHomeGrid
             ? Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: const EdgeInsets.all(5),
                 child: GridView.count(
-                  crossAxisCount: 3,
-                  childAspectRatio: 0.9,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
+                  crossAxisCount: 1,
+                  childAspectRatio: 4.5,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
                     children: [
                     _buildHomeCard(
                       icon: Icons.hub,
@@ -1143,18 +1224,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                         );
                       },
                       ),
-                    _buildHomeCard(
-                      icon: Icons.science,
-                      title: 'المعامل',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LabToLabScreen(),
-                          ),
-                        );
-                      },
-                    ),
+                    
                     ],
                   ),
               )
@@ -1455,58 +1525,37 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           onTap: () => _navigateToCenterDashboard(centerId, centerName),
-                          leading: const Icon(Icons.business, color: Color(0xFF0D47A1)),
+                          
                           title: Text(
                             centerName,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          subtitle: Row(
                             children: [
-                              Text('العنوان: $centerAddress'),
-                              Text('الهاتف: $centerPhone'),
-                              Row(
-                                children: [
-                                  Icon(
-                                    isAvailable ? Icons.check_circle : Icons.cancel,
-                                    color: isAvailable ? Colors.green : Colors.red,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    isAvailable ? 'مفعل' : 'غير مفعل',
-                                    style: TextStyle(
-                                      color: isAvailable ? Colors.green : Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Icon(
-                                    Icons.sort,
-                                    color: const Color(0xFF0D47A1),
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'ترتيب: ${centerData['order'] ?? 999}',
-                                    style: const TextStyle(
-                                      color: Color(0xFF0D47A1),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
+                              Icon(
+                                Icons.sort,
+                                color: const Color(0xFF0D47A1),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'ترتيب: ${centerData['order'] ?? 999}',
+                                style: const TextStyle(
+                                  color: Color(0xFF0D47A1),
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ],
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                color: Colors.grey[400],
-                                size: 16,
+                              IconButton(
+                                icon: const Icon(Icons.info_outline, color: Color(0xFF0D47A1)),
+                                onPressed: () => _showCenterDetailsDialog(centerName, centerAddress, centerPhone, isAvailable),
+                                tooltip: 'تفاصيل المركز',
                               ),
-                              const SizedBox(width: 8),
+                              
                               PopupMenuButton<String>(
                                 icon: const Icon(Icons.more_vert),
                                 onSelected: (value) {

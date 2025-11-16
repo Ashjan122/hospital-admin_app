@@ -133,18 +133,8 @@ class _CentralInsuranceScreenState extends State<CentralInsuranceScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0D47A1).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.business,
-                                color: Color(0xFF0D47A1),
-                              ),
-                            ),
+                            contentPadding: const EdgeInsets.all(10),
+                            
                             title: Text(
                               name,
                               style: const TextStyle(

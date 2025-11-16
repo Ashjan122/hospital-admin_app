@@ -22,8 +22,8 @@ class AddDoctorScreen extends StatefulWidget {
 
 class _AddDoctorScreenState extends State<AddDoctorScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _morningLimitController = TextEditingController(text: '20');
-  final _eveningLimitController = TextEditingController(text: '20');
+  final _morningLimitController = TextEditingController(text: '5');
+  final _eveningLimitController = TextEditingController(text: '5');
   String? _selectedSpecialization;
   String? _selectedDoctor;
   String _selectedDoctorPhone = '';
@@ -363,8 +363,8 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
         _selectedSpecialization!,
         _selectedDoctor!,
         {
-          'morningPatientLimit': int.tryParse(_morningLimitController.text) ?? 20,
-          'eveningPatientLimit': int.tryParse(_eveningLimitController.text) ?? 20,
+          'morningPatientLimit': int.tryParse(_morningLimitController.text) ?? 5,
+          'eveningPatientLimit': int.tryParse(_eveningLimitController.text) ?? 5,
           'photoUrl': _selectedPhotoUrl,
         },
       );

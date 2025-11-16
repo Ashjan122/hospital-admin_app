@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/dashboard_screen.dart';
 import 'package:hospital_admin_app/screens/control_panel_screen.dart';
 import 'package:hospital_admin_app/screens/reception_staff_screen.dart';
-import 'package:hospital_admin_app/screens/lab_dashboard_screen.dart';
+
 // import 'package:hospital_admin_app/screens/doctor_bookings_screen.dart';
 import 'package:hospital_admin_app/screens/doctor_user_screen.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hospital_admin_app/screens/call_center_screen.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -92,16 +94,6 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           );
-        } else if (userType == 'lab' || userType == 'labUser') {
-          final labId = prefs.getString('labId');
-          final labName = prefs.getString('labName');
-          if (labId != null && labName != null) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => LabDashboardScreen(labId: labId, labName: labName),
-              ),
-            );
-          }
         }
     }
   }
@@ -135,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        // Check if control credentials (super admin) from database
+      // ✅ أولًا: تحقق من مستخدم control (التحكم الرئيسي)
         final controlQuery = await FirebaseFirestore.instance
             .collection('controlUsers')
             .where('userName', isEqualTo: _usernameController.text.trim())
@@ -147,14 +139,13 @@ class _LoginScreenState extends State<LoginScreen> {
           final controlPassword = controlData['userPassword'] ?? '';
 
           if (controlPassword == _passwordController.text) {
-            // Control login successful
-            final controlUserName = controlData['userName'] ?? _usernameController.text.trim();
+          final controlUserName =
+              controlData['userName'] ?? _usernameController.text.trim();
+
             await _saveLoginData('control', userName: controlUserName);
             
             if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
+            setState(() => _isLoading = false);
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => const ControlPanelScreen(),
@@ -165,20 +156,19 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
         
-        // First, check if it's a user login
+      // ✅ ثانيًا: تحقق من مستخدم داخل مجموعة users
         final userQuery = await FirebaseFirestore.instance
             .collection('users')
             .where('userName', isEqualTo: _usernameController.text.trim())
             .get();
 
         if (userQuery.docs.isNotEmpty) {
-          // Found a user with this username
           final userDoc = userQuery.docs.first;
           final userData = userDoc.data();
           final userPassword = userData['userPassword'] ?? '';
 
           if (userPassword == _passwordController.text) {
-            // User login successful
+          // نجاح تسجيل الدخول
             final userId = userDoc.id;
             final userName = userData['userName'] ?? '';
             final centerId = userData['centerId'] ?? '';
@@ -186,11 +176,8 @@ class _LoginScreenState extends State<LoginScreen> {
             final userType = userData['userType'] ?? 'user';
             final doctorId = userData['doctorId'] ?? '';
             final doctorName = userData['doctorName'] ?? '';
-            final labIdFromUser = userData['labId']?.toString();
-            final labNameFromUser = userData['labName']?.toString();
 
-            // Update user's last login/seen timestamps for stats
-            try {
+          // تحديث آخر تسجيل دخول
               await FirebaseFirestore.instance
                   .collection('users')
                   .doc(userId)
@@ -198,39 +185,28 @@ class _LoginScreenState extends State<LoginScreen> {
                 'lastLoginAt': FieldValue.serverTimestamp(),
                 'lastSeenAt': FieldValue.serverTimestamp(),
               }, SetOptions(merge: true));
-            } catch (e) {
-              // Non-fatal
-            }
 
-            // Save user login data
-            await _saveLoginData(userType, 
+          // حفظ البيانات محليًا
+          await _saveLoginData(
+            userType,
               centerId: centerId, 
               centerName: centerName,
-              userEmail: userName,
               userName: userName,
               userId: userId,
               doctorId: doctorId,
               doctorName: doctorName,
             );
-            // Persist lab info if labUser
-            if (userType == 'labUser' && labIdFromUser != null && labNameFromUser != null) {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('labId', labIdFromUser);
-              await prefs.setString('labName', labNameFromUser);
-            }
 
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
-              
-              // Redirect based on user type
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+
+          // ✅ التوجيه حسب نوع المستخدم
               if (userType == 'admin') {
                 final prefs = await SharedPreferences.getInstance();
                 final fromControlPanel = prefs.getBool('fromControlPanel') ?? false;
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => DashboardScreen(
+                builder: (_) => DashboardScreen(
                       centerId: centerId,
                       centerName: centerName,
                       fromControlPanel: fromControlPanel,
@@ -240,7 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
               } else if (userType == 'reception') {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => ReceptionStaffScreen(
+                builder: (_) => ReceptionStaffScreen(
                       centerId: centerId,
                       centerName: centerName,
                       userId: userId,
@@ -251,30 +227,40 @@ class _LoginScreenState extends State<LoginScreen> {
               } else if (userType == 'doctor') {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => DoctorUserScreen(
+                builder: (_) => DoctorUserScreen(
                       doctorId: doctorId,
                       centerId: centerId,
                       centerName: centerName,
-                      doctorName: doctorName.isNotEmpty ? doctorName : userName,
+                  doctorName:
+                      doctorName.isNotEmpty ? doctorName : userName,
                     ),
                   ),
                 );
-              } else if (userType == 'labUser' && labIdFromUser != null && labNameFromUser != null) {
+          } else if (userType == 'callCenter') {
+            final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('userId', userId);
+  await prefs.setString('userName', userName);
+  await prefs.setString('centerId', centerId);
+  await prefs.setString('centerName', centerName);
+  await prefs.setString('userType', userType); 
+            // 🟢 تسجيل دخول مستخدم مركز الاتصال
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => LabDashboardScreen(
-                      labId: labIdFromUser,
-                      labName: labNameFromUser,
+                builder: (_) => CallCenterScreen(
+                  centerId: centerId,
+                  centerName: centerName,
+                  userId: userId,
+                  userName: userName,
                     ),
                   ),
                 );
               } else {
-                // Default to dashboard for other user types
+            // باقي الأنواع الافتراضية
                 final prefs = await SharedPreferences.getInstance();
                 final fromControlPanel = prefs.getBool('fromControlPanel') ?? false;
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => DashboardScreen(
+                builder: (_) => DashboardScreen(
                       centerId: centerId,
                       centerName: centerName,
                       fromControlPanel: fromControlPanel,
@@ -282,25 +268,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 );
               }
-            }
-            return; // Exit the function after successful user login
+          return;
           } else {
-            // Invalid user password
-            setState(() {
-              _isLoading = false;
-            });
+          setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('كلمة المرور غير صحيحة'),
                 backgroundColor: Colors.red,
               ),
             );
-            return; // Exit the function
+          return;
           }
         }
 
-        // If not a user login, check if admin credentials (center ID or name)
-        // Check if username is a center ID or name
+      // ✅ ثالثًا: تحقق من بيانات مراكز (admin)
         final centerQuery = await FirebaseFirestore.instance
             .collection('medicalFacilities')
             .where('available', isEqualTo: true)
@@ -312,51 +293,48 @@ class _LoginScreenState extends State<LoginScreen> {
         String centerPassword = '';
 
         for (var doc in centerQuery.docs) {
-          final centerData = doc.data();
-          final centerDocId = doc.id;
-          final centerDocName = centerData['name'] ?? '';
+        final data = doc.data();
+        final id = doc.id;
+        final name = data['name'] ?? '';
 
-          // Check if username matches center ID or name (case insensitive)
-          if (_usernameController.text.trim() == centerDocId || 
-              _usernameController.text.trim().toLowerCase() == centerDocName.toLowerCase() ||
-              _usernameController.text.trim().toLowerCase().contains(centerDocName.toLowerCase()) ||
-              centerDocName.toLowerCase().contains(_usernameController.text.trim().toLowerCase())) {
+        if (_usernameController.text.trim() == id ||
+            _usernameController.text.trim().toLowerCase() ==
+                name.toLowerCase() ||
+            _usernameController.text
+                .trim()
+                .toLowerCase()
+                .contains(name.toLowerCase()) ||
+            name
+                .toLowerCase()
+                .contains(_usernameController.text.trim().toLowerCase())) {
             isAdminLogin = true;
-            centerId = centerDocId;
-            centerName = centerDocName;
-            centerPassword = centerData['adminPassword'] ?? '12345678'; // Default password if not set
+          centerId = id;
+          centerName = name;
+          centerPassword = data['adminPassword'] ?? '12345678';
             break;
           }
         }
 
         if (isAdminLogin) {
-          // Check if password matches
           if (_passwordController.text == centerPassword) {
-            // Save admin login data
-            await _saveLoginData('admin', centerId: centerId, centerName: centerName);
-            
-            // Admin login - redirect to dashboard with center info
-            if (mounted) {
-              setState(() {
-                _isLoading = false;
-              });
+          await _saveLoginData('admin',
+              centerId: centerId, centerName: centerName);
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+
               final prefs = await SharedPreferences.getInstance();
               final fromControlPanel = prefs.getBool('fromControlPanel') ?? false;
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (context) => DashboardScreen(
+              builder: (_) => DashboardScreen(
                     centerId: centerId,
                     centerName: centerName,
                     fromControlPanel: fromControlPanel,
                   ),
                 ),
               );
-            }
           } else {
-            // Invalid password for center
-            setState(() {
-              _isLoading = false;
-            });
+          setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('كلمة المرور غير صحيحة'),
@@ -365,57 +343,16 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
         } else {
-          // Try lab login: by lab name and password (default 123456)
-          final labQuery = await FirebaseFirestore.instance
-              .collection('labToLap')
-              .where('name', isEqualTo: _usernameController.text.trim())
-              .limit(1)
-              .get();
-
-          if (labQuery.docs.isNotEmpty) {
-            final labDoc = labQuery.docs.first;
-            final labData = labDoc.data();
-            final labPassword = labData['password']?.toString() ?? '123456';
-
-            if (_passwordController.text == labPassword) {
-              // Save session as lab
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('isLoggedIn', true);
-              await prefs.setString('userType', 'lab');
-              await prefs.setString('labId', labDoc.id);
-              await prefs.setString('labName', labData['name']?.toString() ?? '');
-
-              if (mounted) {
-                setState(() { _isLoading = false; });
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => LabDashboardScreen(
-                      labId: labDoc.id,
-                      labName: labData['name']?.toString() ?? '',
-                    ),
-                  ),
-                );
-              }
-              return;
-            } else {
-              setState(() { _isLoading = false; });
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('كلمة المرور غير صحيحة'), backgroundColor: Colors.red),
-              );
-              return;
-            }
-          } else {
-            // Not a valid center or lab, show error
-            setState(() { _isLoading = false; });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('الاسم غير موجود'), backgroundColor: Colors.red),
-            );
-          }
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('الاسم غير موجود'),
+            backgroundColor: Colors.red,
+          ),
+        );
         }
       } catch (e) {
-        setState(() {
-          _isLoading = false;
-        });
+      setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('حدث خطأ: $e'),
@@ -425,6 +362,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

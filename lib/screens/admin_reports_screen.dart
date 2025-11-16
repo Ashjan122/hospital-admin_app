@@ -463,13 +463,21 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            'التقارير والإحصائيات - ${widget.centerName}',
+          title:Column(children: [ Text(
+            'التقارير والإحصائيات ',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
+          Text( '${widget.centerName}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+            ),
+            ),
+          ]),
+          centerTitle: true,
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,

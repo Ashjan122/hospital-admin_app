@@ -46,6 +46,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     super.dispose();
   }
 
+
   // دالة تحميل البيانات مع Cache
   Future<void> _loadDataWithCache() async {
     // محاولة تحميل البيانات من Cache أولاً
@@ -319,13 +320,22 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            'إدارة الأطباء - ${widget.centerName ?? 'المركز الطبي'}',
+          title:Column(children: [ Text(
+            'إدارة الأطباء',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
+           
           ),
+           Text( '${widget.centerName}',
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.white,
+            ),
+            ),
+          ]),
+          centerTitle: true,
           backgroundColor: const Color(0xFF2FBDAF),
           foregroundColor: Colors.white,
           elevation: 0,
@@ -546,7 +556,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: ListTile(
-            contentPadding: EdgeInsets.all(16),
+            contentPadding: EdgeInsets.all(8),
             leading: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

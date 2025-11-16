@@ -27,23 +27,34 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     super.dispose();
   }
 
-  Future<List<Map<String, dynamic>>> fetchUsers() async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('centerId', isEqualTo: widget.centerId)
-          .get();
+ Future<List<Map<String, dynamic>>> fetchUsers() async {
+  try {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('centerId', isEqualTo: widget.centerId)
+        .get();
 
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['userId'] = doc.id;
-        return data;
-      }).toList();
-    } catch (e) {
-      print('Error fetching users: $e');
-      return [];
-    }
+    final users = snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['userId'] = doc.id;
+      return data;
+    }).toList();
+
+    // ترتيب المستخدمين بالأحدث أولًا حسب createdAt
+    users.sort((a, b) {
+      final aTime = a['createdAt'] as Timestamp?;
+      final bTime = b['createdAt'] as Timestamp?;
+      return (bTime ?? Timestamp(0,0)).compareTo(aTime ?? Timestamp(0,0));
+    });
+
+    return users;
+  } catch (e) {
+    print('Error fetching users: $e');
+    return [];
   }
+}
+
+
 
   // دالة جديدة تعتمد على _refreshKey لإجبار FutureBuilder على إعادة التشغيل
   Future<List<Map<String, dynamic>>> _getUsersWithRefresh() async {
@@ -121,191 +132,188 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   void _showAddUserDialog() {
-    final userNameController = TextEditingController();
-    final userPhoneController = TextEditingController();
-    final userPasswordController = TextEditingController();
+  final userNameController = TextEditingController();
+  final userPhoneController = TextEditingController();
+  final userPasswordController = TextEditingController();
 
-          showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('إضافة مستخدم جديد'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: userNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'اسم المستخدم',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: userPhoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'رقم الهاتف',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: userPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'كلمة المرور',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (userNameController.text.trim().isNotEmpty &&
-                    userPhoneController.text.trim().isNotEmpty &&
-                    userPasswordController.text.trim().isNotEmpty) {
-                  
-                  Navigator.pop(context);
-                  
-                  try {
-                    await FirebaseFirestore.instance
-                        .collection('users')
-                        .add({
-                      'userName': userNameController.text.trim(),
-                      'userPhone': userPhoneController.text.trim(),
-                      'userPassword': userPasswordController.text.trim(),
-                      'centerId': widget.centerId,
-                      'centerName': widget.centerName,
-                      // افتراضيًا يكون موظف استقبال، يمكن تغييره من البروفايل
-                      'userType': 'reception',
-                      'createdAt': FieldValue.serverTimestamp(),
-                    });
+  String? userNameError;
+  String? userPasswordError;
 
-                    // تحديث فوري للمفتاح
-                    if (mounted) {
-                      setState(() {
-                        _refreshKey++; // تحديث المفتاح لإعادة تشغيل FutureBuilder
-                      });
-                    }
-
-                    if (mounted && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('تم إضافة المستخدم "${userNameController.text.trim()}" بنجاح'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('خطأ في إضافة المستخدم: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2FBDAF),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('إضافة'),
-            ),
-          ],
-        ),
-      );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'إدارة المستخدمين - ${widget.centerName}',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          backgroundColor: const Color(0xFF2FBDAF),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () {
-                setState(() {
-                  _refreshKey++; // تحديث المفتاح لإعادة تشغيل FutureBuilder
-                });
-              },
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: Column(
-          children: [
-            // Search and add user section
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.grey[50],
+  showDialog(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('إضافة مستخدم جديد'),
+            content: SingleChildScrollView(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Search bar
                   TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
+                    controller: userNameController,
                     decoration: InputDecoration(
-                      hintText: 'البحث في المستخدمين...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
+                      labelText: 'اسم المستخدم',
+                      border: const OutlineInputBorder(),
+                      errorText: userNameError,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  // Add user button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _showAddUserDialog,
-                      icon: const Icon(Icons.person_add),
-                      label: const Text('إضافة مستخدم جديد'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2FBDAF),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                  TextField(
+                    controller: userPhoneController,
+                    decoration: const InputDecoration(
+                      labelText: 'رقم الهاتف',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: userPasswordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'كلمة المرور',
+                      border: const OutlineInputBorder(),
+                      errorText: userPasswordError,
                     ),
                   ),
                 ],
               ),
             ),
-            
-            // Users list
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  // إعادة تعيين الأخطاء
+                  setState(() {
+                    userNameError = null;
+                    userPasswordError = null;
+                  });
+
+                  bool hasError = false;
+
+                  if (userNameController.text.trim().length < 6) {
+                    setState(() {
+                      userNameError = 'اسم المستخدم يجب أن يكون 6 أحرف على الأقل';
+                    });
+                    hasError = true;
+                  }
+
+                  if (userPasswordController.text.trim().length < 8) {
+                    setState(() {
+                      userPasswordError = 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
+                    });
+                    hasError = true;
+                  }
+
+                  if (hasError) return;
+
+                  try {
+                    await FirebaseFirestore.instance.collection('users').add({
+                      'userName': userNameController.text.trim(),
+                      'userPhone': userPhoneController.text.trim(),
+                      'userPassword': userPasswordController.text.trim(),
+                      'centerId': widget.centerId,
+                      'centerName': widget.centerName,
+                      'userType': 'reception',
+                      'createdAt': FieldValue.serverTimestamp(),
+                    });
+
+                    // تحديث القائمة مباشرة قبل إغلاق Dialog
+                    if (mounted) {
+                      setState(() {
+                        _refreshKey++;
+                      });
+                    }
+
+                    // الآن يمكن إغلاق الـ Dialog بعد كل شيء
+                    if (mounted) Navigator.pop(context);
+                  } catch (e) {
+                    // يمكن التعامل مع الخطأ هنا إذا أردنا
+                    print('خطأ في إضافة المستخدم: $e');
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2FBDAF),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('إضافة'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+
+ @override
+Widget build(BuildContext context) {
+  return Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(
+        title:Column(children: [ Text(
+          'إدارة المستخدمين ',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        Text(
+          ' ${widget.centerName}',
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.white,
+          ),
+        ),
+        ]),
+        backgroundColor: const Color(0xFF2FBDAF),
+        centerTitle: true,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'إضافة مستخدم جديد',
+            onPressed: _showAddUserDialog,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ✅ قسم البحث فقط
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: Colors.grey[50],
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+                decoration: InputDecoration(
+                  hintText: 'البحث في المستخدمين...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+              ),
+            ),
+
+            // ✅ قائمة المستخدمين
             Expanded(
               child: FutureBuilder<List<Map<String, dynamic>>>(
-                key: ValueKey(_refreshKey), // استخدام المفتاح لإعادة تشغيل FutureBuilder
+                key: ValueKey(_refreshKey),
                 future: _getUsersWithRefresh(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -321,19 +329,9 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 64,
-                            color: Colors.red[400],
-                          ),
+                          Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
                           const SizedBox(height: 16),
-                          Text(
-                            'حدث خطأ في تحميل المستخدمين',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                            ),
-                          ),
+                          Text('حدث خطأ في تحميل المستخدمين', style: TextStyle(fontSize: 18, color: Colors.grey[600])),
                         ],
                       ),
                     );
@@ -354,36 +352,11 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            _searchQuery.isEmpty 
-                                  ? 'لا يوجد مستخدمين في هذا المركز'
-                                  : 'لم يتم العثور على مستخدمين يطابقون البحث',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                            ),
+                            _searchQuery.isEmpty
+                                ? 'لا يوجد مستخدمين في هذا المركز'
+                                : 'لم يتم العثور على مستخدمين يطابقون البحث',
+                            style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _searchQuery.isEmpty 
-                                  ? 'لم يتم العثور على أي مستخدمين مسجلين'
-                                  : 'جرب البحث بكلمات مختلفة',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                          if (_searchQuery.isEmpty) ...[
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              onPressed: _showAddUserDialog,
-                              icon: const Icon(Icons.person_add),
-                              label: const Text('إضافة مستخدم جديد'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2FBDAF),
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     );
@@ -397,148 +370,113 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                       final userName = user['userName'] ?? 'مستخدم غير معروف';
                       final userPhone = user['userPhone'] ?? 'غير محدد';
 
-                      return InkWell(
-                        onTap: () async {
-                          final changed = await Navigator.of(context).push<bool>(
-                            MaterialPageRoute(
-                              builder: (_) => AdminUserProfileScreen(userId: user['userId']),
-                            ),
-                          );
-                          if (changed == true && mounted) {
-                            setState(() {
-                              _refreshKey++;
-                            });
-                          }
-                        },
-                        child: Container(
-                         margin: const EdgeInsets.only(bottom: 12),
-                         decoration: BoxDecoration(
-                           color: Colors.white,
-                           borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[300]!),
-                           boxShadow: [
-                             BoxShadow(
-                               color: Colors.grey.withOpacity(0.08),
-                               spreadRadius: 1,
-                               blurRadius: 6,
-                               offset: const Offset(0, 2),
-                             ),
-                           ],
-                         ),
-                                                  child: Padding(
-                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                           child: Row(
-                             children: [
-                               // User info with labels
-                               Expanded(
-                                 child: Column(
-                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                   children: [
-                                     Row(
-                                       children: [
-                                         Text(
-                                           'اسم المستخدم: ',
-                                           style: TextStyle(
-                                             fontSize: 15,
-                                             fontWeight: FontWeight.w600,
-                                             color: Colors.grey[700],
-                                           ),
-                                         ),
-                                         Text(
-                                           userName,
-                                           style: const TextStyle(
-                                             fontSize: 15,
-                                             fontWeight: FontWeight.bold,
-                                             color: Colors.black87,
-                                           ),
-                                         ),
-                                       ],
-                                     ),
-                                     const SizedBox(height: 8),
-                                     Row(
-                                       children: [
-                                         Text(
-                                           'رقم الهاتف: ',
-                                           style: TextStyle(
-                                             fontSize: 15,
-                                             fontWeight: FontWeight.w600,
-                                             color: Colors.grey[700],
-                                           ),
-                                         ),
-                                         Text(
-                                           userPhone,
-                                           style: TextStyle(
-                                             fontSize: 15,
-                                             color: Colors.grey[600],
-                                           ),
-                                         ),
-                                       ],
-                                     ),
-                                     const SizedBox(height: 8),
-                                     Row(
-                                       children: [
-                                         Text(
-                                           'نوع المستخدم: ',
-                                           style: TextStyle(
-                                             fontSize: 15,
-                                             fontWeight: FontWeight.w600,
-                                             color: Colors.grey[700],
-                                           ),
-                                         ),
-                                         Container(
-                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                           decoration: BoxDecoration(
-                                             color: _getUserTypeColor(user['userType'] ?? 'reception'),
-                                             borderRadius: BorderRadius.circular(12),
-                                           ),
-                                           child: Text(
-                                             _getUserTypeLabel(user['userType'] ?? 'reception'),
-                                             style: const TextStyle(
-                                               fontSize: 12,
-                                               fontWeight: FontWeight.bold,
-                                               color: Colors.white,
-                                             ),
-                                           ),
-                                         ),
-                                       ],
-                                     ),
-                                   ],
-                                 ),
-                               ),
-                               
-                               // Delete button
-                               Container(
-                                 decoration: BoxDecoration(
-                                   color: Colors.red.withOpacity(0.1),
-                                   borderRadius: BorderRadius.circular(8),
-                                 ),
-                                 child: IconButton(
-                                   onPressed: () => deleteUser(user['userId'], userName),
-                                   icon: const Icon(Icons.delete, color: Colors.red, size: 20),
-                                   tooltip: 'حذف المستخدم',
-                                   padding: const EdgeInsets.all(8),
-                                   constraints: const BoxConstraints(
-                                     minWidth: 36,
-                                     minHeight: 36,
-                                   ),
-                                 ),
-                               ),
-                             ],
-                           ),
-                         ),
-                       ),
-                      );
+                     return InkWell(
+  onTap: () async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AdminUserProfileScreen(userId: user['userId']),
+      ),
+    );
+    if (changed == true && mounted) {
+      setState(() {
+        _refreshKey++;
+      });
+    }
+  },
+  child: Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.grey[300]!),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.withOpacity(0.05),
+          spreadRadius: 1,
+          blurRadius: 4,
+          offset: const Offset(0, 1),
+        ),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          // 🔢 رقم تسلسلي
+          Text(
+  '${filteredUsers.length - index}.',
+  style: TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.bold,
+    color: Colors.grey[700],
+  ),
+),
+
+          const SizedBox(width: 10),
+
+          // ✅ اسم المستخدم + النوع في سطر واحد
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    user['userName'] ?? 'مستخدم غير معروف',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _getUserTypeColor(user['userType'] ?? 'reception'),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    _getUserTypeLabel(user['userType'] ?? 'reception'),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 🗑️ زر الحذف الصغير
+          IconButton(
+              onPressed: () => deleteUser(user['userId'], user['userName']),
+              icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+              tooltip: 'حذف المستخدم',
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          
+        ],
+      ),
+    ),
+  ),
+);
+
+
                     },
                   );
                 },
               ),
             ),
           ],
-          ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   Color _getUserTypeColor(String userType) {
     switch (userType) {
@@ -546,6 +484,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         return Colors.red;
       case 'doctor':
         return Colors.blue;
+         case 'callCenter':
+      return Colors.orange;
       case 'reception':
       default:
         return const Color(0xFF2FBDAF);
@@ -558,6 +498,8 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         return 'مدير';
       case 'doctor':
         return 'طبيب';
+      case 'callCenter':
+      return 'Call Center';
       case 'reception':
       default:
         return 'موظف استقبال';

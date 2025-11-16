@@ -19,30 +19,32 @@ class CentralDataScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: null,
+           boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.07),
+          blurRadius: 10,
+          spreadRadius: 1,
+          offset: const Offset(0, 3),
+        ),
+      ],
         ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, size: 32, color: color),
-              const SizedBox(height: 12),
+              
+             
               Text(
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  
                 ),
               ),
+              Icon(icon, size: 25, color: color),
             ],
           ),
         ),
@@ -70,10 +72,10 @@ class CentralDataScreen extends StatelessWidget {
         body: Padding(
           padding: const EdgeInsets.all(16.0),
           child: GridView.count(
-            crossAxisCount: 3,
-            childAspectRatio: 0.9,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            crossAxisCount: 1,
+            childAspectRatio: 4.5,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
             children: [
               _buildHomeCard(
                 icon: Icons.business,

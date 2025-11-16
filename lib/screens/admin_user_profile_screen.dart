@@ -21,7 +21,8 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _doctorSearchController = TextEditingController();
 
-  final List<String> _roles = const ['admin', 'reception', 'doctor'];
+  final List<String> _roles = const ['admin', 'reception', 'doctor', 'callCenter'];
+
   String _selectedRole = 'reception';
   String? _currentDoctorId;
   String? _currentDoctorName;
@@ -589,17 +590,20 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
   }
 
   String _roleLabel(String value) {
-    switch (value) {
-      case 'admin':
-        return 'مدير';
-      case 'reception':
-        return 'موظف استقبال';
-      case 'doctor':
-        return 'طبيب';
-      default:
-        return 'موظف استقبال';
-    }
+  switch (value) {
+    case 'admin':
+      return 'مدير';
+    case 'reception':
+      return 'موظف استقبال';
+    case 'doctor':
+      return 'طبيب';
+    case 'callCenter':
+      return 'Call Center';
+    default:
+      return 'موظف استقبال';
   }
+}
+
 }
 
 

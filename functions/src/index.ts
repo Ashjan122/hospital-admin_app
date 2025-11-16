@@ -204,8 +204,107 @@ export const notifyNewHomeClinicRequest = functions.firestore
       console.error('Error sending new home clinic request notification:', e);
       return null;
     }
-  });
+    });
 
+// Notification for new lab sample request
+/* DISABLED: notifyNewLabSample (requested to keep commented and not deployed)
+export const notifyNewLabSample = functions.firestore
+  .document('labToLap/global/patients/{patientId}/lab_request/{requestId}')
+  .onCreate(async (snap, context) => {
+    console.log('=== notifyNewLabSample TRIGGERED ===');
+    console.log('Patient ID:', context.params.patientId);
+    console.log('Request ID:', context.params.requestId);
+    
+    const data = snap.data() as any || {};
+    console.log('Document data:', data);
+    
+    const testName = data.name || 'فحص جديد';
+    const testPrice = data.price || 0;
+    const patientId = context.params.patientId;
+    
+    console.log('Test data:', { testName, testPrice, patientId });
+    
+    // Get patient info
+    let patientName = 'مريض';
+    let labName = 'معمل';
+    try {
+      const patientDoc = await admin
+        .firestore()
+        .doc(`labToLap/global/patients/${patientId}`)
+        .get();
+      
+      if (patientDoc.exists) {
+        const patientData = patientDoc.data() as any || {};
+        patientName = patientData.name || 'مريض';
+        
+        // Get lab name
+        const labId = patientData.labId;
+        if (labId) {
+          const labDoc = await admin
+            .firestore()
+            .doc(`labToLap/${labId}`)
+            .get();
+          
+          if (labDoc.exists) {
+            const labData = labDoc.data() as any || {};
+            labName = labData.name || 'معمل';
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching patient/lab info for notification:', e);
+    }
+    
+    const message: admin.messaging.Message = {
+      notification: {
+        title: 'عينة جديدة للمعمل',
+        body: `المريض: ${patientName}\nالفحص: ${testName}\nالمعمل: ${labName}\nالسعر: ${testPrice}`,
+      },
+      data: {
+        type: 'new_lab_sample',
+        patientId,
+        requestId: context.params.requestId,
+        patientName,
+        testName,
+        labName,
+        testPrice: String(testPrice),
+        timestamp: new Date().toISOString(),
+      },
+      topic: 'lab_to_lab', // استخدام توبك منفصل للمعامل
+      android: {
+        notification: {
+          sound: 'default',
+          priority: 'high',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+          },
+        },
+      },
+    };
+
+    try {
+      console.log('=== SENDING NOTIFICATION ===');
+      console.log('Topic: lab_to_lab');
+      console.log('Message:', JSON.stringify(message, null, 2));
+      
+      const result = await admin.messaging().send(message);
+      console.log('=== NOTIFICATION SENT SUCCESSFULLY ===');
+      console.log('Result:', result);
+      return null;
+    } catch (e) {
+      console.error('=== ERROR SENDING NOTIFICATION ===');
+      console.error('Error:', e);
+      return null;
+    }
+  });
+*/
+
+  
 export const sendTomorrowReminders = functions.pubsub
   .schedule('0 8 * * *') // daily at 08:00
   .timeZone('Africa/Khartoum')

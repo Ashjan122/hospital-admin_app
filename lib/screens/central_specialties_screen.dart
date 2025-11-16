@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hospital_admin_app/services/central_data_service.dart';
+import 'package:hospital_admin_app/screens/sub_specialties_screen.dart';
 
 class CentralSpecialtiesScreen extends StatefulWidget {
   const CentralSpecialtiesScreen({super.key});
@@ -130,18 +131,8 @@ class _CentralSpecialtiesScreenState extends State<CentralSpecialtiesScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.all(16),
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0D47A1).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.medical_services,
-                                color: Color(0xFF0D47A1),
-                              ),
-                            ),
+                            contentPadding: const EdgeInsets.all(10),
+                            
                             title: Text(
                               name,
                               style: const TextStyle(
@@ -152,14 +143,24 @@ class _CentralSpecialtiesScreenState extends State<CentralSpecialtiesScreen> {
                             subtitle: description.isNotEmpty
                                 ? Text(description)
                                 : null,
-                            trailing: IconButton(
-                              icon: const Icon(Icons.edit),
-                              onPressed: () => _showEditSpecialtyDialog(
-                                doc.id,
-                                name,
-                                description,
-                              ),
-                            ),
+                            trailing: Row(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    IconButton(
+      icon: const Icon(Icons.account_tree), // أيقونة التخصصات الفرعية
+      onPressed: () => _openSubSpecialtiesScreen(doc.id, name),
+    ),
+    IconButton(
+      icon: const Icon(Icons.edit),
+      onPressed: () => _showEditSpecialtyDialog(
+        doc.id,
+        name,
+        description,
+      ),
+    ),
+  ],
+),
+
                           ),
                         );
                       },
@@ -198,6 +199,15 @@ class _CentralSpecialtiesScreenState extends State<CentralSpecialtiesScreen> {
     }
     return (maxId + 1).toString();
   }
+  void _openSubSpecialtiesScreen(String id, String name) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => SubSpecialtiesScreen(parentId: id, parentName: name),
+    ),
+  );
+}
+
 
   void _showAddSpecialtyDialog() {
     final nameController = TextEditingController();

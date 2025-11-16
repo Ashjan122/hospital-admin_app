@@ -212,6 +212,7 @@ class CentralDataService {
 
       if (doctorDoc.exists) {
         final doctorData = doctorDoc.data()!;
+        final subSpecializationId = doctorData['subSpecialization']?.toString();
         
         // إضافة الطبيب إلى المركز مع حفظ الـ ID المرجعي
         await _firestore
@@ -227,11 +228,52 @@ class CentralDataService {
           'phoneNumber': doctorData['phoneNumber'] ?? '',
           'photoUrl': doctorData['photoUrl'] ?? '',
           'specialization': doctorData['specialization'] ?? '',
+          'subSpecialization': subSpecializationId ?? '',
           'morningPatientLimit': additionalData['morningPatientLimit'] ?? 20,
           'eveningPatientLimit': additionalData['eveningPatientLimit'] ?? 20,
           'isActive': true,
           'createdAt': FieldValue.serverTimestamp(),
         });
+        
+        // إذا كان للطبيب تخصص فرعي، إضافته تلقائياً إلى المركز
+        if (subSpecializationId != null && subSpecializationId.isNotEmpty) {
+          try {
+            // التحقق من وجود التخصص الفرعي في المركز
+            final subSpecialtyRef = _firestore
+                .collection('medicalFacilities')
+                .doc(centerId)
+                .collection('specializations')
+                .doc(specializationId)
+                .collection('subSpecialties')
+                .doc(subSpecializationId);
+            
+            final subSpecialtyExists = await subSpecialtyRef.get();
+            
+            if (!subSpecialtyExists.exists) {
+              // جلب اسم التخصص الفرعي من المركزية
+              final subSpecialtyDoc = await _firestore
+                  .collection('medicalSpecialties')
+                  .doc(specializationId)
+                  .collection('subSpecialties')
+                  .doc(subSpecializationId)
+                  .get();
+              
+              if (subSpecialtyDoc.exists) {
+                final subSpecialtyData = subSpecialtyDoc.data()!;
+                final subSpecialtyName = subSpecialtyData['name'] ?? subSpecializationId;
+                
+                // إضافة التخصص الفرعي إلى المركز
+                await subSpecialtyRef.set({
+                  'name': subSpecialtyName,
+                  'addedAt': FieldValue.serverTimestamp(),
+                });
+              }
+            }
+          } catch (e) {
+            // في حالة الخطأ، لا نوقف عملية إضافة الطبيب
+            print('خطأ في إضافة التخصص الفرعي تلقائياً: $e');
+          }
+        }
       }
     } catch (e) {
       print('خطأ في إضافة الطبيب للمركز: $e');
