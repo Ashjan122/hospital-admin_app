@@ -118,7 +118,7 @@ class _AboutScreenState extends State<AboutScreen> {
             'حول التطبيق',
             style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
         ),
@@ -253,7 +253,7 @@ class _AboutScreenState extends State<AboutScreen> {
                                       icon: const Icon(Icons.system_update),
                                     label: const Text('تحديث التطبيق'),
                                       style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2FBDAF),
+                                      backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                                         foregroundColor: Colors.white,
                                       ),
                                     ),
@@ -422,7 +422,7 @@ class _SimplePhoneNumber extends StatelessWidget {
         SnackBar(
           content: Text('تم نسخ الرقم: $phoneNumber'),
           duration: const Duration(seconds: 2),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
         ),
       );
     }
@@ -438,9 +438,9 @@ class _SimplePhoneNumber extends StatelessWidget {
         style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Color(0xFF2FBDAF),
+          color: Color.fromARGB(255, 156, 208, 235),
           decoration: TextDecoration.underline,
-          decorationColor: Color(0xFF2FBDAF),
+          decorationColor: Color.fromARGB(255, 156, 208, 235),
         ),
       ),
     );

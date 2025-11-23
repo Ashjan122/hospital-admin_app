@@ -1,9 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hospital_admin_app/screens/result_entry_screen.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:dio/dio.dart';
-// import 'package:jawda_his/screens/pdf_view_screen.dart';
+ import 'package:hospital_admin_app/screens/pdf_view_screen.dart';
 // import 'package:jawda_his/screens/result_entry_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -34,7 +35,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
   bool isLoading = true;
 
   final Color _color1 = const Color.fromARGB(255, 215, 213, 219);
-  final Color _color2 = const Color.fromARGB(255, 10, 113, 121);
+  final Color _color2 = const Color(0xFF2FBDAF);
 
   @override
   void initState() {
@@ -94,7 +95,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
     setState(() => isLoading = true);
 
     final url = 
-      'https://alroomylab.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-requests';
+      'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-requests';
     
 
     try {
@@ -268,7 +269,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
     }
 
     final String ultraMsgUrl =
-        'https://api.ultramsg.com/$instanceId/messages/document?token=$token';
+        'https://api.ultramsg.com/instance145504/messages/document?token=mh3flw9ka6wm8dkw';
 
     if (!pdfFile.existsSync()) {
       print('PDF file does not exist: ${pdfFile.path}');
@@ -534,7 +535,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                         style: const TextStyle(color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0A7179),
+                        backgroundColor: const Color(0xFF2FBDAF),
                         disabledBackgroundColor: const Color(
                           0xFF0A7179,
                         ).withOpacity(0.6),
@@ -561,7 +562,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
 
                                 try {
                                   final pdfUrl = 
-                                    'https://alroomylab.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-report/pdf';
+                                    'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-report/pdf';
                                   
 
                                   print('Downloading PDF from: $pdfUrl');
@@ -623,7 +624,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
             style: TextStyle(color: Colors.white),
           ),
           centerTitle: true,
-          backgroundColor: const Color(0xFF0A7179),
+          backgroundColor: const Color(0xFF2FBDAF),
           actions: [
             IconButton(
               icon: const FaIcon(
@@ -643,9 +644,9 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                 end: Alignment.bottomCenter,
                 colors: [
                   _color1,
-                  _color2.withOpacity(0.2),
-                  _color2.withOpacity(0.4),
-                  _color2.withOpacity(0.6),
+                 Color(0xFF2FBDAF).withOpacity(0.2),
+                  Color(0xFF2FBDAF).withOpacity(0.4),
+                  Color(0xFF2FBDAF).withOpacity(0.6),
                 ],
               ),
             ),
@@ -670,7 +671,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: const BorderSide(
-                                    color: Color(0xFF0A7179),
+                                    color: Color(0xFF2FBDAF),
                                   ),
                                 ),
                                 child: Padding(
@@ -687,7 +688,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                         style: const TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF0A7179),
+                                          color: Color(0xFF2FBDAF),
                                         ),
                                       ),
                                       const SizedBox(height: 10),
@@ -717,7 +718,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         side: const BorderSide(
-                                          color: Color(0xFF0A7179),
+                                          color: Color(0xFF2FBDAF),
                                         ),
                                       ),
                                       child: ListView.builder(
@@ -727,7 +728,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                           final t = tests[i];
                                           return InkWell(
                                             onTap: () {
-                                              /*setState(
+                                              setState(
                                                 () => checked[i] = !checked[i],
                                               );
                                               Navigator.push(
@@ -741,7 +742,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                             t['id'].toString(),
                                                       ),
                                                 ),
-                                              );*/
+                                              );
                                             },
                                             child: Column(
                                               children: [
@@ -760,9 +761,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                             fontSize: 16,
                                                             color:
                                                                 checked[i]
-                                                                    ? const Color(
-                                                                        0xFF0A7179,
-                                                                      )
+                                                                    ? Color(0xFF2FBDAF)
                                                                     : Colors.black,
                                                             fontWeight:
                                                                 checked[i]
@@ -775,9 +774,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                       ),
                                                       Checkbox(
                                                         value: checked[i],
-                                                        activeColor: const Color(
-                                                          0xFF0A7179,
-                                                        ),
+                                                        activeColor: const Color(0xFF2FBDAF),
                                                         onChanged:
                                                             (val) => setState(
                                                               () =>
@@ -792,7 +789,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                   const Divider(
                                                     height: 1,
                                                     thickness: 1,
-                                                    color: Color(0xFF0A7179),
+                                                    color: Color(0xFF2FBDAF),
                                                   ),
                                               ],
                                             ),
@@ -851,7 +848,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                       ),
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF0A7179),
+                                      backgroundColor: const Color(0xFF2FBDAF),
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 14,
                                       ),
@@ -860,8 +857,8 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                       ),
                                     ),
                                     onPressed: () async {
-                                    /*  final pdfUrl = 
-                                        'https://alroomylab.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-report/pdf';
+                                      final pdfUrl = 
+                                        'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-report/pdf';
                                       
                                       Navigator.push(
                                         context,
@@ -871,7 +868,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                 pdfUrl: pdfUrl,
                                               ),
                                         ),
-                                      );*/
+                                      );
                                     },
                                   ),
                                 ),

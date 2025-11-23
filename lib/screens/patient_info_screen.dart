@@ -366,6 +366,30 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
           'createdAt': FieldValue.serverTimestamp(),
           'isConfirmed': false, // الحجز الجديد يحتاج تأكيد
         });
+         // إضافة نسخة من الحجز داخل المركز
+String? bookingId;
+await FirebaseFirestore.instance
+    .collection('medicalFacilities')
+    .doc(widget.centerId)
+    .collection('appointments')
+    .doc(bookingId)
+    .set({
+      'patientName': patientName,
+      'patientPhone': patientPhone,
+      'patientId': patientId,
+      'facilityId': widget.centerId,
+      'centralSpecialtyId': widget.specializationId,
+      'doctorId': widget.doctorId,
+      'doctorName': doctorName ?? 'طبيب',
+      'specializationName': specializationName ?? 'تخصص طبي',
+      'date': dateStr,
+      'time': availableTime,
+      'period': period,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isConfirmed': false,
+});
+
+
 
     if (!mounted) return;
 

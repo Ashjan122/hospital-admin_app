@@ -884,12 +884,12 @@ class _AdminLabResultsScreenState extends State<AdminLabResultsScreen> {
             "نتائج المختبر",
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2FBDAF),
+              color: Color.fromARGB(255, 156, 208, 235),
               fontSize: 24,
             ),
           ),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF2FBDAF)),
+            icon: const Icon(Icons.arrow_back, color: Color.fromARGB(255, 156, 208, 235)),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
@@ -935,10 +935,10 @@ class _AdminLabResultsScreenState extends State<AdminLabResultsScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                   decoration: BoxDecoration(
-                                    color: _selectedSearchMethod == 1 ? const Color(0xFF2FBDAF) : Colors.white,
+                                    color: _selectedSearchMethod == 1 ? const Color.fromARGB(255, 156, 208, 235) : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: _selectedSearchMethod == 1 ? const Color(0xFF2FBDAF) : Colors.grey[300]!,
+                                      color: _selectedSearchMethod == 1 ? const Color.fromARGB(255, 156, 208, 235) : Colors.grey[300]!,
                                     ),
                                   ),
                                   child: Row(
@@ -970,10 +970,10 @@ class _AdminLabResultsScreenState extends State<AdminLabResultsScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                   decoration: BoxDecoration(
-                                    color: _selectedSearchMethod == 0 ? const Color(0xFF2FBDAF) : Colors.white,
+                                    color: _selectedSearchMethod == 0 ? const Color.fromARGB(255, 156, 208, 235) : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: _selectedSearchMethod == 0 ? const Color(0xFF2FBDAF) : Colors.grey[300]!,
+                                      color: _selectedSearchMethod == 0 ? const Color.fromARGB(255, 156, 208, 235) : Colors.grey[300]!,
                                     ),
                                   ),
                                   child: Row(
@@ -1060,7 +1060,7 @@ class _AdminLabResultsScreenState extends State<AdminLabResultsScreen> {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _searchByReceipt,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2FBDAF),
+                                backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -1137,7 +1137,7 @@ class _AdminLabResultsScreenState extends State<AdminLabResultsScreen> {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : _searchByPhone,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2FBDAF),
+                                backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                                 padding: const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -1264,7 +1264,7 @@ class _AdminLabResultsScreenState extends State<AdminLabResultsScreen> {
             ElevatedButton(
               onPressed: isRowLoading ? null : () => _viewResults(patient),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2FBDAF),
+                backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),

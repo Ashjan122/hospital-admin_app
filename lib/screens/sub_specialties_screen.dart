@@ -30,7 +30,7 @@ class _SubSpecialtiesScreenState extends State<SubSpecialtiesScreen> {
         floatingActionButton: FloatingActionButton(
           onPressed: () => _showAddSubSpecialtyDialog(),
           backgroundColor: const Color(0xFF0D47A1),
-          child: const Icon(Icons.add),
+          child: const Icon(Icons.add, color: Colors.white),
         ),
 
         body: StreamBuilder<QuerySnapshot>(

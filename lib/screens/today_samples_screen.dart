@@ -102,7 +102,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             ..options.headers['Accept'] = 'application/json';
 
       final url = 
-        'https://alroomylab.a.pinggy.link/jawda-medical/public/api/lab/pending-queue';
+        'https://alroomy.a.pinggy.link/jawda-medical/public/api/lab/pending-queue';
       
 
       final response = await dio.get(
@@ -133,6 +133,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
                 : (shiftId ?? currentShiftId);
 
         if (onlyToday && data.isNotEmpty) latestShiftId = currentShiftId;
+       
         print(' رقم الوردية: $currentShiftId');
 
         setState(() {
@@ -212,7 +213,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             ..options.headers['Accept'] = 'application/json';
 
       final url =
-        'https://alroomylab.a.pinggy.link/jawda-medical/public/api/doctor-visits/search-by-patient';
+        'https://alroomy.a.pinggy.link/jawda-medical/public/api/doctor-visits/search-by-patient';
       
 
       final response = await dio.get(
@@ -408,17 +409,17 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             'auth_date': sample['auth_date'],
           },
           onTap: () {
-           /* if (visitId != 0) {
+            if (visitId != 0) {
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => PatientVisitTestsScreen(
                     patientId: visitId,
-                    patientPhone: patientPhone,
+                    patientPhone: '',
                   ),
                 ),
               );
-            }*/
+            }
           },
         );
       },
@@ -564,7 +565,7 @@ class _SampleListTileState extends State<SampleListTile>
 
     try {
       final url = 
-        'https://alroomylab.a.pinggy.link/jawda-medical/public/api/patients/$patientId';
+        'https://alroomy.a.pinggy.link/jawda-medical/public/api/patients/$patientId';
       
       final response = await dio.get(url);
 

@@ -54,8 +54,8 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: const Color(0xFF2FBDAF),
-                  secondary: const Color(0xFF2FBDAF),
+                  primary: const Color.fromARGB(255, 156, 208, 235),
+                  secondary: const Color.fromARGB(255, 156, 208, 235),
                 ),
           ),
           child: child!,
@@ -99,89 +99,65 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
   }
 
   Future<void> fetchAllBookings() async {
-    setState(() {
-      _isLoading = true;
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    final appointmentsSnapshot = await FirebaseFirestore.instance
+        .collection('medicalFacilities')
+        .doc(widget.centerId)
+        .collection('appointments')
+        .get()
+        .timeout(const Duration(seconds: 8));
+
+    List<Map<String, dynamic>> allBookings = [];
+
+    for (var doc in appointmentsSnapshot.docs) {
+      final data = doc.data();
+      data['appointmentId'] = doc.id;
+      allBookings.add(data);
+    }
+
+    // ترتيب الحجوزات حسب createdAt (الأحدث أولاً)
+    allBookings.sort((a, b) {
+      final createdAtA = a['createdAt'];
+      final createdAtB = b['createdAt'];
+
+      if (createdAtA != null && createdAtB != null) {
+        DateTime aTime, bTime;
+
+        if (createdAtA is Timestamp) {
+          aTime = createdAtA.toDate();
+        } else {
+          aTime = DateTime.tryParse(createdAtA.toString()) ?? DateTime(2000);
+        }
+
+        if (createdAtB is Timestamp) {
+          bTime = createdAtB.toDate();
+        } else {
+          bTime = DateTime.tryParse(createdAtB.toString()) ?? DateTime(2000);
+        }
+
+        return bTime.compareTo(aTime);
+      }
+
+      return 0;
     });
 
-    try {
-      // جلب جميع التخصصات
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get()
-          .timeout(const Duration(seconds: 8));
-
-      List<Map<String, dynamic>> allBookings = [];
-      List<Future<void>> futures = [];
-      
-      // البحث في كل تخصص بشكل متوازي
-      for (var specDoc in specializationsSnapshot.docs) {
-        futures.add(_fetchBookingsFromSpecialization(specDoc, allBookings));
-      }
-      
-      await Future.wait(futures);
-      
-      // ترتيب الحجوزات حسب وقت الحجز (آخر حجز يظهر أولاً)
-      allBookings.sort((a, b) {
-        final createdAtA = a['createdAt'];
-        final createdAtB = b['createdAt'];
-        
-        // إذا كان وقت الحجز متوفر، نرتب حسبه
-        if (createdAtA != null && createdAtB != null) {
-          try {
-            DateTime timeA, timeB;
-            
-            if (createdAtA is Timestamp) {
-              timeA = createdAtA.toDate();
-            } else if (createdAtA is String) {
-              timeA = DateTime.parse(createdAtA);
-            } else {
-              throw Exception('Invalid createdAt type');
-            }
-            
-            if (createdAtB is Timestamp) {
-              timeB = createdAtB.toDate();
-            } else if (createdAtB is String) {
-              timeB = DateTime.parse(createdAtB);
-            } else {
-              throw Exception('Invalid createdAt type');
-            }
-            
-            return timeB.compareTo(timeA); // آخر حجز أولاً
-          } catch (e) {
-            // في حالة خطأ في تحليل التاريخ، نرتب حسب تاريخ الحجز
-          }
-        }
-        
-        // إذا لم يكن وقت الحجز متوفر، نرتب حسب تاريخ الحجز
-        final dateA = DateTime.tryParse(a['date'] ?? '');
-        final dateB = DateTime.tryParse(b['date'] ?? '');
-        
-        if (dateA == null && dateB == null) return 0;
-        if (dateA == null) return 1;
-        if (dateB == null) return -1;
-        
-        return dateB.compareTo(dateA); // الأحدث أولاً
-      });
-      
-      setState(() {
-        _allBookings = allBookings;
-        _currentPage = 0;
-        _hasMoreData = allBookings.length > _pageSize;
-        _isLoadingMore = false;
-        _isLoading = false; // انتهاء التحميل الأولي
-      });
-    } catch (e) {
-      print('Error loading bookings: $e');
-      setState(() {
-        _allBookings = [];
-        _currentPage = 0;
-        _hasMoreData = false;
-        _isLoading = false; // انتهاء التحميل الأولي حتى في حالة الخطأ
-      });
-    }
+    setState(() {
+      _allBookings = allBookings;
+      _currentPage = 0;
+      _hasMoreData = allBookings.length > _pageSize;
+      _isLoading = false;
+    });
+  } catch (e) {
+    print("Error fetching bookings: $e");
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
 
   Future<void> _fetchBookingsFromSpecialization(QueryDocumentSnapshot specDoc, List<Map<String, dynamic>> allBookings) async {
     try {
@@ -537,10 +513,10 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
         // إعادة تعيين الصفحة عند تغيير الفلتر
         _resetPagination();
       },
-      selectedColor: const Color(0xFF2FBDAF).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF2FBDAF),
+      selectedColor: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.2),
+      checkmarkColor: const Color.fromARGB(255, 156, 208, 235),
       labelStyle: TextStyle(
-        color: isSelected ? const Color(0xFF2FBDAF) : Colors.grey[600],
+        color: isSelected ? const Color.fromARGB(255, 156, 208, 235) : Colors.grey[600],
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
     );
@@ -563,7 +539,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
       } else if (bookingDay == today) {
         return Colors.green; // Today
       } else {
-        return const Color(0xFF2FBDAF); // Upcoming
+        return const Color.fromARGB(255, 156, 208, 235); // Upcoming
       }
     } catch (e) {
       return Colors.grey;
@@ -873,7 +849,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
 
         final booking = paginatedBookings[index];
                       final doctorName = booking['doctorName'] ?? 'طبيب غير معروف';
-                      final specialization = booking['specialization'] ?? 'تخصص غير معروف';
+                      final specialization = booking['specializationName'] ?? 'تخصص غير معروف';
                       final patientName = booking['patientName'] ?? 'مريض غير معروف';
                       final date = booking['date'] ?? '';
                       final time = booking['time'] ?? '';
@@ -913,7 +889,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
                                          Icon(
                                            Icons.person,
                                            size: 18,
-                                           color: const Color(0xFF2FBDAF),
+                                           color: const Color.fromARGB(255, 156, 208, 235),
                                          ),
                                          const SizedBox(width: 8),
                                          Expanded(
@@ -936,7 +912,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
                                          Icon(
                                            FontAwesomeIcons.userDoctor,
                                            size: 16,
-                                           color: const Color(0xFF2FBDAF),
+                                           color: const Color.fromARGB(255, 156, 208, 235),
                                          ),
                                          const SizedBox(width: 8),
                                          Expanded(
@@ -958,7 +934,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
                                          Icon(
                                            Icons.calendar_today,
                                            size: 16,
-                                           color: const Color(0xFF2FBDAF),
+                                           color: const Color.fromARGB(255, 156, 208, 235),
                                          ),
                                          const SizedBox(width: 8),
                                          Expanded(
@@ -1002,17 +978,17 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
                     Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                          color: const Color(0xFF2FBDAF).withOpacity(0.1),
+                          color: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: const Color(0xFF2FBDAF).withOpacity(0.3),
+                            color: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.3),
                         ),
                       ),
                       child: Text(
                           '$bookingNumber من ${_getTotalBookingsForDate()}',
                           style: const TextStyle(
                             fontSize: 9,
-                            color: Color(0xFF2FBDAF),
+                            color: Color.fromARGB(255, 156, 208, 235),
                             fontWeight: FontWeight.w500,
                           ),
                                   ),
@@ -1127,7 +1103,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
             ),
           ]),
           centerTitle: true,
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -1221,7 +1197,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CircularProgressIndicator(
-                            color: Color(0xFF2FBDAF),
+                            color: Color.fromARGB(255, 156, 208, 235),
                           ),
                           SizedBox(height: 16),
                           Text(

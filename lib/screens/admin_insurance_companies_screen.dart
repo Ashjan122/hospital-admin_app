@@ -291,7 +291,7 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
             ),
           ]),
           centerTitle: true,
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [

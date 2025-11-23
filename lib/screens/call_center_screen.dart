@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/admin_bookings_screen.dart';
 import 'package:hospital_admin_app/screens/admin_doctors_schedule_screen.dart';
 import 'package:hospital_admin_app/screens/callcenter_specialties_screen.dart';
+import 'package:hospital_admin_app/screens/price_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hospital_admin_app/screens/login_screen.dart';
 import 'package:hospital_admin_app/screens/today_samples_screen.dart';
@@ -118,7 +119,9 @@ class CallCenterScreen extends StatelessWidget {
               _buildHomeCard(icon: Icons.science, title: 'النتائج', onTap: (){
                 Navigator.push(context, MaterialPageRoute(builder: (context) => TodaySamplesScreen()));
               }),
-              _buildHomeCard(icon: Icons.price_change, title: 'قائمة الاسعار', onTap: (){}),
+              _buildHomeCard(icon: Icons.price_change, title: 'قائمة الاسعار', onTap: (){
+                Navigator.push(context, MaterialPageRoute(builder: (context) => PricesScreen(centerId: centerId)));
+              }),
             ]))
      );
   }

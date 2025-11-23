@@ -280,7 +280,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
         height: 80,
         child: CircularProgressIndicator(
           strokeWidth: 6,
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2FBDAF)),
+          valueColor: AlwaysStoppedAnimation<Color>(Color.fromARGB(255, 156, 208, 235)),
         ),
       ),
     );
@@ -401,7 +401,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2FBDAF),
+                      backgroundColor: Color.fromARGB(255, 156, 208, 235),
                       foregroundColor: Colors.white,
                     ),
                     child: _isCreatingBooking
@@ -570,10 +570,31 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
 
       final String computedPeriod = candidate.hour < 15 ? 'morning' : 'evening';
 
-      final appointmentRef = doctorRef.collection('appointments').doc();
+      // الحصول على اسم التخصص واسم الطبيب
+      final doctorData = doctorDoc.data();
+      final specializationData = specDoc.data();
+      final specializationName = (specializationData is Map<String, dynamic>)
+          ? (specializationData['specName'] as String? ?? specDoc.id)
+          : specDoc.id;
+      final doctorName = (doctorData is Map<String, dynamic>)
+          ? (doctorData['doctorName'] as String? ?? widget.doctorName)
+          : widget.doctorName;
+
+      // حفظ الحجز في كولكشن appointments داخل المركز مباشرة
+      final appointmentRef = FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('appointments')
+          .doc();
+      
       await appointmentRef.set({
         'patientName': name,
         'patientPhone': phone,
+        'facilityId': widget.centerId,
+        'centralSpecialtyId': specDoc.id,
+        'doctorId': widget.doctorId,
+        'doctorName': doctorName,
+        'specializationName': specializationName,
         'date': dateStr,
         'time': selectedTime,
         'period': computedPeriod,
@@ -665,12 +686,12 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: Theme.of(context).colorScheme.copyWith(
-                  primary: const Color(0xFF2FBDAF),
-                  secondary: const Color(0xFF2FBDAF),
+                  primary: Color.fromARGB(255, 156, 208, 235),
+                  secondary: Color.fromARGB(255, 156, 208, 235),
                 ),
             textButtonTheme: TextButtonThemeData(
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF2FBDAF),
+                foregroundColor: Color.fromARGB(255, 156, 208, 235),
               ),
             ),
           ),
@@ -695,49 +716,27 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
 
   Future<List<Map<String, dynamic>>> fetchDoctorBookings() async {
     try {
-      // البحث عن الطبيب في جميع التخصصات
-      final specializationsSnapshot = await FirebaseFirestore.instance
+      // جلب الحجوزات من كولكشن appointments داخل المركز مباشرة مع فلترة حسب doctorId
+      final appointmentsSnapshot = await FirebaseFirestore.instance
           .collection('medicalFacilities')
           .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+          .collection('appointments')
+          .where('doctorId', isEqualTo: widget.doctorId)
+          .get()
+          .timeout(const Duration(seconds: 10));
 
       List<Map<String, dynamic>> allBookings = [];
 
-      for (var specDoc in specializationsSnapshot.docs) {
-        final doctorDoc = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .get();
-
-        if (doctorDoc.exists) {
-          final specializationData = specDoc.data();
-          final specializationName = specializationData['specName'] ?? specDoc.id;
-
-          // جلب حجوزات الطبيب
-          final appointmentsSnapshot = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(widget.centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(widget.doctorId)
-              .collection('appointments')
-              .get();
-
-          for (var appointmentDoc in appointmentsSnapshot.docs) {
-            final appointmentData = appointmentDoc.data();
-            appointmentData['specialization'] = specializationName;
-            appointmentData['appointmentId'] = appointmentDoc.id;
-            appointmentData['specializationId'] = specDoc.id;
-            allBookings.add(appointmentData);
-          }
-          break; // وجدنا الطبيب، لا نحتاج للبحث في تخصصات أخرى
+      // إضافة الحجوزات إلى القائمة
+      for (var appointmentDoc in appointmentsSnapshot.docs) {
+        final appointmentData = Map<String, dynamic>.from(appointmentDoc.data());
+        appointmentData['appointmentId'] = appointmentDoc.id;
+        // إضافة اسم التخصص إذا كان متوفراً
+        final specializationName = appointmentData['specializationName'];
+        if (specializationName != null) {
+          appointmentData['specialization'] = specializationName;
         }
+        allBookings.add(appointmentData);
       }
 
       // ترتيب الحجوزات حسب وقت الحجز (آخر حجز يظهر أولاً)
@@ -890,7 +889,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
       } else if (bookingDay == today) {
         return Colors.green; // Today
       } else {
-        return const Color(0xFF2FBDAF); // Upcoming
+        return Color.fromARGB(255, 156, 208, 235); // Upcoming
       }
     } catch (e) {
       return Colors.grey;
@@ -1209,7 +1208,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -1309,7 +1308,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(
                         child: CircularProgressIndicator(
-                          color: Color(0xFF2FBDAF),
+                          color: Color.fromARGB(255, 156, 208, 235),
                         ),
                       );
                     }
@@ -1417,7 +1416,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
                                                     child: Scaffold(
                                                       appBar: AppBar(
                                                         title: Text(patientName),
-                                                        backgroundColor: const Color(0xFF2FBDAF),
+                                                        backgroundColor: Color.fromARGB(255, 156, 208, 235),
                                                         foregroundColor: Colors.white,
                                                         elevation: 0,
                                                       ),
@@ -1531,7 +1530,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
                                               Icon(
                                                 Icons.person,
                                                 size: 18,
-                                                color: const Color(0xFF2FBDAF),
+                                                color: Color.fromARGB(255, 156, 208, 235),
                                               ),
                                               const SizedBox(width: 8),
                                               Expanded(
@@ -1561,7 +1560,7 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
                                               Icon(
                                                 Icons.calendar_today,
                                                 size: 16,
-                                                color: const Color(0xFF2FBDAF),
+                                                color: Color.fromARGB(255, 156, 208, 235),
                                               ),
                                               const SizedBox(width: 8),
                                               Expanded(
@@ -1726,10 +1725,10 @@ class _DoctorBookingsScreenState extends State<DoctorBookingsScreen> {
           _selectedFilter = value;
         });
       },
-      selectedColor: const Color(0xFF2FBDAF).withOpacity(0.2),
-      checkmarkColor: const Color(0xFF2FBDAF),
+      selectedColor: Color.fromARGB(255, 156, 208, 235).withOpacity(0.2),
+      checkmarkColor: Color.fromARGB(255, 156, 208, 235),
       labelStyle: TextStyle(
-        color: isSelected ? const Color(0xFF2FBDAF) : Colors.grey[600],
+        color: isSelected ? Color.fromARGB(255, 156, 208, 235) : Colors.grey[600],
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
     );
@@ -1911,7 +1910,7 @@ class _MessageScreenState extends State<_MessageScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('رسالة للمريض'),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
         ),
         body: SafeArea(
@@ -1987,7 +1986,7 @@ class _MessageScreenState extends State<_MessageScreen> {
                         icon: const Icon(Icons.sms, color: Colors.white),
                         label: Text(_sendingSMS ? 'جاري الإرسال...' : 'رسالة نصية'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2FBDAF),
+                          backgroundColor: Color.fromARGB(255, 156, 208, 235),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -2048,7 +2047,7 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
           return Theme(
             data: Theme.of(context).copyWith(
               colorScheme: const ColorScheme.light(
-                primary: Color(0xFF2FBDAF),
+                primary: Color.fromARGB(255, 156, 208, 235),
                 onPrimary: Colors.white,
                 surface: Colors.white,
                 onSurface: Colors.black,
@@ -2177,7 +2176,7 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
       child: Scaffold(
         appBar: AppBar(
           title: Text('تحديد موعد - ${widget.patientName}'),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
         ),
         body: SafeArea(
@@ -2250,7 +2249,7 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
                 ElevatedButton(
                   onPressed: _saving ? null : _saveAppointment,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2FBDAF),
+                    backgroundColor: Color.fromARGB(255, 156, 208, 235),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -2386,7 +2385,7 @@ class _PatientNotesScreenState extends State<_PatientNotesScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text('ملاحظات - ${widget.patientName}'),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
         ),
         body: SafeArea(
@@ -2427,7 +2426,7 @@ class _PatientNotesScreenState extends State<_PatientNotesScreen> {
                   child: ElevatedButton(
                     onPressed: _saving ? null : _saveNote,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2FBDAF),
+                      backgroundColor: Color.fromARGB(255, 156, 208, 235),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -2536,7 +2535,7 @@ class _PatientDetailsScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: Text('تفاصيل المريض'),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
         ),
         body: SafeArea(
@@ -2711,7 +2710,7 @@ class _PatientDetailsScreen extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('تم نسخ الرقم: $phone'),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: Color.fromARGB(255, 156, 208, 235),
           action: SnackBarAction(
             label: 'إلغاء',
             textColor: Colors.white,
@@ -2879,7 +2878,7 @@ class _LabResultsScreenState extends State<_LabResultsScreen> {
       builder: (BuildContext context) {
         return const Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2FBDAF)),
+            valueColor: AlwaysStoppedAnimation<Color>(Color.fromARGB(255, 156, 208, 235)),
           ),
         );
       },
@@ -3078,7 +3077,7 @@ class _LabResultsScreenState extends State<_LabResultsScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -3106,7 +3105,7 @@ class _LabResultsScreenState extends State<_LabResultsScreen> {
                     : const Icon(Icons.search),
                   label: Text(_isLoading ? 'جاري البحث...' : 'الاستعلام عن النتيجة'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2FBDAF),
+                    backgroundColor: Color.fromARGB(255, 156, 208, 235),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -3121,7 +3120,7 @@ class _LabResultsScreenState extends State<_LabResultsScreen> {
                   child: _isLoading
                     ? const Center(
                         child: CircularProgressIndicator(
-                          color: Color(0xFF2FBDAF),
+                          color: Color.fromARGB(255, 156, 208, 235),
                         ),
                       )
                     : _errorMessage != null
@@ -3208,7 +3207,7 @@ class _LabResultsScreenState extends State<_LabResultsScreen> {
                                       _viewResults(patient);
                                     },
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2FBDAF),
+                                      backgroundColor: Color.fromARGB(255, 156, 208, 235),
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       shape: RoundedRectangleBorder(

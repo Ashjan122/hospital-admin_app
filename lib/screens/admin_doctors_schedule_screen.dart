@@ -285,7 +285,7 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
             ),
           ]),
           centerTitle: true,
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -353,7 +353,7 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF2FBDAF),
+                        color: Color.fromARGB(255, 156, 208, 235),
                       ),
                     );
                   }
@@ -457,7 +457,7 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
           child: DataTable(
         headingTextStyle: const TextStyle(
           fontWeight: FontWeight.bold,
-          color: Color(0xFF2FBDAF),
+          color: Color.fromARGB(255, 156, 208, 235),
           fontSize: 12,
         ),
         dataTextStyle: const TextStyle(fontSize: 10),
@@ -498,13 +498,13 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
                         child: Container(
                           padding: const EdgeInsets.all(2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2FBDAF).withOpacity(0.1),
+                            color: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Icon(
                             Icons.picture_as_pdf,
                             size: 12,
-                            color: Color(0xFF2FBDAF),
+                            color: Color.fromARGB(255, 156, 208, 235),
                           ),
                         ),
                       ),
@@ -525,7 +525,7 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
                      style: const TextStyle(
                        fontWeight: FontWeight.bold,
                        fontSize: 12,
-                       color: Color(0xFF2FBDAF),
+                       color: Color.fromARGB(255, 156, 208, 235),
                      ),
                    ),
                 ),
@@ -560,8 +560,8 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
 
                   if (periods.isNotEmpty) {
                     scheduleText = periods.join('\n');
-                    cellColor = const Color(0xFF2FBDAF).withOpacity(0.1);
-                    textColor = const Color(0xFF2FBDAF);
+                    cellColor = const Color.fromARGB(255, 156, 208, 235).withOpacity(0.1);
+                    textColor = const Color.fromARGB(255, 156, 208, 235);
                   }
                 }
 
@@ -804,7 +804,7 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2FBDAF),
+                backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                 foregroundColor: Colors.white,
               ),
               child: isSaving
@@ -883,7 +883,7 @@ class _AdminDoctorsScheduleScreenState extends State<AdminDoctorsScheduleScreen>
         barrierDismissible: false,
         builder: (context) => const Center(
           child: CircularProgressIndicator(
-            color: Color(0xFF2FBDAF),
+            color: Color.fromARGB(255, 156, 208, 235),
           ),
         ),
       );

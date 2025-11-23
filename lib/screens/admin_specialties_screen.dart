@@ -188,6 +188,63 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
     }
   }
 
+  Future<void> _onReorderSpecialties(List<Map<String, dynamic>> specialties, int oldIndex, int newIndex) async {
+    if (oldIndex == newIndex) return;
+    
+    try {
+      // إعادة ترقيم order للجميع
+      final batch = FirebaseFirestore.instance.batch();
+      final centerRef = FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations');
+      
+      for (int i = 0; i < specialties.length; i++) {
+        final specialty = specialties[i];
+        final docRef = centerRef.doc(specialty['id'] as String);
+        batch.update(docRef, {'order': i + 1});
+      }
+      
+      await batch.commit();
+      
+      // تحديث الحالة المحلية - تحديث order لكل تخصص
+      setState(() {
+        for (int i = 0; i < specialties.length; i++) {
+          final specialtyId = specialties[i]['id'] as String;
+          final index = _centerSpecialties.indexWhere((s) => s['id'] == specialtyId);
+          if (index != -1) {
+            _centerSpecialties[index]['order'] = i + 1;
+          }
+        }
+        // إعادة ترتيب القائمة حسب order
+        _centerSpecialties.sort((a, b) {
+          final ao = (a['order'] as int?) ?? 999;
+          final bo = (b['order'] as int?) ?? 999;
+          if (ao != bo) return ao.compareTo(bo);
+          return (a['name'] as String).toLowerCase().compareTo((b['name'] as String).toLowerCase());
+        });
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم تحديث ترتيب التخصصات بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في تحديث الترتيب: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _editSpecialtyOrder(String specialtyId, int currentOrder) async {
     final TextEditingController orderController = TextEditingController(text: currentOrder > 0 ? '$currentOrder' : '');
     final formKey = GlobalKey<FormState>();
@@ -550,7 +607,7 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
             ),
           ]),
           centerTitle: true,
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -627,19 +684,34 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                             ],
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filteredCenterSpecialties.length,
-                          itemBuilder: (context, index) {
-                            final specialty = filteredCenterSpecialties[index];
-                            final isActive = specialty['isActive'] ?? true;
-                            final specialtyId = specialty['id'] as String;
+                      : StatefulBuilder(
+                          builder: (context, setStateLocal) {
+                            List<Map<String, dynamic>> localSpecialties = List.from(filteredCenterSpecialties);
 
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ExpansionTile(
+                            return ReorderableListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: localSpecialties.length,
+                              onReorder: (oldIndex, newIndex) {
+                                if (newIndex > oldIndex) {
+                                  newIndex -= 1;
+                                }
+                                setStateLocal(() {
+                                  final item = localSpecialties.removeAt(oldIndex);
+                                  localSpecialties.insert(newIndex, item);
+                                });
+                                _onReorderSpecialties(localSpecialties, oldIndex, newIndex);
+                              },
+                              itemBuilder: (context, index) {
+                                final specialty = localSpecialties[index];
+                                final isActive = specialty['isActive'] ?? true;
+                                final specialtyId = specialty['id'] as String;
+
+                                return Card(
+                                  key: ValueKey(specialtyId),
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ExpansionTile(
                                 leading: Text(
-                                  '${index + 1}',
+                                  '${(specialty['order'] as int?) ?? 999}',
                                   style: const TextStyle(
                                     color: Colors.black,
                                     fontWeight: FontWeight.bold,
@@ -648,6 +720,8 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                                 ),
                                 title: Text(
                                   specialty['name'],
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: isActive ? Colors.black : Colors.grey,
@@ -771,6 +845,8 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
                                   ),
                                 ],
                               ),
+                            );
+                              },
                             );
                           },
                         ),

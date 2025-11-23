@@ -237,7 +237,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2FBDAF),
+                  backgroundColor: Color.fromARGB(255, 156, 208, 235),
                   foregroundColor: Colors.white,
                 ),
                 child: const Text('إضافة'),
@@ -272,7 +272,7 @@ Widget build(BuildContext context) {
           ),
         ),
         ]),
-        backgroundColor: const Color(0xFF2FBDAF),
+        backgroundColor: const Color.fromARGB(255, 156, 208, 235),
         centerTitle: true,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -319,7 +319,7 @@ Widget build(BuildContext context) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF2FBDAF),
+                        color: Color.fromARGB(255, 156, 208, 235),
                       ),
                     );
                   }

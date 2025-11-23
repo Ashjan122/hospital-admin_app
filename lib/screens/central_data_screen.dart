@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/central_specialties_screen.dart';
 import 'package:hospital_admin_app/screens/central_doctors_screen.dart';
 import 'package:hospital_admin_app/screens/central_insurance_screen.dart';
+import 'package:hospital_admin_app/screens/medical_centers_screen.dart';
 
 class CentralDataScreen extends StatelessWidget {
   const CentralDataScreen({super.key});
@@ -81,7 +82,12 @@ class CentralDataScreen extends StatelessWidget {
                 icon: Icons.business,
                 title: 'المراكز الطبية',
                 onTap: () {
-                  Navigator.pop(context, 'centers');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MedicalCentersScreen(),
+                    ),
+                  );
                 },
               ),
               _buildHomeCard(

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hospital_admin_app/screens/medical_centers_screen.dart';
+import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hospital_admin_app/services/presence_service.dart';
 import 'package:hospital_admin_app/screens/login_screen.dart';
@@ -60,7 +62,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     print('Dashboard build - fromControlPanel: ${widget.fromControlPanel}');
-    return Scaffold(
+    return WillPopScope(
+  onWillPop: () async {
+    if (widget.fromControlPanel) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userType', 'control');
+      await prefs.setBool('isLoggedIn', true);
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const MedicalCentersScreen()),
+        (route) => false,
+      );
+      return false; // منع الخروج من التطبيق
+    }
+
+    return true; // يسمح بالخروج في الحالات العادية
+  },
+  child:  Scaffold(
       appBar: AppBar(
         title: Center(
           child: Column(
@@ -84,75 +102,127 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-        backgroundColor: const Color(0xFF2FBDAF),
+        backgroundColor: Color.fromARGB(255, 156, 208, 235),
         foregroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false, // تعطيل الزر التلقائي
-        leading: widget.fromControlPanel
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () async {
-                  print('زر الرجوع تم الضغط عليه');
-                  try {
-                    // إعادة تعيين userType إلى control
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setString('userType', 'control');
-                    await prefs.setBool('isLoggedIn', true);
-                    // لا نحذف fromControlPanel، نتركه محفوظاً
-                    print('تم تعيين userType إلى control');
-                    
-                    // العودة إلى الكنترول مع إزالة جميع الشاشات السابقة
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(
-                        builder: (context) => const ControlPanelScreen(),
-                      ),
-                      (route) => false,
-                    );
-                    print('تم التنقل إلى الكنترول');
-                  } catch (e) {
-                    print('خطأ في التنقل: $e');
-                  }
-                },
-                tooltip: 'رجوع إلى صفحة الكنترول',
-              )
-            : IconButton(
-                icon: const Icon(Icons.info_outline),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (context) => const AboutScreen()),
-                  );
-                },
-                tooltip: 'حول التطبيق',
-              ),
+       leading: widget.fromControlPanel
+    ? IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('userType', 'control');
+          await prefs.setBool('isLoggedIn', true);
+
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const MedicalCentersScreen()),
+            (route) => false,
+          );
+        },
+        tooltip: 'رجوع إلى صفحة الكنترول',
+      )
+    : const SizedBox(),
+
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              // إذا جاء من تسجيل الدخول العادي، امسح البيانات واذهب لصفحة تسجيل الدخول
-              final prefs = await SharedPreferences.getInstance();
-              final savedUserId = prefs.getString('userId') ?? '';
-              await PresenceService.setOffline(userId: savedUserId);
-              await prefs.clear();
-              
-              if (context.mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            },
-            tooltip: 'تسجيل الخروج',
-          ),
-        ],
+  Builder(
+    builder: (context) => IconButton(
+      icon: const Icon(Icons.menu),
+      onPressed: () {
+        Scaffold.of(context).openEndDrawer(); // فتح الدروار
+      },
+    ),
+  ),
+],
+
       ),
+      endDrawer: Drawer(
+  child: SafeArea(
+    child: Column(
+      children: [
+        // الجزء العلوي الملون
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          color: const Color.fromARGB(255, 156, 208, 235),
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.white,
+                child: Icon(
+                  Icons.person,
+                  size: 50,
+                  color: Color.fromARGB(255, 156, 208, 235),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                currentUserName ?? "مستخدم",
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        
+
+        const Divider(),
+        ListTile(
+  leading: const Icon(Icons.info, color: Colors.blueGrey),
+  title: const Text(
+    "حول التطبيق",
+    style: TextStyle(color: Colors.black),
+  ),
+  onTap: () {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const AboutScreen()),
+    );
+  },
+),
+
+
+        const Spacer(),
+
+        ListTile(
+          leading: const Icon(Icons.logout, color: Colors.blueGrey),
+          title: const Text(
+            "تسجيل الخروج",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+          onTap: () async {
+            final prefs = await SharedPreferences.getInstance();
+            final savedUserId = prefs.getString('userId') ?? '';
+            await PresenceService.setOffline(userId: savedUserId);
+            await prefs.clear();
+
+            if (context.mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            }
+          },
+        ),
+
+        const SizedBox(height: 24),
+      ],
+    ),
+  ),
+),
+
+      
       body: Container(
   decoration: BoxDecoration(
     gradient: LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
       colors: [
-        const Color(0xFF2FBDAF).withOpacity(0.25), // لون التطبيق بخفة
-        Colors.grey[200]!, // الرمادي الفاتح
+         Color.fromARGB(255, 156, 208, 235).withOpacity(0.25),
+        Colors.grey[200]!, 
       ],
     ),
   ),
@@ -170,145 +240,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: GridView.count(
                     crossAxisCount: 1,
-                    childAspectRatio: 4.5,
+                    childAspectRatio: 5,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
                     children: [
                       _buildDashboardCard(
                         context,
-                        'الأطباء',
-                        Icons.medical_services,
-                        const Color(0xFF2FBDAF),
-                        () {
-                          if (displayCenterId != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AdminDoctorsScreen(
-                                  centerId: displayCenterId!,
-                                  centerName: displayCenterName ?? 'مركز طبي',
-                                ),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                      _buildDashboardCard(
-                        context,
-                        'التخصصات',
-                        Icons.medical_services,
-                        const Color(0xFF2FBDAF),
-                        () {
-                          if (displayCenterId != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AdminSpecialtiesScreen(
-                                  centerId: displayCenterId!,
-                                  centerName: displayCenterName ?? 'مركز طبي',
-                                ),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                      _buildDashboardCard(
-                        context,
-                        'شركات التأمين',
-                        Icons.security,
-                        const Color(0xFF2FBDAF),
-                        () {
-                          if (displayCenterId != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AdminInsuranceCompaniesScreen(
-                                  centerId: displayCenterId!,
-                                  centerName: displayCenterName ?? 'مركز طبي',
-                                ),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                      _buildDashboardCard(
-                        context,
-                        'جدول الأطباء',
-                        Icons.schedule,
-                        const Color(0xFF2FBDAF),
-                        () {
-                          if (displayCenterId != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AdminDoctorsScheduleScreen(
-                                  centerId: displayCenterId!,
-                                  centerName: displayCenterName ?? 'مركز طبي',
-                                ),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                      _buildDashboardCard(
-                        context,
-                        'المستخدمين',
-                        Icons.people,
-                        const Color(0xFF2FBDAF),
-                        () {
-                          if (displayCenterId != null) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AdminUsersScreen(
-                                  centerId: displayCenterId!,
-                                  centerName: displayCenterName ?? 'مركز طبي',
-                                ),
-                              ),
-                            );
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                      _buildDashboardCard(
-                        context,
                         'الحجوزات',
-                        Icons.calendar_today,
-                        const Color(0xFF2FBDAF),
+                        'assets/lottie/Calendar Event.json',
+                        40,
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -324,7 +264,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Colors.blueGrey,
                               ),
                             );
                           }
@@ -332,9 +272,141 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       _buildDashboardCard(
                         context,
+                        'الأطباء',
+                        'assets/lottie/doctors.json',
+                        40,
+                        () {
+                          if (displayCenterId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AdminDoctorsScreen(
+                                  centerId: displayCenterId!,
+                                  centerName: displayCenterName ?? 'مركز طبي',
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('يرجى تسجيل الدخول أولاً'),
+                                backgroundColor: Colors.blueGrey,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                       _buildDashboardCard(
+                        context,
+                        'جدول الأطباء',
+                        'assets/lottie/take an appointment.json',
+                        40,
+                        () {
+                          if (displayCenterId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AdminDoctorsScheduleScreen(
+                                  centerId: displayCenterId!,
+                                  centerName: displayCenterName ?? 'مركز طبي',
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('يرجى تسجيل الدخول أولاً'),
+                                backgroundColor: Colors.blueGrey,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      _buildDashboardCard(
+                        context,
+                        'التخصصات',
+                        'assets/lottie/document.json',
+                        40,
+                        () {
+                          if (displayCenterId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AdminSpecialtiesScreen(
+                                  centerId: displayCenterId!,
+                                  centerName: displayCenterName ?? 'مركز طبي',
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('يرجى تسجيل الدخول أولاً'),
+                                backgroundColor: Colors.blueGrey,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      _buildDashboardCard(
+                        context,
+                        'شركات التأمين',
+                        'assets/lottie/Insurance Protection.json',
+                        40,
+                        () {
+                          if (displayCenterId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AdminInsuranceCompaniesScreen(
+                                  centerId: displayCenterId!,
+                                  centerName: displayCenterName ?? 'مركز طبي',
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('يرجى تسجيل الدخول أولاً'),
+                                backgroundColor: Colors.blueGrey,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                     
+                      _buildDashboardCard(
+                        context,
+                        'المستخدمين',
+                        'assets/lottie/Connect.json',
+                        40,
+                        () {
+                          if (displayCenterId != null) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AdminUsersScreen(
+                                  centerId: displayCenterId!,
+                                  centerName: displayCenterName ?? 'مركز طبي',
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('يرجى تسجيل الدخول أولاً'),
+                                backgroundColor: Colors.blueGrey,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                      
+                      _buildDashboardCard(
+                        context,
                         'التقارير',
-                        Icons.analytics,
-                        const Color(0xFF2FBDAF),
+                       'assets/lottie/Financial Reports.json',
+                        40,
                         () {
                           if (displayCenterId != null) {
                             Navigator.push(
@@ -350,7 +422,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('يرجى تسجيل الدخول أولاً'),
-                                backgroundColor: Color(0xFF2FBDAF),
+                                backgroundColor: Colors.blueGrey,
                               ),
                             );
                           }
@@ -370,8 +442,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         _buildDashboardCard(
                           context,
                           'نتيجة المختبر',
-                          Icons.science,
-                          const Color(0xFF2FBDAF),
+                          'assets/lottie/Erlenmeyer flask.json',
+                          40,
                           () {
                             if (displayCenterId != null) {
                               Navigator.push(
@@ -387,7 +459,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('يرجى تسجيل الدخول أولاً'),
-                                  backgroundColor: Color(0xFF2FBDAF),
+                                  backgroundColor: Colors.blueGrey,
                                 ),
                               );
                             }
@@ -400,63 +472,68 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
-      ),
+      ),),
     );
   }
 
   Widget _buildDashboardCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child:Container(
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-
-      
-      border: null,
-
-      
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.08),
-          blurRadius: 12,
-          spreadRadius: 2,
-          offset: const Offset(0, 4),
-        ),
-      ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-               
-              
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    softWrap: true,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      
-                      color: Colors.black,
-                    ),
-                  ),
-                
-              
-              Icon(icon, size: 25, color: const Color(0xFF2FBDAF)),
-            ],
+  BuildContext context,
+  String title,
+  String lottieAsset,   // ← بدل Icon
+  double lottieSize,
+  VoidCallback onTap,
+) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            spreadRadius: 2,
+            offset: const Offset(0, 4),
           ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+
+            // النص
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+                textAlign: TextAlign.start,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+
+            // لوتي
+            Container(
+              height: lottieSize,
+              width: lottieSize,
+              alignment: Alignment.center,
+              child: Lottie.asset(
+                lottieAsset,
+                fit: BoxFit.contain,
+                repeat: true,
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

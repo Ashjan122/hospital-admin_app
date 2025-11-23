@@ -105,25 +105,32 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
     });
 
     try {
-      // جلب التخصصات الموجودة في المركز
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+      // جلب البيانات بشكل متوازي لتسريع التحميل
+      final results = await Future.wait([
+        // جلب التخصصات
+        FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .get()
+            .timeout(const Duration(seconds: 5)),
+        // جلب جميع الأطباء من قاعدة البيانات المركزية
+        CentralDataService.getAllDoctors(),
+        // جمع معرفات الأطباء المضافين مسبقاً في المركز
+        _collectExistingCenterDoctorIds(widget.centerId),
+      ]);
+
+      final specializationsSnapshot = results[0] as QuerySnapshot;
+      final allDoctors = results[1] as List<Map<String, dynamic>>;
+      final existingDoctorIds = results[2] as Set<String>;
 
       final specializations = specializationsSnapshot.docs.map((doc) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>?;
         return {
           'id': doc.id,
-          'name': data['specName'] ?? doc.id,
+          'name': data?['specName'] ?? doc.id,
         };
       }).toList();
-
-      // جلب جميع الأطباء من قاعدة البيانات المركزية
-      final allDoctors = await CentralDataService.getAllDoctors();
-      // جمع معرفات الأطباء المضافين مسبقاً في المركز (كل التخصصات)
-      final existingDoctorIds = await _collectExistingCenterDoctorIds(widget.centerId);
 
       setState(() {
         _specializations = specializations;
@@ -133,7 +140,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
         _isLoadingData = false;
       });
     } catch (e) {
-      // Error loading data
+      print('خطأ في تحميل البيانات: $e');
       setState(() {
         _isLoadingData = false;
       });
@@ -150,22 +157,34 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
           .collection('medicalFacilities')
           .doc(centerId)
           .collection('specializations')
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 5));
+      
+      // جلب الأطباء من جميع التخصصات بشكل متوازي
+      final List<Future<void>> futures = [];
+      
       for (final spec in specsSnap.docs) {
-        final docsSnap = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(centerId)
-            .collection('specializations')
-            .doc(spec.id)
-            .collection('doctors')
-            .get();
-        for (final d in docsSnap.docs) {
-          ids.add(d.id);
-        }
+        futures.add(
+          FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(centerId)
+              .collection('specializations')
+              .doc(spec.id)
+              .collection('doctors')
+              .get()
+              .timeout(const Duration(seconds: 5))
+              .then((docsSnap) {
+                for (final d in docsSnap.docs) {
+                  ids.add(d.id);
+                }
+              }),
+        );
       }
+      
+      await Future.wait(futures);
       return ids;
     } catch (e) {
-      // Error collecting existing center doctor IDs
+      print('خطأ في جمع معرفات الأطباء: $e');
       return {};
     }
   }
@@ -414,7 +433,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
         ),
@@ -438,7 +457,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xFF2FBDAF),
+                              color: const Color.fromARGB(255, 156, 208, 235),
                               width: 3,
                             ),
                           ),
@@ -470,7 +489,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
                         icon: const Icon(Icons.camera_alt),
                         label: const Text('تغيير الصورة'),
                         style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF2FBDAF),
+                          foregroundColor: const Color.fromARGB(255, 156, 208, 235),
                         ),
                       ),
                     ],
@@ -590,7 +609,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _addDoctor,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2FBDAF),
+                            backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(

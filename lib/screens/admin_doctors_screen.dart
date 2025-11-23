@@ -336,7 +336,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
             ),
           ]),
           centerTitle: true,
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -414,7 +414,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(
-              color: Color(0xFF2FBDAF),
+              color: Color.fromARGB(255, 156, 208, 235),
             ),
             SizedBox(height: 16),
             Text(
@@ -467,7 +467,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
               icon: const Icon(Icons.refresh),
               label: const Text('إعادة المحاولة'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2FBDAF),
+                backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                 foregroundColor: Colors.white,
               ),
             ),
@@ -605,14 +605,14 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2FBDAF).withAlpha(26),
+                    color: const Color.fromARGB(255, 156, 208, 235).withAlpha(26),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     specialization,
                     style: TextStyle(
                       fontSize: 12,
-                      color: const Color(0xFF2FBDAF),
+                      color: const Color.fromARGB(255, 156, 208, 235),
                       fontWeight: FontWeight.w600,
                     ),
                   ),

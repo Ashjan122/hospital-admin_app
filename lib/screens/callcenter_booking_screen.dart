@@ -110,21 +110,21 @@ class _BookingScreenState extends State<BookingScreen> {
       
       if (_hasScheduleOn(day)) {
         final dayName = intl.DateFormat('EEEE', 'ar').format(day).trim();
-        final schedule = widget.workingSchedule[dayName] as Map<String, dynamic>?;
+      final schedule = widget.workingSchedule[dayName] as Map<String, dynamic>?;
 
-        bool hasValidPeriod = false;
+      bool hasValidPeriod = false;
 
-        final morning = schedule?['morning'] as Map<String, dynamic>?;
-        if (morning != null && morning.isNotEmpty) {
-          hasValidPeriod = true;
-        }
+      final morning = schedule?['morning'] as Map<String, dynamic>?;
+      if (morning != null && morning.isNotEmpty) {
+        hasValidPeriod = true;
+      }
 
-        final evening = schedule?['evening'] as Map<String, dynamic>?;
-        if (evening != null && evening.isNotEmpty) {
-          hasValidPeriod = true;
-        }
+      final evening = schedule?['evening'] as Map<String, dynamic>?;
+      if (evening != null && evening.isNotEmpty) {
+        hasValidPeriod = true;
+      }
 
-        if (hasValidPeriod) {
+      if (hasValidPeriod) {
           allowed.add(dayStr);
         }
       }
@@ -952,8 +952,8 @@ class _BookingScreenState extends State<BookingScreen> {
                         return Icon(
   FontAwesomeIcons.whatsapp,
   color: Colors.green,
-  size: 24,
-);
+                          size: 24,
+                        );
                       },
                     ),
                     SizedBox(height: 2),

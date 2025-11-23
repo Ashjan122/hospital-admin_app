@@ -478,7 +478,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
             ),
           ]),
           centerTitle: true,
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -495,7 +495,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                      mainAxisAlignment: MainAxisAlignment.center,
                      children: [
                        const CircularProgressIndicator(
-                         color: Color(0xFF2FBDAF),
+                         color: Color.fromARGB(255, 156, 208, 235),
                        ),
                        const SizedBox(height: 16),
                        Text(
@@ -540,7 +540,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                              icon: const Icon(Icons.refresh),
                              label: const Text('إعادة المحاولة'),
                              style: ElevatedButton.styleFrom(
-                               backgroundColor: const Color(0xFF2FBDAF),
+                               backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                                foregroundColor: Colors.white,
                              ),
                            ),
@@ -732,7 +732,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                                style: TextStyle(
                                  fontSize: 16,
                                  fontWeight: FontWeight.bold,
-                                 color: Color(0xFF2FBDAF),
+                                 color: Color.fromARGB(255, 156, 208, 235),
                                ),
                              ),
                              const SizedBox(height: 12),
@@ -854,7 +854,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                               style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF2FBDAF),
+                                color: Color.fromARGB(255, 156, 208, 235),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -916,7 +916,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2FBDAF).withOpacity(0.1),
+                          color: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.1),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: const Color(0xFF2FBDAF).withOpacity(0.3)),
                         ),
@@ -928,7 +928,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF2FBDAF),
+                                color: Color.fromARGB(255, 156, 208, 235),
                               ),
                             ),
                             const SizedBox(height: 12),

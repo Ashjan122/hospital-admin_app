@@ -91,7 +91,7 @@ class CentralDataService {
     required String insuranceId,
     required String name,
     required String description,
-    String? phone,
+    String? phone, String? imageUrl,
   }) async {
     try {
       final query = await _firestore

@@ -301,12 +301,12 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(_nameController.text.isNotEmpty ? _nameController.text : 'ملف المستخدم'),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           foregroundColor: Colors.white,
         ),
         body: _loading
             ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF2FBDAF)),
+                child: CircularProgressIndicator(color: Color.fromARGB(255, 156, 208, 235)),
               )
             : SafeArea(
                 child: SingleChildScrollView(
@@ -349,7 +349,7 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
                               right: 0,
                               child: Container(
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFF2FBDAF),
+                                  color: Color.fromARGB(255, 156, 208, 235),
                                   shape: BoxShape.circle,
                                 ),
                                 child: IconButton(
@@ -364,7 +364,7 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
                       ),
                       const SizedBox(height: 12),
                       if (_uploadingImage)
-                        const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2FBDAF))),
+                        const Center(child: CircularProgressIndicator(strokeWidth: 2, color: Color.fromARGB(255, 156, 208, 235))),
                       const SizedBox(height: 16),
                       const SizedBox(height: 16),
                       TextField(
@@ -521,7 +521,7 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
                                               ),
                                               subtitle: Text(doctor['specialization'] as String),
                                               selected: isSelected,
-                                              selectedTileColor: const Color(0xFF2FBDAF).withOpacity(0.1),
+                                              selectedTileColor: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.1),
                                                                                              onTap: () {
                                                  setState(() {
                                                    _currentDoctorId = doctor['doctorId'] as String;
@@ -554,7 +554,7 @@ class _AdminUserProfileScreenState extends State<AdminUserProfileScreen> {
                               : const Icon(Icons.save),
                           label: const Text('حفظ التغييرات'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2FBDAF),
+                            backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                             foregroundColor: Colors.white,
                           ),
                         ),
