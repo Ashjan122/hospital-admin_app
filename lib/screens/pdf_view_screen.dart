@@ -62,11 +62,11 @@ class _PdfViewScreenState extends State<PdfViewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('نتيجة التحاليل',style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),),
-        backgroundColor: const Color(0xFF2FBDAF),
+        backgroundColor: const Color.fromARGB(255, 156, 208, 235),
         centerTitle: true,
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2FBDAF)))
+          ? const Center(child: CircularProgressIndicator(color: Color.fromARGB(255, 156, 208, 235)))
           : error != null
               ? Center(child: Text('فشل تحميل الملف:\n$error'))
               : SfPdfViewer.file(localPdf!),

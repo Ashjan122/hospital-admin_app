@@ -35,7 +35,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
   bool isLoading = true;
 
   final Color _color1 = const Color.fromARGB(255, 215, 213, 219);
-  final Color _color2 = const Color(0xFF2FBDAF);
+  final Color _color2 = const Color.fromARGB(255, 156, 208, 235);
 
   @override
   void initState() {
@@ -508,7 +508,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                     enabled: !isSending,
                     decoration: const InputDecoration(
                       labelText: 'رقم الهاتف',
-                      prefixIcon: Icon(Icons.phone, color: Color(0xFF0A7179)),
+                      prefixIcon: Icon(Icons.phone, color: Color.fromARGB(255, 156, 208, 235)),
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -535,10 +535,8 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                         style: const TextStyle(color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2FBDAF),
-                        disabledBackgroundColor: const Color(
-                          0xFF0A7179,
-                        ).withOpacity(0.6),
+                        backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+                        disabledBackgroundColor: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.6),
                       ),
                       onPressed:
                           isSending
@@ -624,7 +622,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
             style: TextStyle(color: Colors.white),
           ),
           centerTitle: true,
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           actions: [
             IconButton(
               icon: const FaIcon(
@@ -644,9 +642,9 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                 end: Alignment.bottomCenter,
                 colors: [
                   _color1,
-                 Color(0xFF2FBDAF).withOpacity(0.2),
-                  Color(0xFF2FBDAF).withOpacity(0.4),
-                  Color(0xFF2FBDAF).withOpacity(0.6),
+                 Color.fromARGB(255, 156, 208, 235).withOpacity(0.2),
+                  Color.fromARGB(255, 156, 208, 235).withOpacity(0.4),
+                  Color.fromARGB(255, 156, 208, 235).withOpacity(0.6),
                 ],
               ),
             ),
@@ -654,7 +652,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                 isLoading
                     ? const Center(
                       child: CircularProgressIndicator(
-                        color: Color(0xFF0A7179),
+                        color: Color.fromARGB(255, 156, 208, 235),
                       ),
                     )
                     : Column(
@@ -671,7 +669,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: const BorderSide(
-                                    color: Color(0xFF2FBDAF),
+                                    color: Color.fromARGB(255, 156, 208, 235),
                                   ),
                                 ),
                                 child: Padding(
@@ -688,7 +686,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                         style: const TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF2FBDAF),
+                                          color: Color.fromARGB(255, 156, 208, 235),
                                         ),
                                       ),
                                       const SizedBox(height: 10),
@@ -718,7 +716,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         side: const BorderSide(
-                                          color: Color(0xFF2FBDAF),
+                                          color: Color.fromARGB(255, 156, 208, 235),
                                         ),
                                       ),
                                       child: ListView.builder(
@@ -761,7 +759,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                             fontSize: 16,
                                                             color:
                                                                 checked[i]
-                                                                    ? Color(0xFF2FBDAF)
+                                                                    ? Color.fromARGB(255, 156, 208, 235)
                                                                     : Colors.black,
                                                             fontWeight:
                                                                 checked[i]
@@ -774,7 +772,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                       ),
                                                       Checkbox(
                                                         value: checked[i],
-                                                        activeColor: const Color(0xFF2FBDAF),
+                                                        activeColor: const Color.fromARGB(255, 156, 208, 235),
                                                         onChanged:
                                                             (val) => setState(
                                                               () =>
@@ -789,7 +787,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                   const Divider(
                                                     height: 1,
                                                     thickness: 1,
-                                                    color: Color(0xFF2FBDAF),
+                                                    color: Color.fromARGB(255, 156, 208, 235),
                                                   ),
                                               ],
                                             ),
@@ -848,7 +846,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                       ),
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2FBDAF),
+                                      backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 14,
                                       ),

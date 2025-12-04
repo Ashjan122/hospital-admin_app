@@ -18,7 +18,7 @@ class _PricesScreenState extends State<PricesScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   final Color _color1 = const Color.fromARGB(255, 215, 213, 219);
-  final Color _color2 = const Color(0xFF2FBDAF);
+  final Color _color2 = const Color.fromARGB(255, 156, 208, 235);
 
   @override
   void initState() {
@@ -192,7 +192,7 @@ class _PricesScreenState extends State<PricesScreen> {
             'قائمة الأسعار',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           centerTitle: true,
         ),
         body:  Column(

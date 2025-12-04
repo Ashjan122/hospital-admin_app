@@ -825,8 +825,8 @@ class _BookingScreenState extends State<BookingScreen> {
               );
             },
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: const Color(0xFF2FBDAF), width: 2),
-              foregroundColor: const Color(0xFF2FBDAF),
+              side: BorderSide(color: const Color.fromARGB(255, 156, 208, 235), width: 2),
+              foregroundColor: const Color.fromARGB(255, 156, 208, 235),
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -913,7 +913,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         widget.name,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2FBDAF),
+                          color: const Color.fromARGB(255, 156, 208, 235),
                           fontSize: 20,
                         ),
                       ),
@@ -932,7 +932,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     "اختيار الموعد",
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFF2FBDAF),
+                      color: const Color.fromARGB(255, 156, 208, 235),
                       fontSize: 30,
                     ),
                   ),
@@ -961,7 +961,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       'مشاركة الجدول',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Color(0xFF2FBDAF),
+                        color: Color.fromARGB(255, 156, 208, 235),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1082,7 +1082,7 @@ class _BookingScreenState extends State<BookingScreen> {
                                   icon: const Icon(Icons.arrow_back),
                                   label: const Text('العودة لاختيار طبيب آخر'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF2FBDAF),
+                                    backgroundColor: const Color.fromARGB(255, 156, 208, 235),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 24,

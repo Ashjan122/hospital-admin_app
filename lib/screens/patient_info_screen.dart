@@ -454,7 +454,7 @@ await FirebaseFirestore.instance
               Navigator.of(context).pop(); // العودة للشاشة السابقة
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2FBDAF),
+              backgroundColor: const Color.fromARGB(255, 156, 208, 235),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
@@ -527,7 +527,7 @@ await FirebaseFirestore.instance
             widget.isReschedule ? "تأجيل الحجز" : "إدخال البيانات",
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF2FBDAF),
+              color: const Color.fromARGB(255, 156, 208, 235),
               fontSize: 30,
             ),
           ),
@@ -545,11 +545,11 @@ await FirebaseFirestore.instance
                             labelText: 'الاسم *',
                             hintText: 'أدخل الاسم (اسمين على الأقل)',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.person, color: const Color(0xFF2FBDAF)),
+                            prefixIcon: Icon(Icons.person, color: const Color.fromARGB(255, 156, 208, 235)),
                             focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: const Color(0xFF2FBDAF), width: 2),
+                              borderSide: BorderSide(color: const Color.fromARGB(255, 156, 208, 235), width: 2),
                             ),
-                            labelStyle: TextStyle(color: const Color(0xFF2FBDAF)),
+                            labelStyle: TextStyle(color: const Color.fromARGB(255, 156, 208, 235)),
                           ),
                           onChanged: (val) => patientName = val,
                           textDirection: TextDirection.rtl,
@@ -576,11 +576,11 @@ await FirebaseFirestore.instance
                             labelText: 'رقم الهاتف *',
                             hintText: 'أدخل رقم الهاتف',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.phone, color: const Color(0xFF2FBDAF)),
+                            prefixIcon: Icon(Icons.phone, color: const Color.fromARGB(255, 156, 208, 235)),
                             focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: const Color(0xFF2FBDAF), width: 2),
+                              borderSide: BorderSide(color: const Color.fromARGB(255, 156, 208, 235), width: 2),
                             ),
-                            labelStyle: TextStyle(color: const Color(0xFF2FBDAF)),
+                            labelStyle: TextStyle(color: const Color.fromARGB(255, 156, 208, 235)),
                           ),
                           onChanged: (val) => patientPhone = val,
                           keyboardType: TextInputType.phone,
@@ -611,10 +611,10 @@ await FirebaseFirestore.instance
                         onPressed: confirmBooking,
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(
-                                color: const Color(0xFF2FBDAF),
+                                color: const Color.fromARGB(255, 156, 208, 235),
                                 width: 2,
                               ),
-                              foregroundColor: const Color(0xFF2FBDAF),
+                              foregroundColor: const Color.fromARGB(255, 156, 208, 235),
                               backgroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),

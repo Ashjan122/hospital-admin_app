@@ -36,7 +36,7 @@ class CallCenterScreen extends StatelessWidget {
     required IconData icon,
     required String title,
     required VoidCallback onTap,
-    Color color = const Color(0xFF2FBDAF),
+    Color color = const Color.fromARGB(255, 156, 208, 235),
   }) {
     return InkWell(
       onTap: onTap,
@@ -83,7 +83,7 @@ class CallCenterScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2FBDAF),
+        backgroundColor: Color.fromARGB(255, 156, 208, 235),
         centerTitle: true,
         title: Column(
           children: [

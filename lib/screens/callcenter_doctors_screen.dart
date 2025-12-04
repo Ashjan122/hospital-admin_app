@@ -262,7 +262,7 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
                         _searchController.clear();
                       });
                     },
-                    icon: Icon(Icons.close, color: Color(0xFF2FBDAF)),
+                    icon: Icon(Icons.close, color: Color.fromARGB(255, 156, 208, 235)),
                   )
                 : IconButton(
                     onPressed: () {
@@ -270,7 +270,7 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
                         _isSearching = true;
                       });
                     },
-                    icon: Icon(Icons.search, color: Color(0xFF2FBDAF)),
+                    icon: Icon(Icons.search, color: Color.fromARGB(255, 156, 208, 235)),
                   ),
           ],
           title: _isSearching
@@ -299,7 +299,7 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
                   "أطباء ${widget.specializationName}",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2FBDAF),
+                    color: Color.fromARGB(255, 156, 208, 235),
                     fontSize: 20,
                   ),
                 ),
@@ -311,7 +311,7 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const OptimizedLoadingWidget(
                   message: 'جاري تحميل الأطباء...',
-                  color: Color(0xFF2FBDAF),
+                  color: Color.fromARGB(255, 156, 208, 235),
                 );
               }
 

@@ -72,7 +72,7 @@ class _ResultEntryScreenState extends State<ResultEntryScreen> {
   @override
   Widget build(BuildContext context) {
     final Color color1 = const Color.fromARGB(255, 215, 213, 219);
-    final Color color2 = const Color.fromARGB(255, 10, 113, 121);
+    final Color color2 = const Color.fromARGB(255, 156, 208, 235);
 
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -82,7 +82,7 @@ class _ResultEntryScreenState extends State<ResultEntryScreen> {
             widget.mainTestName,
             style: const TextStyle(color: Colors.white),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
           centerTitle: true,
         ),
         body:SafeArea(child: SizedBox.expand(
@@ -93,9 +93,9 @@ class _ResultEntryScreenState extends State<ResultEntryScreen> {
                 end: Alignment.bottomCenter,
                 colors: [
                   color1,
-                  Color(0xFF2FBDAF).withOpacity(0.2),
-                  Color(0xFF2FBDAF).withOpacity(0.4),
-                  Color(0xFF2FBDAF).withOpacity(0.6),
+                  Color.fromARGB(255, 156, 208, 235).withOpacity(0.2),
+                  Color.fromARGB(255, 156, 208, 235).withOpacity(0.4),
+                  Color.fromARGB(255, 156, 208, 235).withOpacity(0.6),
                 ],
               ),
             ),

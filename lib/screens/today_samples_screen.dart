@@ -23,7 +23,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   final Color _color1 = const Color.fromARGB(255, 215, 213, 219);
-  final Color _color2 = const  Color(0xFF2FBDAF);
+  final Color _color2 = const  Color.fromARGB(255, 156, 208, 235);
 
   int? currentShiftId;
   int? latestShiftId;
@@ -299,7 +299,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
-          backgroundColor: const  Color(0xFF2FBDAF),
+          backgroundColor: const  Color.fromARGB(255, 156, 208, 235),
         
           actions: [
             IconButton(
@@ -358,7 +358,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
                           shiftId: currentShiftId,
                           onlyToday: currentShiftId == null,
                         ),
-                    color: const Color(0xFF0A7179),
+                    color: const Color.fromARGB(255, 156, 208, 235),
                     child:
                         isLoading
                             ? const Center(child: CircularProgressIndicator())
@@ -494,7 +494,7 @@ class _SampleListTileState extends State<SampleListTile>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
-  final Color appColor = const Color(0xFF0A7179);
+  final Color appColor = const Color.fromARGB(255, 156, 208, 235);
   bool isLoadingDetails = false;
 
   @override
@@ -911,7 +911,7 @@ class _SampleGridTileState extends State<SampleGridTile>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
-  final Color appColor = const Color(0xFF0A7179);
+  final Color appColor = const Color.fromARGB(255, 156, 208, 235);
 
   @override
   void initState() {

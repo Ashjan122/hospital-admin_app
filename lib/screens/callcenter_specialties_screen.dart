@@ -91,7 +91,7 @@ class _CallcenterSpecialtiesScreenState extends State<CallcenterSpecialtiesScree
                         _searchController.clear();
                       });
                     },
-                    icon: Icon(Icons.close, color: Color(0xFF2FBDAF)),
+                    icon: Icon(Icons.close, color: Color.fromARGB(255, 156, 208, 235)),
                   )
                 : IconButton(
                     onPressed: () {
@@ -99,7 +99,7 @@ class _CallcenterSpecialtiesScreenState extends State<CallcenterSpecialtiesScree
                         _isSearching = true;
                       });
                     },
-                    icon: Icon(Icons.search, color: Color(0xFF2FBDAF)),
+                    icon: Icon(Icons.search, color: Color.fromARGB(255, 156, 208, 235)),
                   ),
           ],
           title: _isSearching
@@ -128,7 +128,7 @@ class _CallcenterSpecialtiesScreenState extends State<CallcenterSpecialtiesScree
                   "التخصصات الطبية",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2FBDAF),
+                    color: const Color.fromARGB(255, 156, 208, 235),
                     fontSize: 30,
                   ),
                 ),
@@ -140,7 +140,7 @@ class _CallcenterSpecialtiesScreenState extends State<CallcenterSpecialtiesScree
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const OptimizedLoadingWidget(
                   message: 'جاري تحميل التخصصات...',
-                  color: Color(0xFF2FBDAF),
+                  color: Color.fromARGB(255, 156, 208, 235),
                 );
               }
 

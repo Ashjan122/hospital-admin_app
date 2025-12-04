@@ -325,6 +325,7 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
+
               const SizedBox(height: 12),
 
               // اختيار التخصص الرئيسي
@@ -336,18 +337,15 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
                     subSpecialties = null;
                   });
 
-                  // تحميل التخصصات الفرعية إن وجدت
                   final snap = await FirebaseFirestore.instance
                       .collection('medicalSpecialties')
                       .doc(value)
                       .collection('subSpecialties')
                       .get();
 
-                  if (snap.docs.isNotEmpty) {
-                    setDialogState(() {
-                      subSpecialties = snap.docs;
-                    });
-                  }
+                  setDialogState(() {
+                    subSpecialties = snap.docs;
+                  });
                 }),
                 child: Container(
                   padding: const EdgeInsets.all(16),
@@ -379,36 +377,66 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
                 ),
               ),
 
-              // اختيار التخصص الفرعي إذا وجد
-              if (subSpecialties != null && subSpecialties!.isNotEmpty) ...[
+              // التخصص الفرعي يظهر فقط بعد اختيار التخصص الرئيسي
+              if (selectedSpecializationId != null) ...[
                 const SizedBox(height: 12),
+
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      const Text("اختر التخصص الفرعي"),
-                      const SizedBox(height: 8),
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedSubSpecializationId,
-                        hint: const Text("اختيار تخصص فرعي"),
-                        items: subSpecialties!.map((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          return DropdownMenuItem(
-                            value: doc.id,
-                            child: Text(data['name']),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setDialogState(() {
-                            selectedSubSpecializationId = value;
-                          });
-                        },
+                      Expanded(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          underline: const SizedBox(),
+                          value: selectedSubSpecializationId,
+                          hint: const Text("اختر التخصص الفرعي"),
+                          items: (subSpecialties != null && subSpecialties!.isNotEmpty)
+                              ? subSpecialties!.map((doc) {
+                                  final data = doc.data() as Map<String, dynamic>;
+                                  return DropdownMenuItem(
+                                    value: doc.id,
+                                    child: Text(data['name']),
+                                  );
+                                }).toList()
+                              : const [
+                                  DropdownMenuItem(
+                                    enabled: false,
+                                    value: null,
+                                    child: Text(
+                                      "لا توجد تخصصات فرعية",
+                                      style: TextStyle(color: Colors.grey),
+                                    ),
+                                  )
+                                ],
+                          onChanged: (value) {
+                            setDialogState(() {
+                              selectedSubSpecializationId = value;
+                            });
+                          },
+                        ),
+                      ),
+
+                      // زر + داخل الحقل
+                      IconButton(
+                        icon: const Icon(Icons.add_circle, color: Color(0xFF0D47A1)),
+                        onPressed: () => _showAddSubSpecializationDialog(
+                          selectedSpecializationId!,
+                          (newId) {
+                            setDialogState(() {
+                              selectedSubSpecializationId = newId;
+                            });
+                          },
+                          (updatedList) {
+                            setDialogState(() {
+                              subSpecialties = updatedList;
+                            });
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -435,8 +463,10 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (nameController.text.trim().isNotEmpty && selectedSpecializationId != null) {
+              if (nameController.text.trim().isNotEmpty &&
+                  selectedSpecializationId != null) {
                 Navigator.pop(context);
+
                 await _addDoctor(
                   nameController.text.trim(),
                   selectedSpecializationId!,
@@ -445,10 +475,6 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
                 );
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D47A1),
-              foregroundColor: Colors.white,
-            ),
             child: const Text('إضافة'),
           ),
         ],
@@ -456,6 +482,7 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
     ),
   );
 }
+
 
   void _showEditDoctorDialog(String id, String currentName, String currentSpecializationId, String currentPhone) {
   final nameController = TextEditingController(text: currentName);
@@ -648,6 +675,83 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
     });
   }
 }
+void _showAddSubSpecializationDialog(
+  String? parentSpecializationId,
+  Function(String newSubId) onCreated,
+  Function(List<QueryDocumentSnapshot> newList) onListUpdated,
+) {
+  if (parentSpecializationId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('الرجاء اختيار التخصص أولاً'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
+
+  final controller = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("إضافة تخصص فرعي جديد"),
+      content: TextField(
+        controller: controller,
+        decoration: const InputDecoration(
+          labelText: "اسم التخصص الفرعي",
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("إلغاء"),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final name = controller.text.trim();
+            if (name.isEmpty) return;
+
+            // إنشاء ID
+            final docRef = FirebaseFirestore.instance
+                .collection('medicalSpecialties')
+                .doc(parentSpecializationId)
+                .collection('subSpecialties')
+                .doc();
+
+            // حفظ البيانات
+            await docRef.set({
+              'id': docRef.id,
+              'name': name,
+            });
+
+            // إعادة تحديث القائمة بمجرد الإضافة
+            final upd = await FirebaseFirestore.instance
+                .collection('medicalSpecialties')
+                .doc(parentSpecializationId)
+                .collection('subSpecialties')
+                .get();
+
+            onListUpdated(upd.docs);
+            onCreated(docRef.id);
+
+            Navigator.pop(context);
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("تم إضافة تخصص فرعي: $name"),
+                backgroundColor: Colors.green,
+              ),
+            );
+          },
+          child: const Text("إضافة"),
+        ),
+      ],
+    ),
+  );
+}
+
 
 
   Future<void> _updateDoctor(String id, String name, String specializationId, String? subSpecializationId, String phone) async {
@@ -695,4 +799,5 @@ class _CentralDoctorsScreenState extends State<CentralDoctorsScreen> {
     });
   }
 }}
+
 
