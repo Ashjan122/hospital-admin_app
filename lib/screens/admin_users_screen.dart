@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'admin_user_profile_screen.dart';
 
 class AdminUsersScreen extends StatefulWidget {
@@ -132,123 +134,185 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   void _showAddUserDialog() {
-  final userNameController = TextEditingController();
-  final userPhoneController = TextEditingController();
-  final userPasswordController = TextEditingController();
+    final userNameController = TextEditingController();
+    final emailController = TextEditingController();
+    final userPhoneController = TextEditingController();
+    final userPasswordController = TextEditingController();
+    String selectedUserType = 'reception';
+    bool isSubmitting = false;
 
-  String? userNameError;
-  String? userPasswordError;
+    String? userNameError;
+    String? emailError;
+    String? userPasswordError;
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('إضافة مستخدم جديد'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: userNameController,
-                    decoration: InputDecoration(
-                      labelText: 'اسم المستخدم',
-                      border: const OutlineInputBorder(),
-                      errorText: userNameError,
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('إضافة مستخدم جديد'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: userNameController,
+                      decoration: InputDecoration(
+                        labelText: 'اسم المستخدم',
+                        border: const OutlineInputBorder(),
+                        errorText: userNameError,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: userPhoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'رقم الهاتف',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'البريد الإلكتروني',
+                        border: const OutlineInputBorder(),
+                        errorText: emailError,
+                      ),
                     ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: userPasswordController,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      labelText: 'كلمة المرور',
-                      border: const OutlineInputBorder(),
-                      errorText: userPasswordError,
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: userPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'رقم الهاتف',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('إلغاء'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  // إعادة تعيين الأخطاء
-                  setState(() {
-                    userNameError = null;
-                    userPasswordError = null;
-                  });
-
-                  bool hasError = false;
-
-                  if (userNameController.text.trim().length < 6) {
-                    setState(() {
-                      userNameError = 'اسم المستخدم يجب أن يكون 6 أحرف على الأقل';
-                    });
-                    hasError = true;
-                  }
-
-                  if (userPasswordController.text.trim().length < 8) {
-                    setState(() {
-                      userPasswordError = 'كلمة المرور يجب أن تكون 8 أحرف على الأقل';
-                    });
-                    hasError = true;
-                  }
-
-                  if (hasError) return;
-
-                  try {
-                    await FirebaseFirestore.instance.collection('users').add({
-                      'userName': userNameController.text.trim(),
-                      'userPhone': userPhoneController.text.trim(),
-                      'userPassword': userPasswordController.text.trim(),
-                      'centerId': widget.centerId,
-                      'centerName': widget.centerName,
-                      'userType': 'reception',
-                      'createdAt': FieldValue.serverTimestamp(),
-                    });
-
-                    // تحديث القائمة مباشرة قبل إغلاق Dialog
-                    if (mounted) {
-                      setState(() {
-                        _refreshKey++;
-                      });
-                    }
-
-                    // الآن يمكن إغلاق الـ Dialog بعد كل شيء
-                    if (mounted) Navigator.pop(context);
-                  } catch (e) {
-                    // يمكن التعامل مع الخطأ هنا إذا أردنا
-                    print('خطأ في إضافة المستخدم: $e');
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color.fromARGB(255, 156, 208, 235),
-                  foregroundColor: Colors.white,
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: userPasswordController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: 'كلمة المرور',
+                        border: const OutlineInputBorder(),
+                        errorText: userPasswordError,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedUserType,
+                      decoration: const InputDecoration(
+                        labelText: 'نوع المستخدم',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'reception', child: Text('موظف استقبال')),
+                        DropdownMenuItem(value: 'callcenter', child: Text('Call Center')),
+                        DropdownMenuItem(value: 'doctor', child: Text('طبيب')),
+                        DropdownMenuItem(value: 'admin', child: Text('مدير')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) setDialogState(() => selectedUserType = val);
+                      },
+                    ),
+                  ],
                 ),
-                child: const Text('إضافة'),
               ),
-            ],
-          );
-        },
-      );
-    },
-  );
-}
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+                  child: const Text('إلغاء'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            userNameError = null;
+                            emailError = null;
+                            userPasswordError = null;
+                          });
+
+                          bool hasError = false;
+
+                          if (userNameController.text.trim().length < 3) {
+                            setDialogState(() => userNameError = 'يجب أن يكون 3 أحرف على الأقل');
+                            hasError = true;
+                          }
+
+                          if (!emailController.text.trim().contains('@')) {
+                            setDialogState(() => emailError = 'أدخل بريد إلكتروني صحيح');
+                            hasError = true;
+                          }
+
+                          if (userPasswordController.text.trim().length < 6) {
+                            setDialogState(() => userPasswordError = 'يجب أن تكون 6 أحرف على الأقل');
+                            hasError = true;
+                          }
+
+                          if (hasError) return;
+
+                          setDialogState(() => isSubmitting = true);
+
+                          try {
+                            // إنشاء حساب Firebase Auth بدون تغيير الجلسة الحالية
+                            final secondaryApp = await Firebase.initializeApp(
+                              name: 'secondary_${DateTime.now().millisecondsSinceEpoch}',
+                              options: Firebase.app().options,
+                            );
+                            final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+
+                            final cred = await secondaryAuth.createUserWithEmailAndPassword(
+                              email: emailController.text.trim(),
+                              password: userPasswordController.text.trim(),
+                            );
+
+                            final uid = cred.user!.uid;
+                            await secondaryAuth.signOut();
+                            await secondaryApp.delete();
+
+                            await FirebaseFirestore.instance.collection('users').doc(uid).set({
+                              'uid': uid,
+                              'email': emailController.text.trim(),
+                              'displayName': userNameController.text.trim(),
+                              'userName': userNameController.text.trim(),
+                              'role': selectedUserType,
+                              'userType': selectedUserType,
+                              'userPhone': userPhoneController.text.trim(),
+                              'facilityId': widget.centerId,
+                              'centerId': widget.centerId,
+                              'createdAt': FieldValue.serverTimestamp(),
+                            });
+
+                            if (mounted) Navigator.pop(ctx);
+                            if (mounted) setState(() => _refreshKey++);
+                          } catch (e) {
+                            setDialogState(() => isSubmitting = false);
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                  content: Text('خطأ: ${e.toString().replaceAll('Exception: ', '')}'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('إضافة'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
 
  @override
@@ -484,7 +548,7 @@ Widget build(BuildContext context) {
         return Colors.red;
       case 'doctor':
         return Colors.blue;
-         case 'callCenter':
+         case 'callcenter':
       return Colors.orange;
       case 'reception':
       default:
@@ -498,7 +562,7 @@ Widget build(BuildContext context) {
         return 'مدير';
       case 'doctor':
         return 'طبيب';
-      case 'callCenter':
+      case 'callcenter':
       return 'Call Center';
       case 'reception':
       default:

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/medical_centers_screen.dart';
 import 'package:lottie/lottie.dart';
@@ -193,19 +194,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
             "تسجيل الخروج",
             style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
           ),
-          onTap: () async {
-            final prefs = await SharedPreferences.getInstance();
-            final savedUserId = prefs.getString('userId') ?? '';
-            await PresenceService.setOffline(userId: savedUserId);
-            await prefs.clear();
+         onTap: () async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUserId = prefs.getString('userId') ?? '';
 
-            if (context.mounted) {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
-            }
-          },
+    // 1. إيقاف الـ presence (لو موجود)
+    await PresenceService.setOffline(userId: savedUserId);
+
+    // 2. تسجيل خروج Firebase (مهم جداً للاستقرار)
+    await FirebaseAuth.instance.signOut();
+
+    // 3. مسح بيانات الجلسة فقط (مش كل حاجة)
+    await prefs.remove('isLoggedIn');
+    await prefs.remove('userId');
+    await prefs.remove('userType');
+    await prefs.remove('userName');
+    await prefs.remove('centerId');
+    await prefs.remove('centerName');
+
+    if (!context.mounted) return;
+
+    // 4. الرجوع لصفحة تسجيل الدخول
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false,
+    );
+  } catch (e) {
+    debugPrint('Logout error: $e');
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('حدث خطأ أثناء تسجيل الخروج'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+}
+         
         ),
 
         const SizedBox(height: 24),

@@ -1,6 +1,7 @@
-import 'dart:io';
+ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -39,11 +40,11 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    final userType = prefs.getString('userType');
-    
-    print('ControlPanel _checkLoginStatus - isLoggedIn: $isLoggedIn, userType: $userType');
-    
-    if (!isLoggedIn || userType != 'control') {
+    final role = prefs.getString('role');
+
+    print('ControlPanel _checkLoginStatus - isLoggedIn: $isLoggedIn, role: $role');
+
+    if (!isLoggedIn || role != 'control') {
       print('Redirecting to login screen');
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -82,9 +83,19 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   }
 
   Future<void> _logout() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    
+    await prefs.remove('isLoggedIn');
+    await prefs.remove('userId');
+    await prefs.remove('userName');
+    await prefs.remove('userType');
+    await prefs.remove('role');
+    await prefs.remove('profileImageUrl');
+    await prefs.remove('subscribed_to_new_signup');
+
     if (mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     }
@@ -288,7 +299,7 @@ Future<void> _loadUserName() async {
   final prefs = await SharedPreferences.getInstance();
   String? name = prefs.getString('userName');
   String? img = prefs.getString('profileImageUrl');
-  final controlUserId = prefs.getString('control_user_id');
+  final controlUserId = prefs.getString('userId');
 
   if ((name == null || name.isEmpty) || (img == null || img.isEmpty)) {
     if (controlUserId != null) {
@@ -314,6 +325,7 @@ Future<void> _loadUserName() async {
 
       if (!mounted) return;
       setState(() {
+    _controlUserId = controlUserId;
     _userName = name;
     _profileImageUrl = img;
   });

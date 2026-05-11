@@ -1,12 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:hospital_admin_app/screens/dashboard_screen.dart';
-import 'package:hospital_admin_app/screens/control_panel_screen.dart';
-import 'package:hospital_admin_app/screens/reception_staff_screen.dart';
-import 'package:hospital_admin_app/screens/doctor_user_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/call_center_screen.dart';
+import 'package:hospital_admin_app/screens/control_panel_screen.dart';
+import 'package:hospital_admin_app/screens/dashboard_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,8 +16,9 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   String _version = '';
@@ -31,320 +31,168 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _getVersionInfo() async {
-  try {
-    final packageInfo = await PackageInfo.fromPlatform();
-    if (!mounted) return;
-    setState(() {
-      _version = 'رقم الإصدار ${packageInfo.version}';
-    });
-  } catch (e) {
-    if (!mounted) return;
-    setState(() {
-      _version = '';
-    });
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() {
+        _version = 'رقم الإصدار ${packageInfo.version}';
+      });
+    } catch (e) {
+      print("Version error: $e");
+    }
   }
-}
-
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _checkLoginStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    final userType = prefs.getString('userType');
-    final centerId = prefs.getString('centerId');
-    final centerName = prefs.getString('centerName');
+  // ✅ البحث بـ uid field داخل الدوكيومنت
+  Future<Map<String, dynamic>> _getUserData(String uid) async {
+    try {
+      final query =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('uid', isEqualTo: uid)
+              .limit(1)
+              .get();
 
-    if (isLoggedIn) {
-      if (userType == 'control') {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const ControlPanelScreen()),
-        );
-      } else if (userType == 'admin' && centerId != null && centerName != null) {
-        final fromControlPanel = prefs.getBool('fromControlPanel') ?? false;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => DashboardScreen(
-              centerId: centerId,
-              centerName: centerName,
-              fromControlPanel: fromControlPanel,
-            ),
-          ),
-        );
-      } else if (userType == 'reception' && centerId != null && centerName != null) {
-        final userId = prefs.getString('userId') ?? '';
-        final userName = prefs.getString('userName') ?? '';
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => ReceptionStaffScreen(
-              centerId: centerId,
-              centerName: centerName,
-              userId: userId,
-              userName: userName,
-            ),
-          ),
-        );
-      } else if (userType == 'doctor' && centerId != null && centerName != null) {
-        final userName = prefs.getString('userName') ?? '';
-        final doctorId = prefs.getString('doctorId') ?? '';
-        final doctorName = prefs.getString('doctorName') ?? userName;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => DoctorUserScreen(
-              doctorId: doctorId,
-              centerId: centerId,
-              centerName: centerName,
-              doctorName: doctorName,
-            ),
-          ),
-        );
-      } else if (userType == 'callCenter' && centerId != null && centerName != null) {
-        final userId = prefs.getString('userId') ?? '';
-        final userName = prefs.getString('userName') ?? '';
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => CallCenterScreen(
-              centerId: centerId,
-              centerName: centerName,
-              userId: userId,
-              userName: userName,
-            ),
-          ),
-        );
+      if (query.docs.isEmpty) {
+        print("❌ No user found with uid field: $uid");
+        throw Exception('بيانات المستخدم غير موجودة');
       }
+
+      return query.docs.first.data();
+    } catch (e) {
+      print("🔥 Firestore error: $e");
+      rethrow;
     }
   }
 
+  // ✅ التحقق من تسجيل الدخول
+  Future<void> _checkLoginStatus() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final data = await _getUserData(user.uid);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('userId', user.uid);
+      await prefs.setString('userName', data['displayName'] ?? '');
+      await prefs.setString('userType', data['userType'] ?? '');
+      await prefs.setString('role', data['role'] ?? '');
+      await prefs.setString('centerId', data['facilityId'] ?? '');
+      await prefs.setString('centerName', data['displayName'] ?? '');
+
+      _navigateUser(data);
+    } catch (e) {
+      print("Check login error: $e");
+    }
+  }
+
+  // ✅ التنقل حسب الدور
+  void _navigateUser(Map<String, dynamic> data) {
+    final role = data['role'];
+    final userType = data['userType'];
+
+    final centerId = data['facilityId'] ?? '';
+    final centerName = data['displayName'] ?? '';
+
+    print("User role: $role | userType: $userType");
+
+    if (role == 'control') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const ControlPanelScreen()),
+      );
+      return;
+    }
+
+    if (userType == 'admin') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => DashboardScreen(
+                centerId: centerId,
+                centerName: centerName,
+                fromControlPanel: false,
+              ),
+        ),
+      );
+      return;
+    }
+
+    if (userType == 'callcenter') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => CallCenterScreen(
+                centerId: centerId,
+                centerName: centerName,
+                userId: FirebaseAuth.instance.currentUser!.uid,
+                userName: data['displayName'] ?? '',
+              ),
+        ),
+      );
+      return;
+    }
+
+    print("❌ Unknown user type");
+  }
+
+  // ✅ تسجيل الدخول
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // ================================================================
-      // 🔥 1️⃣ تسجيل دخول مستخدم CONTROL – بعد التعديل
-      // ================================================================
-      final controlQuery = await FirebaseFirestore.instance
-          .collection('controlUsers')
-          .where('userName', isEqualTo: _usernameController.text.trim())
-          .get();
-
-      if (controlQuery.docs.isNotEmpty) {
-        final controlDoc = controlQuery.docs.first;
-        final controlData = controlDoc.data();
-        final controlPassword = controlData['userPassword'] ?? '';
-
-        if (controlPassword == _passwordController.text) {
-          final controlUserName =
-              controlData['userName'] ?? _usernameController.text.trim();
-
-          final controlUserId = controlDoc.id;
-          final controlImage = controlData['profileImageUrl'] ?? '';
-
-          final prefs = await SharedPreferences.getInstance();
-
-          await prefs.setBool('isLoggedIn', true);
-          await prefs.setString('userType', 'control');
-          await prefs.setString('userName', controlUserName);
-          await prefs.setString('control_user_id', controlUserId);
-
-          if (controlImage.isNotEmpty) {
-            await prefs.setString('profileImageUrl', controlImage);
-          }
-
-          if (mounted) {
-            setState(() => _isLoading = false);
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const ControlPanelScreen()),
-            );
-          }
-          return;
-        }
-      }
-
-      // ================================================================
-      // 2️⃣ باقي المستخدمين كما هو بدون تعديل
-      // ================================================================
-
-      final userQuery = await FirebaseFirestore.instance
-          .collection('users')
-          .where('userName', isEqualTo: _usernameController.text.trim())
-          .get();
-
-      if (userQuery.docs.isNotEmpty) {
-        final userDoc = userQuery.docs.first;
-        final userData = userDoc.data();
-        final userPassword = userData['userPassword'] ?? '';
-
-        if (userPassword == _passwordController.text) {
-          final userId = userDoc.id;
-          final userName = userData['userName'] ?? '';
-          final centerId = userData['centerId'] ?? '';
-          final centerName = userData['centerName'] ?? '';
-          final userType = userData['userType'] ?? 'user';
-          final doctorId = userData['doctorId'] ?? '';
-          final doctorName = userData['doctorName'] ?? '';
-
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .set({
-            'lastLoginAt': FieldValue.serverTimestamp(),
-            'lastSeenAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('isLoggedIn', true);
-          await prefs.setString('userType', userType);
-          await prefs.setString('userName', userName);
-          await prefs.setString('userId', userId);
-          await prefs.setString('centerId', centerId);
-          await prefs.setString('centerName', centerName);
-          await prefs.setString('doctorId', doctorId);
-          await prefs.setString('doctorName', doctorName);
-
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-
-          if (userType == 'admin') {
-            final fromControlPanel =
-                prefs.getBool('fromControlPanel') ?? false;
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DashboardScreen(
-                  centerId: centerId,
-                  centerName: centerName,
-                  fromControlPanel: fromControlPanel,
-                ),
-              ),
-            );
-          } else if (userType == 'reception') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ReceptionStaffScreen(
-                  centerId: centerId,
-                  centerName: centerName,
-                  userId: userId,
-                  userName: userName,
-                ),
-              ),
-            );
-          } else if (userType == 'doctor') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DoctorUserScreen(
-                  doctorId: doctorId,
-                  centerId: centerId,
-                  centerName: centerName,
-                  doctorName: doctorName.isNotEmpty ? doctorName : userName,
-                ),
-              ),
-            );
-          } else if (userType == 'callCenter') {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => CallCenterScreen(
-                  centerId: centerId,
-                  centerName: centerName,
-                  userId: userId,
-                  userName: userName,
-                ),
-              ),
-            );
-          }
-          return;
-        }
-      }
-
-      // ================================================================
-      // 3️⃣ دخول أدمن المراكز
-      // ================================================================
-      final centerQuery = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .where('available', isEqualTo: true)
-          .get();
-
-      bool isAdminLogin = false;
-      String centerId = '';
-      String centerName = '';
-      String centerPassword = '';
-
-      for (var doc in centerQuery.docs) {
-        final data = doc.data();
-        final id = doc.id;
-        final name = data['name'] ?? '';
-
-        if (_usernameController.text.trim() == id ||
-            _usernameController.text.trim().toLowerCase() == name.toLowerCase() ||
-            _usernameController.text.trim().toLowerCase().contains(name.toLowerCase()) ||
-            name.toLowerCase().contains(_usernameController.text.trim().toLowerCase())) {
-          isAdminLogin = true;
-          centerId = id;
-          centerName = name;
-          centerPassword = data['adminPassword'] ?? '12345678';
-          break;
-        }
-      }
-
-      if (isAdminLogin) {
-        if (_passwordController.text == centerPassword) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('isLoggedIn', true);
-          await prefs.setString('userType', 'admin');
-          await prefs.setString('centerId', centerId);
-          await prefs.setString('centerName', centerName);
-
-          final fromControlPanel =
-              prefs.getBool('fromControlPanel') ?? false;
-
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => DashboardScreen(
-                centerId: centerId,
-                centerName: centerName,
-                fromControlPanel: fromControlPanel,
-              ),
-            ),
-          );
-        } else {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('كلمة المرور غير صحيحة'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('الاسم غير موجود'),
-          backgroundColor: Colors.red,
-        ),
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
-    } catch (e) {
+
+      final user = credential.user;
+      if (user == null) throw Exception('فشل تسجيل الدخول');
+
+      print("Firebase UID: ${user.uid}");
+
+      final data = await _getUserData(user.uid);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('userId', user.uid);
+      await prefs.setString('userName', data['displayName'] ?? '');
+      await prefs.setString('userType', data['userType'] ?? '');
+      await prefs.setString('role', data['role'] ?? '');
+      await prefs.setString('centerId', data['facilityId'] ?? '');
+      await prefs.setString('centerName', data['displayName'] ?? '');
+
+      if (!mounted) return;
       setState(() => _isLoading = false);
+
+      _navigateUser(data);
+    } on FirebaseAuthException catch (e) {
+      print("Auth error: ${e.code}");
+
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message ?? 'خطأ')));
+    } catch (e) {
+      print("General error: $e");
+
+      setState(() => _isLoading = false);
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
       );
     }
   }
@@ -360,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color.fromARGB(255, 156, 208, 235).withOpacity(0.1),
+                const Color.fromARGB(255, 156, 208, 235).withOpacity(0.1),
                 Colors.grey[50]!,
               ],
             ),
@@ -373,152 +221,110 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(24.0),
                       child: Card(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding:  EdgeInsets.all(32.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 120,
-                            height: 120,
-                            child: Image.asset(
-                              'assets/images/logo.png',
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          const Text(
-                            'إدارة المراكز الطبية',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          TextFormField(
-                            controller: _usernameController,
-                            decoration: InputDecoration(
-                              labelText: 'اسم المستخدم',
-                              hintText: 'أدخل اسم المستخدم',
-                              prefixIcon: const Icon(Icons.person, color: Color.fromARGB(255, 156, 208, 235)),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color.fromARGB(255, 156, 208, 235),
-                                  width: 2,
+                        elevation: 8,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(32.0),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                Image.asset(
+                                  'assets/images/logo.png',
+                                  height: 120,
                                 ),
-                              ),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'يرجى إدخال اسم المستخدم';
-                              }
-                              return null;
-                            },
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: !_isPasswordVisible,
-                            decoration: InputDecoration(
-                              labelText: 'كلمة المرور',
-                              hintText: 'أدخل كلمة المرور',
-                              prefixIcon: const Icon(Icons.lock, color: Color.fromARGB(255, 156, 208, 235)),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _isPasswordVisible
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
-                                  color: const Color.fromARGB(255, 156, 208, 235),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'إدارة المراكز الطبية',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                                onPressed: () {
-                                  setState(() {
-                                    _isPasswordVisible = !_isPasswordVisible;
-                                  });
-                                },
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: Color.fromARGB(255, 156, 208, 235),
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'يرجى إدخال كلمة المرور';
-                              }
-                              return null;
-                            },
-                          ),
+                                const SizedBox(height: 24),
 
-                          const SizedBox(height: 24),
-
-                          SizedBox(
-                            width: double.infinity,
-                            height: 50,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _login,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Color.fromARGB(255, 156, 208, 235),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                TextFormField(
+                                  controller: _emailController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                    prefixIcon: Icon(Icons.email),
+                                  ),
+                                  validator:
+                                      (v) =>
+                                          v!.isEmpty
+                                              ? 'أدخل البريد الإلكتروني'
+                                              : null,
                                 ),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                            Colors.white),
+
+                                const SizedBox(height: 16),
+
+                                TextFormField(
+                                  controller: _passwordController,
+                                  obscureText: !_isPasswordVisible,
+                                  decoration: InputDecoration(
+                                    labelText: 'Password',
+                                    prefixIcon: const Icon(Icons.lock),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _isPasswordVisible
+                                            ? Icons.visibility
+                                            : Icons.visibility_off,
                                       ),
-                                    )
-                                  : const Text(
-                                      'تسجيل الدخول',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
+                                      onPressed: () {
+                                        setState(() {
+                                          _isPasswordVisible =
+                                              !_isPasswordVisible;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  validator:
+                                      (v) =>
+                                          v!.isEmpty
+                                              ? 'أدخل كلمة المرور'
+                                              : null,
+                                ),
+
+                                const SizedBox(height: 24),
+
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _login,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2FBDAF),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
                                     ),
+                                    child:
+                                        _isLoading
+                                            ? const CircularProgressIndicator(
+                                              color: Colors.white,
+                                            )
+                                            : const Text(
+                                                'تسجيل الدخول',
+                                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                              ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-                ),
+
                 if (_version.isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      _version,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Text(_version),
                   ),
               ],
             ),

@@ -1,8 +1,10 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ControlUsersScreen extends StatefulWidget {
   const ControlUsersScreen({super.key});
@@ -33,29 +35,29 @@ class _ControlUsersScreenState extends State<ControlUsersScreen> {
   }
 
   // ============================
-  //  جلب المستخدمين من controlUsers
+  // تحميل المستخدمين control فقط
   // ============================
-
   Future<void> _loadControlUsers() async {
     try {
       setState(() => _isLoading = true);
 
       final snap =
-          await FirebaseFirestore.instance.collection('controlUsers').get();
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('role', isEqualTo: 'control')
+              .get();
 
-      List<Map<String, dynamic>> users = [];
+      final users =
+          snap.docs.map((doc) {
+            final data = doc.data();
 
-      for (var doc in snap.docs) {
-        final data = doc.data();
-        users.add({
-          'docId': doc.id,
-          'userId': data['userId'] ?? '',
-          'userName': data['userName'] ?? '',
-          'userPassword': data['userPassword'] ?? '',
-          'profileImageUrl': data['profileImageUrl'] ?? '',
-          'isOnline': data['isOnline'] ?? false,
-        });
-      }
+            return {
+              'uid': doc.id,
+              'userName': data['displayName'] ?? '',
+              'email': data['email'] ?? '',
+              'profileImageUrl': data['profileImageUrl'] ?? '',
+            };
+          }).toList();
 
       setState(() {
         _allUsers = users;
@@ -63,15 +65,14 @@ class _ControlUsersScreenState extends State<ControlUsersScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      print("❌ خطأ في تحميل مستخدمي الكنترول: $e");
+      print(e);
       setState(() => _isLoading = false);
     }
   }
 
   // ============================
-  //   البحث
+  // بحث
   // ============================
-
   void _filterUsers(String query) {
     setState(() {
       _searchQuery = query;
@@ -79,270 +80,218 @@ class _ControlUsersScreenState extends State<ControlUsersScreen> {
       if (query.isEmpty) {
         _filteredUsers = _allUsers;
       } else {
-        final lower = query.toLowerCase();
-        _filteredUsers = _allUsers.where((u) {
-          return u['userName'].toString().toLowerCase().contains(lower) ||
-              u['userId'].toString().toLowerCase().contains(lower);
-        }).toList();
+        final q = query.toLowerCase();
+        _filteredUsers =
+            _allUsers.where((u) {
+              return u['userName'].toString().toLowerCase().contains(q) ||
+                  u['email'].toString().toLowerCase().contains(q);
+            }).toList();
       }
     });
   }
 
-  
+  // ============================
+  // إضافة مستخدم (Auth + Firestore)
+  // ============================
+  void _showAddUserDialog() {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final passController = TextEditingController();
+    File? image;
 
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text("إضافة مستخدم"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: "الاسم"),
+                  ),
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(labelText: "الإيميل"),
+                  ),
+                  TextField(
+                    controller: passController,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: "كلمة المرور"),
+                  ),
+                  const SizedBox(height: 10),
+
+                  TextButton.icon(
+                    onPressed: () async {
+                      final picked = await ImagePicker().pickImage(
+                        source: ImageSource.gallery,
+                      );
+                      if (picked != null) {
+                        setStateDialog(() {
+                          image = File(picked.path);
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.image),
+                    label: const Text("صورة"),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("إلغاء"),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final cred = await FirebaseAuth.instance
+                          .createUserWithEmailAndPassword(
+                            email: emailController.text.trim(),
+                            password: passController.text.trim(),
+                          );
+
+                      final uid = cred.user!.uid;
+
+                      String imageUrl = '';
+
+                      if (image != null) {
+                        final ref = FirebaseStorage.instance.ref().child(
+                          'profile_images/$uid.jpg',
+                        );
+
+                        await ref.putFile(image!);
+                        imageUrl = await ref.getDownloadURL();
+                      }
+
+                      await FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(uid)
+                          .set({
+                            'uid': uid,
+                            'displayName': nameController.text.trim(),
+                            'email': emailController.text.trim(),
+                            'role': 'control',
+                            'profileImageUrl': imageUrl,
+                            'createdAt': FieldValue.serverTimestamp(),
+                          });
+
+                      Navigator.pop(context);
+                      _loadControlUsers();
+                    } catch (e) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(e.toString())));
+                    }
+                  },
+                  child: const Text("إضافة"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ============================
+  // تعديل الاسم فقط
+  // ============================
   void _editUserDialog(Map<String, dynamic> user) {
-    final TextEditingController nameController =
-        TextEditingController(text: user['userName']);
-    final TextEditingController passController =
-        TextEditingController(text: user['userPassword']);
+    final nameController = TextEditingController(text: user['userName']);
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("تعديل بيانات المستخدم"),
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration:
-                      const InputDecoration(labelText: "اسم المستخدم"),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: passController,
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: "كلمة المرور"),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () => _changeUserImage(user),
-                  icon: const Icon(Icons.image),
-                  label: const Text("تغيير الصورة"),
-                  style: ElevatedButton.styleFrom(
-                    
-                  ),
-                ),
-              ],
-            ),
+          title: const Text("تعديل المستخدم"),
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(labelText: "الاسم"),
           ),
           actions: [
             TextButton(
-              child: const Text("إلغاء"),
               onPressed: () => Navigator.pop(context),
+              child: const Text("إلغاء"),
             ),
             ElevatedButton(
-              child: const Text("حفظ"),
               onPressed: () async {
                 await FirebaseFirestore.instance
-                    .collection('controlUsers')
-                    .doc(user['docId'])
-                    .update({
-                  'userName': nameController.text.trim(),
-                  'userPassword': passController.text.trim(),
-                });
+                    .collection('users')
+                    .doc(user['uid'])
+                    .update({'displayName': nameController.text.trim()});
 
                 Navigator.pop(context);
                 _loadControlUsers();
               },
+              child: const Text("حفظ"),
             ),
           ],
         );
       },
     );
   }
-  void _showAddUserDialog() {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController passController = TextEditingController();
-  File? pickedImage;
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          title: const Text("إضافة مستخدم كنترول"),
-          content: SingleChildScrollView(
-            child: Column(
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: "اسم المستخدم",
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                TextField(
-                  controller: passController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: "كلمة المرور",
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // اختيار صورة
-                TextButton.icon(
-                  onPressed: () async {
-                    final picked = await ImagePicker().pickImage(
-                        source: ImageSource.gallery, imageQuality: 70);
-                    if (picked != null) {
-                      setStateDialog(() {
-                        pickedImage = File(picked.path);
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.image),
-                  label: const Text("اختيار صورة (اختياري)"),
-                ),
-
-                if (pickedImage != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: CircleAvatar(
-                      radius: 40,
-                      backgroundImage: FileImage(pickedImage!),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("إلغاء"),
-            ),
-            ElevatedButton(
-              child: const Text("إضافة"),
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty ||
-                    passController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("الرجاء إدخال الاسم وكلمة المرور"),
-                    ),
-                  );
-                  return;
-                }
-
-                // إنشاء userId تلقائي
-                final newUserId =
-                    "control_${DateTime.now().millisecondsSinceEpoch}";
-
-                String? imageUrl;
-
-                // رفع الصورة إن وُجدت
-                if (pickedImage != null) {
-                  final ref = FirebaseStorage.instance
-                      .ref()
-                      .child('profile_images/$newUserId.jpg');
-                  await ref.putFile(pickedImage!);
-                  imageUrl = await ref.getDownloadURL();
-                }
-
-                // إضافة المستخدم
-                await FirebaseFirestore.instance
-                    .collection('controlUsers')
-                    .doc(newUserId)
-                    .set({
-                  'userId': newUserId,
-                  'userName': nameController.text.trim(),
-                  'userPassword': passController.text.trim(),
-                  'profileImageUrl': imageUrl ?? '',
-                  'isOnline': true,
-                  'userType': 'control',
-                  'lastSeen': DateTime.now(),
-                });
-
-                Navigator.pop(context);
-                _loadControlUsers();
-              },
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-
-  
-
+  // ============================
+  // تغيير الصورة
+  // ============================
   Future<void> _changeUserImage(Map<String, dynamic> user) async {
-    final picked =
-        await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    final picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
     final file = File(picked.path);
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child('profile_images/${user['userId']}.jpg');
+
+    final ref = FirebaseStorage.instance.ref().child(
+      'profile_images/${user['uid']}.jpg',
+    );
 
     await ref.putFile(file);
     final url = await ref.getDownloadURL();
 
     await FirebaseFirestore.instance
-        .collection('controlUsers')
-        .doc(user['docId'])
+        .collection('users')
+        .doc(user['uid'])
         .update({'profileImageUrl': url});
 
     _loadControlUsers();
   }
 
-  
-  Future<void> _toggleOnline(Map<String, dynamic> user) async {
-    await FirebaseFirestore.instance
-        .collection('controlUsers')
-        .doc(user['docId'])
-        .update({'isOnline': !user['isOnline']});
-
-    _loadControlUsers();
-  }
-
-  
+  // ============================
+  // UI
+  // ============================
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text("مستخدمي الكنترول"),
-          backgroundColor: const Color(0xFF0D47A1),
+          title: const Text(
+            "مستخدمي الكنترول",
+            style: TextStyle(color: Colors.white),
+          ),
           centerTitle: true,
-          foregroundColor: Colors.white,
+          backgroundColor: const Color(0xFF0D47A1),
           actions: [
-    IconButton(
-      icon: const Icon(Icons.add),
-      tooltip: "إضافة مستخدم جديد",
-      onPressed: _showAddUserDialog,
-    ),
-    
-  ],
+            IconButton(
+              icon: const Icon(Icons.add, color: Colors.white),
+              onPressed: _showAddUserDialog,
+            ),
+          ],
         ),
 
         body: Column(
           children: [
-            
-            Container(
-              padding: const EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(12),
               child: TextField(
                 controller: _searchController,
                 onChanged: _filterUsers,
                 decoration: InputDecoration(
-                  hintText: 'بحث باسم المستخدم',
+                  hintText: "بحث...",
                   prefixIcon: const Icon(Icons.search),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            _filterUsers('');
-                          },
-                        )
-                      : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -351,86 +300,57 @@ class _ControlUsersScreenState extends State<ControlUsersScreen> {
             ),
 
             Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF0D47A1)),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _filteredUsers.length,
-                      itemBuilder: (context, index) {
-                        final user = _filteredUsers[index];
+              child:
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ListView.builder(
+                        itemCount: _filteredUsers.length,
+                        itemBuilder: (context, i) {
+                          final user = _filteredUsers[i];
 
-                        return Card(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 2,
-                          margin: const EdgeInsets.only(bottom: 14),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              radius: 25,
-                              backgroundImage:
-                                  user['profileImageUrl'] != null &&
-                                          user['profileImageUrl'] != ''
-                                      ? NetworkImage(user['profileImageUrl'])
-                                      : null,
-                              child: user['profileImageUrl'] == null ||
-                                      user['profileImageUrl'] == ''
-                                  ? const Icon(Icons.person, size: 28)
-                                  : null,
-                            ),
+                          return Card(
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage:
+                                    user['profileImageUrl'] != ''
+                                        ? NetworkImage(user['profileImageUrl'])
+                                        : null,
+                                child:
+                                    user['profileImageUrl'] == ''
+                                        ? const Icon(Icons.person)
+                                        : null,
+                              ),
+                              title: Text(user['userName']),
+                              subtitle: Text(user['email']),
 
-                            title: Text(
-                              user['userName'],
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold),
-                            ),
-
-                            trailing: PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert),
-                              onSelected: (value) {
-                                switch (value) {
-                                  case 'edit':
-                                    _editUserDialog(user);
-                                    break;
-                                  case 'toggle':
-                                    _toggleOnline(user);
-                                    break;
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                const PopupMenuItem<String>(
-                                  value: 'edit',
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.edit, color: Color(0xFF0D47A1), size: 20),
-                                      SizedBox(width: 8),
-                                      Text('تعديل'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'toggle',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        user['isOnline'] ? Icons.toggle_on : Icons.toggle_off,
-                                        color: user['isOnline'] ? Colors.green : Colors.grey,
-                                        size: 20,
+                              trailing: PopupMenuButton(
+                                itemBuilder:
+                                    (context) => [
+                                      PopupMenuItem(
+                                        value: 'edit',
+                                        child: const Text('تعديل الاسم'),
+                                        onTap:
+                                            () => Future.delayed(
+                                              Duration.zero,
+                                              () => _editUserDialog(user),
+                                            ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(user['isOnline'] ? 'تعطيل' : 'تفعيل'),
+                                      PopupMenuItem(
+                                        value: 'img',
+                                        child: const Text('تغيير الصورة'),
+                                        onTap:
+                                            () => Future.delayed(
+                                              Duration.zero,
+                                              () => _changeUserImage(user),
+                                            ),
+                                      ),
                                     ],
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-            )
+                          );
+                        },
+                      ),
+            ),
           ],
         ),
       ),
