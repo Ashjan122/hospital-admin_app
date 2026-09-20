@@ -1,17 +1,18 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
-import 'package:path/path.dart' as path;
 import 'dart:typed_data';
-import 'package:syncfusion_flutter_pdf/pdf.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:path_provider/path_provider.dart';
-import 'package:open_filex/open_filex.dart';
-import 'package:hospital_admin_app/screens/dashboard_screen.dart';
 import 'package:hospital_admin_app/screens/control_panel_screen.dart';
+import 'package:hospital_admin_app/screens/dashboard_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 class MedicalCentersScreen extends StatefulWidget {
   const MedicalCentersScreen({super.key});
@@ -33,7 +34,8 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
   bool _isAddingCenter = false;
   bool _showAddForm = false;
   String? _editingCenterId;
-  
+  bool _requireBookingConfirmation = false;
+
   // Image handling variables
   String _selectedImageUrl = '';
   File? _selectedImageFile;
@@ -61,12 +63,12 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImageFile = File(image.path);
         });
-        
+
         // رفع الصورة إلى Firebase Storage
         await _uploadImage();
       }
@@ -84,30 +86,31 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
 
   Future<void> _uploadImage() async {
     if (_selectedImageFile == null) return;
-    
+
     setState(() {
       _isUploadingImage = true;
     });
-    
+
     try {
       // إنشاء اسم فريد للصورة
-      final fileName = 'facilities/${DateTime.now().millisecondsSinceEpoch}_${path.basename(_selectedImageFile!.path)}';
-      
+      final fileName =
+          'facilities/${DateTime.now().millisecondsSinceEpoch}_${path.basename(_selectedImageFile!.path)}';
+
       // رفع الصورة إلى Firebase Storage
       final storageRef = FirebaseStorage.instance.ref().child(fileName);
       final uploadTask = storageRef.putFile(_selectedImageFile!);
-      
+
       // انتظار اكتمال الرفع
       final snapshot = await uploadTask;
-      
+
       // الحصول على رابط التحميل
       final downloadUrl = await snapshot.ref.getDownloadURL();
-      
+
       setState(() {
         _selectedImageUrl = downloadUrl;
         _isUploadingImage = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -120,7 +123,7 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
       setState(() {
         _isUploadingImage = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -135,30 +138,31 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
   void _showImageSourceDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('اختر مصدر الصورة'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('الكاميرا'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
+      builder:
+          (context) => AlertDialog(
+            title: const Text('اختر مصدر الصورة'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('الكاميرا'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('المعرض'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('المعرض'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -170,12 +174,13 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
 
       try {
         // جلب أعلى ترتيب موجود لتحديد الترتيب التالي
-        final snapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .orderBy('order', descending: true)
-            .limit(1)
-            .get();
-        
+        final snapshot =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .orderBy('order', descending: true)
+                .limit(1)
+                .get();
+
         int nextOrder = 1;
         if (snapshot.docs.isNotEmpty) {
           final highestOrder = snapshot.docs.first.data()['order'] ?? 0;
@@ -190,8 +195,9 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
           'available': true,
           'imageUrl': _selectedImageUrl.isNotEmpty ? _selectedImageUrl : null,
           'createdAt': FieldValue.serverTimestamp(),
+          'requireBookingConfirmation': _requireBookingConfirmation,
         };
-        
+
         await FirebaseFirestore.instance
             .collection('medicalFacilities')
             .add(centerData);
@@ -203,7 +209,9 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
         setState(() {
           _selectedImageUrl = '';
           _selectedImageFile = null;
+          _requireBookingConfirmation = false;
           _showAddForm = false;
+          
         });
 
         if (mounted) {
@@ -231,19 +239,22 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
     }
   }
 
-  Future<void> _toggleCenterAvailability(String centerId, bool currentStatus) async {
+  Future<void> _toggleCenterAvailability(
+    String centerId,
+    bool currentStatus,
+  ) async {
     try {
       await FirebaseFirestore.instance
           .collection('medicalFacilities')
           .doc(centerId)
-          .update({
-        'available': !currentStatus,
-      });
+          .update({'available': !currentStatus});
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(currentStatus ? 'تم إلغاء تفعيل المركز' : 'تم تفعيل المركز'),
+            content: Text(
+              currentStatus ? 'تم إلغاء تفعيل المركز' : 'تم تفعيل المركز',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -260,16 +271,18 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
     }
   }
 
-  Future<void> _exportCenterDoctorsSchedulePdf(String centerId, String centerName) async {
+  Future<void> _exportCenterDoctorsSchedulePdf(
+    String centerId,
+    String centerName,
+  ) async {
     try {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF0D47A1),
-          ),
-        ),
+        builder:
+            (context) => const Center(
+              child: CircularProgressIndicator(color: Color(0xFF0D47A1)),
+            ),
       );
 
       final PdfDocument document = PdfDocument();
@@ -279,50 +292,80 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
       PdfFont baseFont;
       Uint8List? arabicFontBytes;
       try {
-        final ByteData logoData = await rootBundle.load('assets/images/logo.png');
+        final ByteData logoData = await rootBundle.load(
+          'assets/images/logo.png',
+        );
         logoImage = PdfBitmap(logoData.buffer.asUint8List());
       } catch (_) {}
 
       try {
-        final ByteData fontData = await rootBundle.load('assets/fonts/NotoNaskhArabic-Regular.ttf');
+        final ByteData fontData = await rootBundle.load(
+          'assets/fonts/NotoNaskhArabic-Regular.ttf',
+        );
         arabicFontBytes = fontData.buffer.asUint8List();
-        baseFont = PdfTrueTypeFont(arabicFontBytes, 12, style: PdfFontStyle.regular);
+        baseFont = PdfTrueTypeFont(
+          arabicFontBytes,
+          12,
+          style: PdfFontStyle.regular,
+        );
       } catch (_) {
         baseFont = PdfStandardFont(PdfFontFamily.helvetica, 12);
       }
 
-      final PdfFont titleFont = (arabicFontBytes != null)
-          ? PdfTrueTypeFont(arabicFontBytes, 20, style: PdfFontStyle.bold)
-          : PdfStandardFont(PdfFontFamily.helvetica, 20, style: PdfFontStyle.bold);
-      final PdfFont headerFont = (arabicFontBytes != null)
-          ? PdfTrueTypeFont(arabicFontBytes, 16, style: PdfFontStyle.bold)
-          : PdfStandardFont(PdfFontFamily.helvetica, 16, style: PdfFontStyle.bold);
-      final PdfFont colHeaderFont = (arabicFontBytes != null)
-          ? PdfTrueTypeFont(arabicFontBytes, 12, style: PdfFontStyle.bold)
-          : PdfStandardFont(PdfFontFamily.helvetica, 12, style: PdfFontStyle.bold);
-      final PdfFont bodyFont = (arabicFontBytes != null)
-          ? PdfTrueTypeFont(arabicFontBytes, 11, style: PdfFontStyle.bold)
-          : PdfStandardFont(PdfFontFamily.helvetica, 11, style: PdfFontStyle.bold);
+      final PdfFont titleFont =
+          (arabicFontBytes != null)
+              ? PdfTrueTypeFont(arabicFontBytes, 20, style: PdfFontStyle.bold)
+              : PdfStandardFont(
+                PdfFontFamily.helvetica,
+                20,
+                style: PdfFontStyle.bold,
+              );
+      final PdfFont headerFont =
+          (arabicFontBytes != null)
+              ? PdfTrueTypeFont(arabicFontBytes, 16, style: PdfFontStyle.bold)
+              : PdfStandardFont(
+                PdfFontFamily.helvetica,
+                16,
+                style: PdfFontStyle.bold,
+              );
+      final PdfFont colHeaderFont =
+          (arabicFontBytes != null)
+              ? PdfTrueTypeFont(arabicFontBytes, 12, style: PdfFontStyle.bold)
+              : PdfStandardFont(
+                PdfFontFamily.helvetica,
+                12,
+                style: PdfFontStyle.bold,
+              );
+      final PdfFont bodyFont =
+          (arabicFontBytes != null)
+              ? PdfTrueTypeFont(arabicFontBytes, 11, style: PdfFontStyle.bold)
+              : PdfStandardFont(
+                PdfFontFamily.helvetica,
+                11,
+                style: PdfFontStyle.bold,
+              );
 
       // Fetch specializations for the center
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(centerId)
-          .collection('specializations')
-          .get();
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(centerId)
+              .collection('specializations')
+              .get();
 
       for (var specDoc in specializationsSnapshot.docs) {
         final specData = specDoc.data();
         final String specName = specData['specName']?.toString() ?? specDoc.id;
 
         // Fetch doctors under this specialization
-        final doctorsSnapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .get();
+        final doctorsSnapshot =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .get();
 
         // Add a page per specialization
         final PdfPage page = document.pages.add();
@@ -337,29 +380,51 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
           final double wmH = wmW;
           currentG.drawImage(
             logoImage,
-            Rect.fromLTWH((currentPageSize.width - wmW) / 2, (currentPageSize.height - wmH) / 2, wmW, wmH),
+            Rect.fromLTWH(
+              (currentPageSize.width - wmW) / 2,
+              (currentPageSize.height - wmH) / 2,
+              wmW,
+              wmH,
+            ),
           );
           currentG.restore();
         }
         // Draw center name and small logo on every page
         if (logoImage != null) {
-          currentG.drawImage(logoImage, Rect.fromLTWH(currentPageSize.width - 60, 20, 40, 40));
+          currentG.drawImage(
+            logoImage,
+            Rect.fromLTWH(currentPageSize.width - 60, 20, 40, 40),
+          );
         }
         currentG.drawString(
           centerName,
           titleFont,
           bounds: Rect.fromLTWH(0, 30, currentPageSize.width, 36),
-          format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+          format: PdfStringFormat(
+            alignment: PdfTextAlignment.center,
+            textDirection: PdfTextDirection.rightToLeft,
+          ),
         );
         currentG.drawString(
           specName,
           headerFont,
           bounds: Rect.fromLTWH(0, 80, currentPageSize.width, 28),
-          format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+          format: PdfStringFormat(
+            alignment: PdfTextAlignment.center,
+            textDirection: PdfTextDirection.rightToLeft,
+          ),
         );
 
         // Single table for all doctors in this specialization
-        final List<String> days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+        final List<String> days = [
+          'الأحد',
+          'الاثنين',
+          'الثلاثاء',
+          'الأربعاء',
+          'الخميس',
+          'الجمعة',
+          'السبت',
+        ];
         final double topStart = 120;
         final double rowHeight = 26;
         final double dayColWidth = 76;
@@ -395,7 +460,8 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
         double currentYForTables = topStart;
         while (start < activeDoctors.length) {
           final int remaining = activeDoctors.length - start;
-          final int colsThisTable = remaining < maxColsPerTable ? remaining : maxColsPerTable;
+          final int colsThisTable =
+              remaining < maxColsPerTable ? remaining : maxColsPerTable;
 
           // For small tables (1-2 doctors), expand to minimum width and center
           final bool isNarrow = colsThisTable <= 2;
@@ -436,8 +502,16 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
             currentG.drawString(
               'يتبع...',
               baseFont,
-              bounds: Rect.fromLTWH(0, currentPageSize.height - 30, currentPageSize.width, 20),
-              format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+              bounds: Rect.fromLTWH(
+                0,
+                currentPageSize.height - 30,
+                currentPageSize.width,
+                20,
+              ),
+              format: PdfStringFormat(
+                alignment: PdfTextAlignment.center,
+                textDirection: PdfTextDirection.rightToLeft,
+              ),
             );
             final PdfPage nextPage = document.pages.add();
             currentG = nextPage.graphics;
@@ -450,7 +524,12 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
               final double wmH2 = wmW2;
               currentG.drawImage(
                 logoImage,
-                Rect.fromLTWH((currentPageSize.width - wmW2) / 2, (currentPageSize.height - wmH2) / 2, wmW2, wmH2),
+                Rect.fromLTWH(
+                  (currentPageSize.width - wmW2) / 2,
+                  (currentPageSize.height - wmH2) / 2,
+                  wmW2,
+                  wmH2,
+                ),
               );
               currentG.restore();
             }
@@ -458,14 +537,22 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
               specName,
               headerFont,
               bounds: Rect.fromLTWH(0, 60, currentPageSize.width, 25),
-              format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+              format: PdfStringFormat(
+                alignment: PdfTextAlignment.center,
+                textDirection: PdfTextDirection.rightToLeft,
+              ),
             );
             currentYForTables = topStart;
           }
 
           // Header row background
           currentG.drawRectangle(
-            bounds: Rect.fromLTWH(startX, currentYForTables, localTableWidth, rowHeight),
+            bounds: Rect.fromLTWH(
+              startX,
+              currentYForTables,
+              localTableWidth,
+              rowHeight,
+            ),
             pen: PdfPen(PdfColor(180, 180, 180)),
             brush: PdfSolidBrush(PdfColor(235, 235, 235)),
           );
@@ -474,8 +561,16 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
           currentG.drawString(
             'اليوم',
             colHeaderFont,
-            bounds: Rect.fromLTWH(startX + colsThisTable * dColW, currentYForTables + headerPadY, dayW, rowHeight),
-            format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+            bounds: Rect.fromLTWH(
+              startX + colsThisTable * dColW,
+              currentYForTables + headerPadY,
+              dayW,
+              rowHeight,
+            ),
+            format: PdfStringFormat(
+              alignment: PdfTextAlignment.center,
+              textDirection: PdfTextDirection.rightToLeft,
+            ),
           );
 
           // Doctor headers
@@ -485,8 +580,16 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
             currentG.drawString(
               dName,
               colHeaderFont,
-              bounds: Rect.fromLTWH(x + cellPadX, currentYForTables + headerPadY, dColW - (cellPadX * 2), rowHeight),
-              format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+              bounds: Rect.fromLTWH(
+                x + cellPadX,
+                currentYForTables + headerPadY,
+                dColW - (cellPadX * 2),
+                rowHeight,
+              ),
+              format: PdfStringFormat(
+                alignment: PdfTextAlignment.center,
+                textDirection: PdfTextDirection.rightToLeft,
+              ),
             );
           }
 
@@ -506,15 +609,25 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
             currentG.drawString(
               day,
               bodyFont,
-              bounds: Rect.fromLTWH(startX + colsThisTable * dColW, y + bodyPadY, dayW, rowHeight),
-              format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+              bounds: Rect.fromLTWH(
+                startX + colsThisTable * dColW,
+                y + bodyPadY,
+                dayW,
+                rowHeight,
+              ),
+              format: PdfStringFormat(
+                alignment: PdfTextAlignment.center,
+                textDirection: PdfTextDirection.rightToLeft,
+              ),
             );
 
             // Doctor cells
             for (int c = 0; c < colsThisTable; c++) {
-              final Map<String, dynamic> schedule = activeDoctors[start + c]['schedule'] as Map<String, dynamic>;
+              final Map<String, dynamic> schedule =
+                  activeDoctors[start + c]['schedule'] as Map<String, dynamic>;
               String text = '—';
-              final Map<String, dynamic>? daySchedule = schedule[day] as Map<String, dynamic>?;
+              final Map<String, dynamic>? daySchedule =
+                  schedule[day] as Map<String, dynamic>?;
               if (daySchedule != null) {
                 final bool hasMorning = daySchedule['morning'] != null;
                 final bool hasEvening = daySchedule['evening'] != null;
@@ -530,8 +643,16 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
               currentG.drawString(
                 text,
                 bodyFont,
-                bounds: Rect.fromLTWH(x + cellPadX, y + bodyPadY, dColW - (cellPadX * 2), rowHeight),
-                format: PdfStringFormat(alignment: PdfTextAlignment.center, textDirection: PdfTextDirection.rightToLeft),
+                bounds: Rect.fromLTWH(
+                  x + cellPadX,
+                  y + bodyPadY,
+                  dColW - (cellPadX * 2),
+                  rowHeight,
+                ),
+                format: PdfStringFormat(
+                  alignment: PdfTextAlignment.center,
+                  textDirection: PdfTextDirection.rightToLeft,
+                ),
               );
             }
 
@@ -577,13 +698,18 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
     }
   }
 
-  Future<void> _editCenter(String centerId, Map<String, dynamic> centerData) async {
+  Future<void> _editCenter(
+    String centerId,
+    Map<String, dynamic> centerData,
+  ) async {
     setState(() {
       _editingCenterId = centerId;
       _centerNameController.text = centerData['name'] ?? '';
       _centerAddressController.text = centerData['address'] ?? '';
       _centerPhoneController.text = centerData['phone'] ?? '';
       _selectedImageUrl = centerData['imageUrl'] ?? '';
+      _requireBookingConfirmation =
+          centerData['requireBookingConfirmation'] as bool? ?? false;
       _showAddForm = true;
     });
   }
@@ -596,23 +722,26 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
 
       try {
         // الحفاظ على الترتيب الحالي للمركز
-        final currentCenterDoc = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(_editingCenterId)
-            .get();
-        
+        final currentCenterDoc =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(_editingCenterId)
+                .get();
+
         final currentOrder = currentCenterDoc.data()?['order'] ?? 999;
 
         await FirebaseFirestore.instance
             .collection('medicalFacilities')
             .doc(_editingCenterId)
             .update({
-          'name': _centerNameController.text.trim(),
-          'address': _centerAddressController.text.trim(),
-          'phone': _centerPhoneController.text.trim(),
-          'order': currentOrder,
-          'imageUrl': _selectedImageUrl.isNotEmpty ? _selectedImageUrl : null,
-        });
+              'name': _centerNameController.text.trim(),
+              'address': _centerAddressController.text.trim(),
+              'phone': _centerPhoneController.text.trim(),
+              'order': currentOrder,
+              'requireBookingConfirmation': _requireBookingConfirmation,
+              'imageUrl':
+                  _selectedImageUrl.isNotEmpty ? _selectedImageUrl : null,
+            });
 
         _centerNameController.clear();
         _centerAddressController.clear();
@@ -660,27 +789,29 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
       _centerOrderController.clear();
       _selectedImageUrl = '';
       _selectedImageFile = null;
+      _requireBookingConfirmation = false;
     });
   }
 
   Future<void> _deleteCenter(String centerId, String centerName) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد الحذف'),
-        content: Text('هل أنت متأكد من حذف المركز "$centerName"؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('تأكيد الحذف'),
+            content: Text('هل أنت متأكد من حذف المركز "$centerName"؟'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('إلغاء'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('حذف'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -711,100 +842,108 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
     }
   }
 
-  void _showCenterDetailsDialog(String centerName, String centerAddress, String centerPhone, bool isAvailable) {
+  void _showCenterDetailsDialog(
+    String centerName,
+    String centerAddress,
+    String centerPhone,
+    bool isAvailable,
+  ) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                centerName,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+      builder:
+          (context) => AlertDialog(
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    centerName,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'العنوان: $centerAddress',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'الهاتف: $centerPhone',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      isAvailable ? Icons.check_circle : Icons.cancel,
+                      color: isAvailable ? Colors.green : Colors.red,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      ' ${isAvailable ? 'مفعل' : 'غير مفعل'}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isAvailable ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إغلاق'),
               ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'العنوان: $centerAddress',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'الهاتف: $centerPhone',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  isAvailable ? Icons.check_circle : Icons.cancel,
-                  color: isAvailable ? Colors.green : Colors.red,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  ' ${isAvailable ? 'مفعل' : 'غير مفعل'}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isAvailable ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إغلاق'),
+            ],
           ),
-        ],
-      ),
     );
   }
 
-  List<QueryDocumentSnapshot> _filterCenters(List<QueryDocumentSnapshot> centers) {
+  List<QueryDocumentSnapshot> _filterCenters(
+    List<QueryDocumentSnapshot> centers,
+  ) {
     // ترتيب المراكز أولاً
     final sortedCenters = List<QueryDocumentSnapshot>.from(centers);
     sortedCenters.sort((a, b) {
       try {
         final aData = a.data() as Map<String, dynamic>;
         final bData = b.data() as Map<String, dynamic>;
-        
+
         // التحقق من حالة التفعيل أولاً
         final aAvailable = aData['available'] as bool? ?? false;
         final bAvailable = bData['available'] as bool? ?? false;
-        
+
         // إذا كان أحدهما مفعل والآخر غير مفعل، المفعل يأتي أولاً
         if (aAvailable != bAvailable) {
           return aAvailable ? -1 : 1;
         }
-        
+
         // إذا كان كلاهما مفعل، ترتيب حسب order
         if (aAvailable && bAvailable) {
           final aOrder = aData['order'] as int? ?? 999;
           final bOrder = bData['order'] as int? ?? 999;
           return aOrder.compareTo(bOrder);
         }
-        
+
         // إذا كان كلاهما غير مفعل، ترتيب حسب order
         final aOrder = aData['order'] as int? ?? 999;
         final bOrder = bData['order'] as int? ?? 999;
@@ -813,21 +952,25 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
         return 0;
       }
     });
-    
+
     return sortedCenters;
   }
 
-  Future<void> _onReorderCenters(List<QueryDocumentSnapshot> centers, int oldIndex, int newIndex) async {
+  Future<void> _onReorderCenters(
+    List<QueryDocumentSnapshot> centers,
+    int oldIndex,
+    int newIndex,
+  ) async {
     if (oldIndex == newIndex) return;
-    
+
     try {
       // إنشاء نسخة من القائمة لتعديلها
       final List<QueryDocumentSnapshot> reorderedCenters = List.from(centers);
-      
+
       // إعادة ترتيب القائمة
       final item = reorderedCenters.removeAt(oldIndex);
       reorderedCenters.insert(newIndex, item);
-      
+
       // إعادة ترقيم order للجميع
       final batch = FirebaseFirestore.instance.batch();
       for (int i = 0; i < reorderedCenters.length; i++) {
@@ -837,9 +980,9 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
             .doc(center.id);
         batch.update(centerRef, {'order': i + 1});
       }
-      
+
       await batch.commit();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -867,16 +1010,17 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
     await prefs.setString('userType', 'admin');
     await prefs.setBool('isLoggedIn', true);
     await prefs.setBool('fromControlPanel', true);
-    
+
     if (mounted) {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => DashboardScreen(
-            centerId: centerId,
-            centerName: centerName,
-            fromControlPanel: true,
-          ),
+          builder:
+              (context) => DashboardScreen(
+                centerId: centerId,
+                centerName: centerName,
+                fromControlPanel: true,
+              ),
         ),
       );
     }
@@ -902,10 +1046,7 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
           ),
           title: const Text(
             'المراكز الطبية',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           backgroundColor: const Color(0xFF0D47A1),
           elevation: 0,
@@ -937,12 +1078,16 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                         Row(
                           children: [
                             Icon(
-                              _editingCenterId != null ? Icons.edit : Icons.add_business,
+                              _editingCenterId != null
+                                  ? Icons.edit
+                                  : Icons.add_business,
                               color: const Color(0xFF0D47A1),
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              _editingCenterId != null ? 'تعديل المركز' : 'إضافة مركز جديد',
+                              _editingCenterId != null
+                                  ? 'تعديل المركز'
+                                  : 'إضافة مركز جديد',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -972,25 +1117,31 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                                           ),
                                         ),
                                         child: ClipOval(
-                                          child: _isUploadingImage
-                                              ? const Center(
-                                                  child: CircularProgressIndicator(),
-                                                )
-                                              : _selectedImageUrl.isNotEmpty
+                                          child:
+                                              _isUploadingImage
+                                                  ? const Center(
+                                                    child:
+                                                        CircularProgressIndicator(),
+                                                  )
+                                                  : _selectedImageUrl.isNotEmpty
                                                   ? Image.network(
-                                                      _selectedImageUrl,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (context, error, stackTrace) {
-                                                        return Image.asset(
-                                                          'assets/images/center.png',
-                                                          fit: BoxFit.cover,
-                                                        );
-                                                      },
-                                                    )
+                                                    _selectedImageUrl,
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) {
+                                                      return Image.asset(
+                                                        'assets/images/center.png',
+                                                        fit: BoxFit.cover,
+                                                      );
+                                                    },
+                                                  )
                                                   : Image.asset(
-                                                      'assets/images/center.png',
-                                                      fit: BoxFit.cover,
-                                                    ),
+                                                    'assets/images/center.png',
+                                                    fit: BoxFit.cover,
+                                                  ),
                                         ),
                                       ),
                                     ),
@@ -1000,7 +1151,9 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                                       icon: const Icon(Icons.camera_alt),
                                       label: const Text('اختيار صورة المركز'),
                                       style: TextButton.styleFrom(
-                                        foregroundColor: const Color(0xFF0D47A1),
+                                        foregroundColor: const Color(
+                                          0xFF0D47A1,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1074,7 +1227,8 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                                 decoration: const InputDecoration(
                                   labelText: 'ترتيب المركز (رقم)',
                                   border: OutlineInputBorder(),
-                                  hintText: 'مثال: 1 للمركز الأول، 2 للمركز الثاني',
+                                  hintText:
+                                      'مثال: 1 للمركز الأول، 2 للمركز الثاني',
                                 ),
                                 keyboardType: TextInputType.number,
                                 textInputAction: TextInputAction.done,
@@ -1092,27 +1246,71 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                                   return null;
                                 },
                               ),
+                              const SizedBox(height: 8),
+
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text(
+                                  'تأكيد الحجز',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: const Text(
+                                  'عند التفعيل يحتاج الحجز إلى تأكيد من المركز',
+                                ),
+                                value: _requireBookingConfirmation,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _requireBookingConfirmation = value;
+                                  });
+                                },
+                                secondary: Icon(
+                                  _requireBookingConfirmation
+                                      ? Icons.verified
+                                      : Icons.verified_outlined,
+                                  color:
+                                      _requireBookingConfirmation
+                                          ? Colors.green
+                                          : Colors.grey,
+                                ),
+                              ),
                               const SizedBox(height: 16),
                               Row(
                                 children: [
                                   Expanded(
                                     child: ElevatedButton(
-                                      onPressed: _isAddingCenter ? null : (_editingCenterId != null ? _updateCenter : _addCenter),
+                                      onPressed:
+                                          _isAddingCenter
+                                              ? null
+                                              : (_editingCenterId != null
+                                                  ? _updateCenter
+                                                  : _addCenter),
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF0D47A1),
+                                        backgroundColor: const Color(
+                                          0xFF0D47A1,
+                                        ),
                                         foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
                                       ),
-                                      child: _isAddingCenter
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      child:
+                                          _isAddingCenter
+                                              ? const SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                ),
+                                              )
+                                              : Text(
+                                                _editingCenterId != null
+                                                    ? 'تحديث المركز'
+                                                    : 'إضافة المركز',
                                               ),
-                                            )
-                                          : Text(_editingCenterId != null ? 'تحديث المركز' : 'إضافة المركز'),
                                     ),
                                   ),
                                   if (_editingCenterId != null) ...[
@@ -1121,7 +1319,9 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                                       child: OutlinedButton(
                                         onPressed: _cancelEdit,
                                         style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
                                         ),
                                         child: const Text('إلغاء'),
                                       ),
@@ -1137,13 +1337,14 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                   ),
                 ),
               ),
-            
+
             // Centers List
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('medicalFacilities')
-                    .snapshots(),
+                stream:
+                    FirebaseFirestore.instance
+                        .collection('medicalFacilities')
+                        .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return Center(
@@ -1170,7 +1371,11 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.business, color: Colors.grey, size: 64),
+                          const Icon(
+                            Icons.business,
+                            color: Colors.grey,
+                            size: 64,
+                          ),
                           const SizedBox(height: 16),
                           const Text(
                             'لا توجد مراكز طبية',
@@ -1184,7 +1389,8 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(
-                            onPressed: () => setState(() => _showAddForm = true),
+                            onPressed:
+                                () => setState(() => _showAddForm = true),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF0D47A1),
                               foregroundColor: Colors.white,
@@ -1198,7 +1404,9 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
 
                   return StatefulBuilder(
                     builder: (context, setStateLocal) {
-                      List<QueryDocumentSnapshot> localCenters = List.from(centers);
+                      List<QueryDocumentSnapshot> localCenters = List.from(
+                        centers,
+                      );
 
                       return ReorderableListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -1215,121 +1423,191 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
                         },
                         itemBuilder: (context, index) {
                           final center = localCenters[index];
-                      final centerData = center.data() as Map<String, dynamic>;
-                      final centerId = center.id;
-                      final centerName = centerData['name'] ?? '';
-                      final centerAddress = centerData['address'] ?? '';
-                      final centerPhone = centerData['phone'] ?? '';
-                      final isAvailable = centerData['available'] ?? false;
+                          final centerData =
+                              center.data() as Map<String, dynamic>;
+                          final centerId = center.id;
+                          final centerName = centerData['name'] ?? '';
+                          final centerAddress = centerData['address'] ?? '';
+                          final centerPhone = centerData['phone'] ?? '';
+                          final isAvailable = centerData['available'] ?? false;
 
-                      return Card(
-                        key: ValueKey(centerId),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          onTap: () => _navigateToCenterDashboard(centerId, centerName),
-                          
-                          title: Text(
-                            centerName,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Row(
-                            children: [
-                              Icon(
-                                Icons.sort,
-                                color: const Color(0xFF0D47A1),
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'ترتيب: ${centerData['order'] ?? 999}',
+                          return Card(
+                            key: ValueKey(centerId),
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              onTap:
+                                  () => _navigateToCenterDashboard(
+                                    centerId,
+                                    centerName,
+                                  ),
+
+                              title: Text(
+                                centerName,
                                 style: const TextStyle(
-                                  color: Color(0xFF0D47A1),
                                   fontWeight: FontWeight.bold,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.info_outline, color: Color(0xFF0D47A1)),
-                                onPressed: () => _showCenterDetailsDialog(centerName, centerAddress, centerPhone, isAvailable),
-                                tooltip: 'تفاصيل المركز',
-                              ),
-                              
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert),
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'edit':
-                                      _editCenter(centerId, centerData);
-                                      break;
-                                    case 'toggle':
-                                      _toggleCenterAvailability(centerId, isAvailable);
-                                      break;
-                                    case 'delete':
-                                      _deleteCenter(centerId, centerName);
-                                      break;
-                                    case 'export_pdf':
-                                      _exportCenterDoctorsSchedulePdf(centerId, centerName);
-                                      break;
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  PopupMenuItem<String>(
-                                    value: 'edit',
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.edit, color: Color(0xFF0D47A1), size: 20),
-                                        const SizedBox(width: 8),
-                                        const Text('تعديل المركز'),
-                                      ],
+                              subtitle: Row(
+                                children: [
+                                  // حالة المركز
+                                  Icon(
+                                    isAvailable
+                                        ? Icons.check_circle
+                                        : Icons.cancel,
+                                    color:
+                                        isAvailable ? Colors.green : Colors.red,
+                                    size: 17,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    isAvailable ? 'مفعل' : 'غير مفعل',
+                                    style: TextStyle(
+                                      color:
+                                          isAvailable
+                                              ? Colors.green
+                                              : Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
                                     ),
                                   ),
-                                  PopupMenuItem<String>(
-                                    value: 'toggle',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          isAvailable ? Icons.block : Icons.check_circle,
-                                          color: isAvailable ? Colors.orange : Colors.green,
-                                          size: 20,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(isAvailable ? 'إلغاء التفعيل' : 'تفعيل'),
-                                      ],
-                                    ),
+
+                                  const SizedBox(width: 16),
+
+                                  // الترتيب
+                                  const Icon(
+                                    Icons.sort,
+                                    color: Color(0xFF0D47A1),
+                                    size: 16,
                                   ),
-                                  PopupMenuItem<String>(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.delete, color: Colors.red, size: 20),
-                                        const SizedBox(width: 8),
-                                        const Text('حذف المركز'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuDivider(),
-                                  const PopupMenuItem<String>(
-                                    value: 'export_pdf',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.picture_as_pdf, color: Color(0xFF0D47A1), size: 20),
-                                        SizedBox(width: 8),
-                                        Text('جدول الأطباء PDF'),
-                                      ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'ترتيب: ${centerData['order'] ?? 999}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF0D47A1),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
-                      );
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.info_outline,
+                                      color: Color(0xFF0D47A1),
+                                    ),
+                                    onPressed:
+                                        () => _showCenterDetailsDialog(
+                                          centerName,
+                                          centerAddress,
+                                          centerPhone,
+                                          isAvailable,
+                                        ),
+                                    tooltip: 'تفاصيل المركز',
+                                  ),
+
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.more_vert),
+                                    onSelected: (value) {
+                                      switch (value) {
+                                        case 'edit':
+                                          _editCenter(centerId, centerData);
+                                          break;
+                                        case 'toggle':
+                                          _toggleCenterAvailability(
+                                            centerId,
+                                            isAvailable,
+                                          );
+                                          break;
+                                        case 'delete':
+                                          _deleteCenter(centerId, centerName);
+                                          break;
+                                        case 'export_pdf':
+                                          _exportCenterDoctorsSchedulePdf(
+                                            centerId,
+                                            centerName,
+                                          );
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder:
+                                        (context) => [
+                                          PopupMenuItem<String>(
+                                            value: 'edit',
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.edit,
+                                                  color: Color(0xFF0D47A1),
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                const Text('تعديل المركز'),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem<String>(
+                                            value: 'toggle',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  isAvailable
+                                                      ? Icons.block
+                                                      : Icons.check_circle,
+                                                  color:
+                                                      isAvailable
+                                                          ? Colors.orange
+                                                          : Colors.green,
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  isAvailable
+                                                      ? 'إلغاء التفعيل'
+                                                      : 'تفعيل',
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem<String>(
+                                            value: 'delete',
+                                            child: Row(
+                                              children: [
+                                                const Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                  size: 20,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                const Text('حذف المركز'),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuDivider(),
+                                          const PopupMenuItem<String>(
+                                            value: 'export_pdf',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.picture_as_pdf,
+                                                  color: Color(0xFF0D47A1),
+                                                  size: 20,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('جدول الأطباء PDF'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
                         },
                       );
                     },
@@ -1343,4 +1621,3 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
     );
   }
 }
-

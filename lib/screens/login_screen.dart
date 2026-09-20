@@ -49,22 +49,24 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // ✅ البحث بـ uid field داخل الدوكيومنت
   Future<Map<String, dynamic>> _getUserData(String uid) async {
     try {
-      final query =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .where('uid', isEqualTo: uid)
-              .limit(1)
-              .get();
+      // البحث مباشرة باستخدام UID كـ Document ID
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
-      if (query.docs.isEmpty) {
-        print("❌ No user found with uid field: $uid");
+      if (!doc.exists) {
+        print("❌ No user document found: users/$uid");
         throw Exception('بيانات المستخدم غير موجودة');
       }
 
-      return query.docs.first.data();
+      final data = doc.data();
+
+      if (data == null) {
+        throw Exception('بيانات المستخدم فارغة');
+      }
+
+      return data;
     } catch (e) {
       print("🔥 Firestore error: $e");
       rethrow;
@@ -97,14 +99,16 @@ class _LoginScreenState extends State<LoginScreen> {
   // ✅ التنقل حسب الدور
   void _navigateUser(Map<String, dynamic> data) {
     final role = data['role'];
-    final userType = data['userType'];
 
     final centerId = data['facilityId'] ?? '';
-    final centerName = data['displayName'] ?? '';
+    final centerName = data['facilityName'] ?? '';
 
-    print("User role: $role | userType: $userType");
+    print("User role: $role");
 
-    if (role == 'control') {
+    // =========================================================
+    // Super Admin → الكنترول
+    // =========================================================
+    if (role == 'superadmin') {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const ControlPanelScreen()),
@@ -112,7 +116,10 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (userType == 'admin') {
+    // =========================================================
+    // مشرف مرفق
+    // =========================================================
+    if (data['userType'] == 'admin') {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -127,7 +134,10 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (userType == 'callcenter') {
+    // =========================================================
+    // كول سنتر
+    // =========================================================
+    if (data['userType'] == 'callcenter') {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -143,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    print("❌ Unknown user type");
+    print("❌ Unknown user role: $role");
   }
 
   // ✅ تسجيل الدخول
@@ -219,100 +229,258 @@ class _LoginScreenState extends State<LoginScreen> {
                 Expanded(
                   child: Center(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Card(
-                        elevation: 8,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(32.0),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              children: [
-                                Image.asset(
-                                  'assets/images/logo.png',
-                                  height: 120,
-                                ),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'إدارة المراكز الطبية',
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-
-                                TextFormField(
-                                  controller: _emailController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Email',
-                                    prefixIcon: Icon(Icons.email),
-                                  ),
-                                  validator:
-                                      (v) =>
-                                          v!.isEmpty
-                                              ? 'أدخل البريد الإلكتروني'
-                                              : null,
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                TextFormField(
-                                  controller: _passwordController,
-                                  obscureText: !_isPasswordVisible,
-                                  decoration: InputDecoration(
-                                    labelText: 'Password',
-                                    prefixIcon: const Icon(Icons.lock),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _isPasswordVisible
-                                            ? Icons.visibility
-                                            : Icons.visibility_off,
-                                      ),
-                                      onPressed: () {
-                                        setState(() {
-                                          _isPasswordVisible =
-                                              !_isPasswordVisible;
-                                        });
-                                      },
+                      padding: const EdgeInsets.all(24),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 460),
+                        child: Card(
+                          color: const Color(0xFFFDFEFF),
+                          elevation: 6,
+                          shadowColor: const Color(
+                            0xFF7AAFC4,
+                          ).withOpacity(0.18),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(
+                              color: const Color(0xFF2FBDAF).withOpacity(0.08),
+                              width: 1,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(32, 30, 32, 30),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // =========================
+                                  // Logo
+                                  // =========================
+                                  Center(
+                                    child: Image.asset(
+                                      'assets/images/logo.png',
+                                      height: 120,
                                     ),
                                   ),
-                                  validator:
-                                      (v) =>
-                                          v!.isEmpty
-                                              ? 'أدخل كلمة المرور'
-                                              : null,
-                                ),
 
-                                const SizedBox(height: 24),
+                                  const SizedBox(height: 18),
 
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: _isLoading ? null : _login,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2FBDAF),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
+                                  const Text(
+                                    'إدارة المراكز الطبية',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 8),
+
+                                  Text(
+                                    'تسجيل الدخول',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 28),
+
+                                  // =========================
+                                  // Email
+                                  // =========================
+                                  const Text(
+                                    'البريد الإلكتروني',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 8),
+
+                                  TextFormField(
+                                    controller: _emailController,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                    decoration: InputDecoration(
+                                      hintText: 'أدخل البريد الإلكتروني',
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 14,
+                                      ),
+                                      prefixIcon: const Icon(
+                                        Icons.email_outlined,
+                                        color: Color(0xFF2FBDAF),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 16,
+                                          ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF2FBDAF),
+                                          width: 1.5,
+                                        ),
                                       ),
                                     ),
-                                    child:
-                                        _isLoading
-                                            ? const CircularProgressIndicator(
-                                              color: Colors.white,
-                                            )
-                                            : const Text(
+                                    validator: (v) {
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'أدخل البريد الإلكتروني';
+                                      }
+
+                                      if (!v.contains('@')) {
+                                        return 'أدخل بريد إلكتروني صحيح';
+                                      }
+
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 20),
+
+                                  // =========================
+                                  // Password
+                                  // =========================
+                                  const Text(
+                                    'كلمة المرور',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 8),
+
+                                  TextFormField(
+                                    controller: _passwordController,
+                                    obscureText: !_isPasswordVisible,
+                                    textInputAction: TextInputAction.done,
+                                    onFieldSubmitted: (_) {
+                                      if (!_isLoading) {
+                                        _login();
+                                      }
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'أدخل كلمة المرور',
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey[400],
+                                        fontSize: 14,
+                                      ),
+                                      prefixIcon: const Icon(
+                                        Icons.lock_outline,
+                                        color: Color(0xFF2FBDAF),
+                                      ),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _isPasswordVisible
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                          color: Colors.grey[500],
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            _isPasswordVisible =
+                                                !_isPasswordVisible;
+                                          });
+                                        },
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 16,
+                                          ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey.shade300,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(
+                                          color: Color(0xFF2FBDAF),
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) {
+                                        return 'أدخل كلمة المرور';
+                                      }
+
+                                      return null;
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 28),
+
+                                  // =========================
+                                  // Login Button
+                                  // =========================
+                                  SizedBox(
+                                    height: 52,
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: _isLoading ? null : _login,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFF2FBDAF,
+                                        ),
+                                        foregroundColor: Colors.white,
+                                        elevation: 2,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                      ),
+                                      child:
+                                          _isLoading
+                                              ? const SizedBox(
+                                                width: 22,
+                                                height: 22,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2.5,
+                                                      color: Colors.white,
+                                                    ),
+                                              )
+                                              : const Text(
                                                 'تسجيل الدخول',
-                                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -324,7 +492,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 if (_version.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Text(_version),
+                    child: Text(
+                      _version,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
                   ),
               ],
             ),

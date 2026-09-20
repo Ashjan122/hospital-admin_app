@@ -1,21 +1,20 @@
- import 'dart:io';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-
 import 'package:hospital_admin_app/screens/central_data_screen.dart';
+import 'package:hospital_admin_app/screens/control_notifications_screen.dart';
 import 'package:hospital_admin_app/screens/control_user_screen.dart';
-import 'package:hospital_admin_app/screens/users_stats_screen.dart';
+import 'package:hospital_admin_app/screens/home_clinic_centers_screen.dart';
 import 'package:hospital_admin_app/screens/sample_requests_screen.dart';
 import 'package:hospital_admin_app/screens/support_numbers_screen.dart';
-import 'package:hospital_admin_app/screens/control_notifications_screen.dart';
-import 'package:hospital_admin_app/screens/home_clinic_centers_screen.dart';
+import 'package:hospital_admin_app/screens/users_stats_screen.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ControlPanelScreen extends StatefulWidget {
   const ControlPanelScreen({super.key});
@@ -34,7 +33,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     super.initState();
     print('ControlPanelScreen initState');
     _checkLoginStatus();
-     _loadUserName();
+    _loadUserName();
   }
 
   Future<void> _checkLoginStatus() async {
@@ -42,29 +41,33 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final role = prefs.getString('role');
 
-    print('ControlPanel _checkLoginStatus - isLoggedIn: $isLoggedIn, role: $role');
+    print(
+      'ControlPanel _checkLoginStatus - '
+      'isLoggedIn: $isLoggedIn, role: $role',
+    );
 
-    if (!isLoggedIn || role != 'control') {
+    if (!isLoggedIn || role != 'superadmin') {
       print('Redirecting to login screen');
+
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
       }
-    } else {
-      print('User is logged in as control, staying in ControlPanel');
-      // حذف fromControlPanel عند الوصول للكنترول
-      await prefs.remove('fromControlPanel');
-      print('تم حذف fromControlPanel عند الوصول للكنترول');
-      
-      // إعادة الاشتراك في الإشعارات إذا كان مشترك سابقاً
-      await _restoreNotificationSubscription();
+
+      return;
     }
+
+    print('User is logged in as superadmin');
+
+    await prefs.remove('fromControlPanel');
+
+    await _restoreNotificationSubscription();
   }
 
   Future<void> _restoreNotificationSubscription() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final isSubscribed = prefs.getBool('subscribed_to_new_signup') ?? false;
-      
+
       if (isSubscribed) {
         // استيراد Firebase Messaging
         final FirebaseMessaging messaging = FirebaseMessaging.instance;
@@ -103,10 +106,10 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
 
   // عنصر بطاقة أيقونة في الشاشة الرئيسية
   Widget _buildHomeCard({
-  required String lottieAsset,
+    required String lottieAsset,
     required String title,
     required VoidCallback onTap,
-  double size = 60, // الحجم الافتراضي
+    double size = 60, // الحجم الافتراضي
   }) {
     return InkWell(
       onTap: onTap,
@@ -117,31 +120,31 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            spreadRadius: 2,
-            offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              spreadRadius: 2,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 title,
                 textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
-            ),
+                style: const TextStyle(fontSize: 16),
+              ),
 
-            SizedBox(
-              height: size,
-              width: size,
-              child: Lottie.asset(
-                lottieAsset,
-                repeat: true,
-                fit: BoxFit.contain,
+              SizedBox(
+                height: size,
+                width: size,
+                child: Lottie.asset(
+                  lottieAsset,
+                  repeat: true,
+                  fit: BoxFit.contain,
                 ),
               ),
             ],
@@ -154,181 +157,201 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
   void _showReceptionStaffList() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const ControlUsersScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const ControlUsersScreen()),
     );
   }
 
   void _showSampleRequests() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const SampleRequestsScreen(),
-          ),
-        );
-      }
-  void _showEditProfileDialog() {
-  final TextEditingController nameController = TextEditingController(text: _userName ?? '');
-  final TextEditingController passwordController = TextEditingController();
-
-      showDialog(
-        context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('الملف الشخصي'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // حقل الاسم
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'اسم المستخدم'),
-              ),
-              const SizedBox(height: 10),
-
-              // حقل تغيير كلمة المرور
-              TextField(
-                controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'تغيير كلمة المرور',
-                  hintText: 'اتركه فارغ إذا لا تريد التغيير',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newName = nameController.text.trim();
-              final newPassword = passwordController.text.trim();
-
-              if (_controlUserId == null) return;
-
-              final updates = <String, dynamic>{};
-
-              if (newName.isNotEmpty) {
-                updates['userName'] = newName;
-              }
-
-              if (newPassword.isNotEmpty) {
-                updates['userPassword'] = newPassword;
-              }
-
-              if (updates.isNotEmpty) {
-                try {
-                  await FirebaseFirestore.instance
-                      .collection('controlUsers')
-                      .doc(_controlUserId)
-                      .update(updates);
-
-                  final prefs = await SharedPreferences.getInstance();
-                  if (newName.isNotEmpty) {
-                    await prefs.setString('userName', newName);
-                  }
-
-                  setState(() {
-                    if (newName.isNotEmpty) _userName = newName;
-                  });
-
-        Navigator.of(context).pop();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('تم حفظ التعديلات بنجاح')),
-        );
-    } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('فشل في التحديث: $e')),
-                  );
-                }
-              } else {
-                Navigator.of(context).pop(); // لم يتم تغيير شيء
-              }
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
-      );
-    },
-  );
-}
-Future<void> _pickAndUploadProfileImage() async {
-  if (_controlUserId == null) return;
-
-  final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 75);
-  if (picked == null) return;
-
-  final file = File(picked.path);
-  try {
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child('profile_images/$_controlUserId.jpg');
-
-    await ref.putFile(file);
-    final url = await ref.getDownloadURL();
-
-        await FirebaseFirestore.instance
-        .collection('controlUsers')
-        .doc(_controlUserId)
-        .update({'profileImageUrl': url});
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('profileImageUrl', url);
-
-        setState(() {
-      _profileImageUrl = url;
-        });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم تحديث الصورة')),
-          );
-      } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('فشل في رفع الصورة: $e')),
+      MaterialPageRoute(builder: (context) => const SampleRequestsScreen()),
     );
   }
-}
-Future<void> _loadUserName() async {
-  final prefs = await SharedPreferences.getInstance();
-  String? name = prefs.getString('userName');
-  String? img = prefs.getString('profileImageUrl');
-  final controlUserId = prefs.getString('userId');
 
-  if ((name == null || name.isEmpty) || (img == null || img.isEmpty)) {
-    if (controlUserId != null) {
+  void _showEditProfileDialog() {
+    final TextEditingController nameController = TextEditingController(
+      text: _userName ?? '',
+    );
+    final TextEditingController passwordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('الملف الشخصي'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // حقل الاسم
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'اسم المستخدم'),
+                ),
+                const SizedBox(height: 10),
+
+                // حقل تغيير كلمة المرور
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'تغيير كلمة المرور',
+                    hintText: 'اتركه فارغ إذا لا تريد التغيير',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final newName = nameController.text.trim();
+                final newPassword = passwordController.text.trim();
+
+                if (_controlUserId == null) return;
+
+                final updates = <String, dynamic>{};
+
+                if (newName.isNotEmpty) {
+                  updates['userName'] = newName;
+                }
+
+                if (newPassword.isNotEmpty) {
+                  updates['userPassword'] = newPassword;
+                }
+
+                if (updates.isNotEmpty) {
+                  try {
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(_controlUserId)
+                        .update(updates);
+
+                    final prefs = await SharedPreferences.getInstance();
+                    if (newName.isNotEmpty) {
+                      await prefs.setString('userName', newName);
+                    }
+
+                    setState(() {
+                      if (newName.isNotEmpty) _userName = newName;
+                    });
+
+                    Navigator.of(context).pop();
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم حفظ التعديلات بنجاح')),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('فشل في التحديث: $e')),
+                    );
+                  }
+                } else {
+                  Navigator.of(context).pop(); // لم يتم تغيير شيء
+                }
+              },
+              child: const Text('حفظ'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadProfileImage() async {
+    if (_controlUserId == null) return;
+
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 75,
+    );
+
+    if (picked == null) return;
+
+    final file = File(picked.path);
+
+    try {
+      final ref = FirebaseStorage.instance.ref().child(
+        'profile_images/$_controlUserId.jpg',
+      );
+
+      await ref.putFile(file);
+
+      final url = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_controlUserId)
+          .update({'profileImageUrl': url});
+
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setString('profileImageUrl', url);
+
+      if (!mounted) return;
+
+      setState(() {
+        _profileImageUrl = url;
+      });
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم تحديث الصورة')));
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل في رفع الصورة: $e')));
+    }
+  }
+
+  Future<void> _loadUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    String? name = prefs.getString('userName');
+    String? img = prefs.getString('profileImageUrl');
+
+    final userId = prefs.getString('userId');
+
+    if (userId != null) {
       try {
-        final snap = await FirebaseFirestore.instance
-            .collection('controlUsers')
-            .doc(controlUserId)
-            .get();
+        final snap =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(userId)
+                .get();
+
         if (snap.exists) {
-          name ??= snap.data()?['userName']?.toString();
-          img ??= snap.data()?['profileImageUrl']?.toString();
+          final data = snap.data();
+
+          name = data?['displayName']?.toString() ?? name;
+          img = data?['profileImageUrl']?.toString() ?? img;
 
           if (name != null && name.isNotEmpty) {
             await prefs.setString('userName', name);
           }
+
           if (img != null && img.isNotEmpty) {
             await prefs.setString('profileImageUrl', img);
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        print('خطأ في تحميل بيانات المستخدم: $e');
+      }
     }
-  }
 
-      if (!mounted) return;
-      setState(() {
-    _controlUserId = controlUserId;
-    _userName = name;
-    _profileImageUrl = img;
-  });
+    if (!mounted) return;
+
+    setState(() {
+      _controlUserId = userId;
+      _userName = name;
+      _profileImageUrl = img;
+    });
   }
 
   @override
@@ -340,168 +363,173 @@ Future<void> _loadUserName() async {
         appBar: AppBar(
           title: const Text(
             'لوحة تحكم الكنترول',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
           ),
           backgroundColor: const Color(0xFF0D47A1),
           elevation: 0,
           centerTitle: true,
-          
-         
-         
         ),
-       drawer: Drawer(
-  child: SafeArea(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // ✅ رأس الدروار بصورة واسم المستخدم
-        Container(
-          color: const Color(0xFF0D47A1),
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-          child: Column(
-            children: [
-              GestureDetector(
-                onTap: _pickAndUploadProfileImage,
-                child: CircleAvatar(
-                  radius: 45, // حجم أكبر
-                  backgroundColor: Colors.white,
-                  backgroundImage: (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
-                      ? NetworkImage(_profileImageUrl!)
-                      : null,
-                  child: (_profileImageUrl == null || _profileImageUrl!.isEmpty)
-                      ? const Icon(Icons.person, color: Color(0xFF0D47A1), size: 40)
-                      : null,
+        drawer: Drawer(
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ✅ رأس الدروار بصورة واسم المستخدم
+                Container(
+                  color: const Color(0xFF0D47A1),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 16,
+                  ),
+                  child: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: _pickAndUploadProfileImage,
+                        child: CircleAvatar(
+                          radius: 45, // حجم أكبر
+                          backgroundColor: Colors.white,
+                          backgroundImage:
+                              (_profileImageUrl != null &&
+                                      _profileImageUrl!.isNotEmpty)
+                                  ? NetworkImage(_profileImageUrl!)
+                                  : null,
+                          child:
+                              (_profileImageUrl == null ||
+                                      _profileImageUrl!.isEmpty)
+                                  ? const Icon(
+                                    Icons.person,
+                                    color: Color(0xFF0D47A1),
+                                    size: 40,
+                                  )
+                                  : null,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        _userName ?? 'المستخدم',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _userName ?? 'المستخدم',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+                // ✅ زر الملف الشخصي
+                ListTile(
+                  leading: const Icon(Icons.person, color: Color(0xFF0D47A1)),
+                  title: const Text('الملف الشخصي'),
+                  onTap: () {
+                    Navigator.pop(context); // يغلق الدروار
+                    _showEditProfileDialog(); // يظهر الديالوق
+                  },
+                ),
+
+                // 🟪 باقي العناصر يمكن إضافتها هنا
+                const Spacer(),
+
+                // ✅ زر تسجيل الخروج داخل إطار
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Color(0xFF0D47A1)),
+                  title: const Text('تسجيل الخروج'),
+                  onTap: () {
+                    Navigator.pop(context); // يغلق الدروار
+                    _logout(); // ينفذ تسجيل الخروج
+                  },
+                ),
+                const SizedBox(height: 24), // هامش سفلي بسيط
+              ],
             ),
-          ],
+          ),
         ),
-        ),
-        // ✅ زر الملف الشخصي
-ListTile(
-  leading: const Icon(Icons.person, color: Color(0xFF0D47A1)),
-  title: const Text('الملف الشخصي'),
-  onTap: () {
-    Navigator.pop(context); // يغلق الدروار
-    _showEditProfileDialog(); // يظهر الديالوق
-  },
-),
 
-
-
-            // 🟪 باقي العناصر يمكن إضافتها هنا
-            const Spacer(),
-
-        // ✅ زر تسجيل الخروج داخل إطار
-        ListTile(
-          leading: const Icon(Icons.logout, color: Color(0xFF0D47A1)),
-          title: const Text('تسجيل الخروج'),
-          onTap: () {
-            Navigator.pop(context); // يغلق الدروار
-            _logout(); // ينفذ تسجيل الخروج
-          },
-        ),
-        const SizedBox(height: 24), // هامش سفلي بسيط
-      ],
-    ),
-  ),
-), 
-        
         body: Padding(
           padding: const EdgeInsets.all(5),
-                child: GridView.count(
+          child: GridView.count(
             crossAxisCount: 1,
             childAspectRatio: 5,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
-                    children: [
-                    _buildHomeCard(
-                      title: 'البيانات المركزية',
-  lottieAsset: 'assets/lottie/Red Network Globe.json',
-  onTap: () {
-    Navigator.push(
-                          context,
-      MaterialPageRoute(builder: (context) => const CentralDataScreen()),
-    );
-                          },
+            children: [
+              _buildHomeCard(
+                title: 'البيانات المركزية',
+                lottieAsset: 'assets/lottie/Red Network Globe.json',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CentralDataScreen(),
                     ),
-                    _buildHomeCard(
-                      lottieAsset: 'assets/lottie/Connect.json', 
+                  );
+                },
+              ),
+              _buildHomeCard(
+                lottieAsset: 'assets/lottie/Connect.json',
                 title: 'المستخدمين',
-                
-                
-                      onTap: () {
-                            _showReceptionStaffList();
-                          },
+
+                onTap: () {
+                  _showReceptionStaffList();
+                },
+              ),
+              _buildHomeCard(
+                lottieAsset: 'assets/lottie/registro.json',
+                title: 'طلبات العيادة المنزلية',
+                onTap: () {
+                  _showSampleRequests();
+                },
+              ),
+              _buildHomeCard(
+                lottieAsset:
+                    'assets/lottie/Call Center Support Lottie Animation.json',
+                title: 'أرقام الدعم الفني',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SupportNumbersScreen(),
                     ),
-                    _buildHomeCard(
-                      lottieAsset: 'assets/lottie/registro.json',
-                      title: 'طلبات العيادة المنزلية',
-                      onTap: () {
-                            _showSampleRequests();
-                          },
+                  );
+                },
+              ),
+              _buildHomeCard(
+                lottieAsset: 'assets/lottie/search users.json',
+                title: 'إحصائيات المستخدمين',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const UsersStatsScreen(),
                     ),
-                    _buildHomeCard(
-                      lottieAsset: 'assets/lottie/Call Center Support Lottie Animation.json',
-                      title: 'أرقام الدعم الفني',
-                      onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const SupportNumbersScreen(),
-                              ),
-                            );
-                          },
+                  );
+                },
+              ),
+              _buildHomeCard(
+                lottieAsset: 'assets/lottie/Notifications.json',
+                title: 'الإشعارات',
+
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ControlNotificationsScreen(),
                     ),
-                    _buildHomeCard(
-                      lottieAsset: 'assets/lottie/search users.json',
-                      title: 'إحصائيات المستخدمين',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const UsersStatsScreen(),
-                          ),
-                        );
-                      },
-                      ),
-                    _buildHomeCard(
-                      lottieAsset: 'assets/lottie/Notifications.json',
-                      title: 'الإشعارات',
-                      
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const ControlNotificationsScreen(),
-                          ),
-                        );
-                      },
-                      ),
-                    _buildHomeCard(
-                      lottieAsset: 'assets/lottie/Home Icon Loading.json',
-                      title: 'مراكز العيادة المنزلية',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const HomeClinicCentersScreen(),
-                          ),
-                        );
-                      },
-                      ),
+                  );
+                },
+              ),
+              _buildHomeCard(
+                lottieAsset: 'assets/lottie/Home Icon Loading.json',
+                title: 'مراكز العيادة المنزلية',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HomeClinicCentersScreen(),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
         ),
