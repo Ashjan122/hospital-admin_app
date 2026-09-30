@@ -1,9 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:hospital_admin_app/widgets/optimized_loading_widget.dart';
 import 'package:hospital_admin_app/screens/callcenter_booking_screen.dart';
-
-
+import 'package:hospital_admin_app/widgets/optimized_loading_widget.dart';
 
 class CallcenterDoctorsScreen extends StatefulWidget {
   final String centerId;
@@ -20,7 +18,8 @@ class CallcenterDoctorsScreen extends StatefulWidget {
   });
 
   @override
-  State<CallcenterDoctorsScreen> createState() => _CallcenterDoctorsScreenState();
+  State<CallcenterDoctorsScreen> createState() =>
+      _CallcenterDoctorsScreenState();
 }
 
 class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
@@ -51,33 +50,35 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
   @override
   void initState() {
     super.initState();
-    _doctorsStream = FirebaseFirestore.instance
-        .collection('medicalFacilities')
-        .doc(widget.centerId)
-        .collection('specializations')
-        .doc(widget.specId)
-        .collection('doctors')
-        .orderBy('createdAt', descending: true)
-        .snapshots();
+    _doctorsStream =
+        FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(widget.specId)
+            .collection('doctors')
+            .orderBy('createdAt', descending: true)
+            .snapshots();
   }
 
   List<QueryDocumentSnapshot> getFilteredDoctors() {
     // تصفية الأطباء المفعلين أولاً
-    final activeDoctors = _allDoctors.where((doctor) {
-      final data = doctor.data() as Map<String, dynamic>;
-      final isActive = data['isActive'];
-      // فقط الأطباء الذين لديهم isActive = true صراحة
-      if (isActive != true) return false;
-      
-      // إذا كان هناك تخصص فرعي محدد، فلتر الأطباء حسب التخصص الفرعي
-      if (widget.subSpecialtyId != null) {
-        final doctorSubSpecialty = data['subSpecialization']?.toString();
-        return doctorSubSpecialty == widget.subSpecialtyId;
-      }
-      
-      return true;
-    }).toList();
-    
+    final activeDoctors =
+        _allDoctors.where((doctor) {
+          final data = doctor.data() as Map<String, dynamic>;
+          final isActive = data['isActive'];
+          // فقط الأطباء الذين لديهم isActive = true صراحة
+          if (isActive != true) return false;
+
+          // إذا كان هناك تخصص فرعي محدد، فلتر الأطباء حسب التخصص الفرعي
+          if (widget.subSpecialtyId != null) {
+            final doctorSubSpecialty = data['subSpecialization']?.toString();
+            return doctorSubSpecialty == widget.subSpecialtyId;
+          }
+
+          return true;
+        }).toList();
+
     // ترتيب الأطباء حسب أقرب يوم عمل قادم: غداً أولاً ثم بعد غد وهكذا
     final listToSort = List<QueryDocumentSnapshot>.from(activeDoctors);
     listToSort.sort((a, b) {
@@ -101,16 +102,16 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
       final bName = (bData['docName'] ?? '').toString();
       return aName.compareTo(bName);
     });
-    
+
     if (_searchQuery.isEmpty) {
       return listToSort;
     }
-    
+
     return listToSort.where((doctor) {
       final data = doctor.data() as Map<String, dynamic>;
       final doctorName = data['docName']?.toString().toLowerCase() ?? '';
       final searchLower = _searchQuery.toLowerCase();
-      
+
       return doctorName.contains(searchLower);
     }).toList();
   }
@@ -129,10 +130,15 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
     }
 
     List<String> workingDays = [];
-    
+
     scheduleMap.forEach((day, value) {
-      if (day == 'الأحد' || day == 'الاثنين' || day == 'الثلاثاء' || 
-          day == 'الأربعاء' || day == 'الخميس' || day == 'الجمعة' || day == 'السبت') {
+      if (day == 'الأحد' ||
+          day == 'الاثنين' ||
+          day == 'الثلاثاء' ||
+          day == 'الأربعاء' ||
+          day == 'الخميس' ||
+          day == 'الجمعة' ||
+          day == 'السبت') {
         workingDays.add(day);
       }
     });
@@ -167,14 +173,22 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
   // دالة لتحويل رقم اليوم إلى اسم عربي
   String _getArabicDayName(int weekday) {
     switch (weekday) {
-      case 1: return 'الاثنين';
-      case 2: return 'الثلاثاء';
-      case 3: return 'الأربعاء';
-      case 4: return 'الخميس';
-      case 5: return 'الجمعة';
-      case 6: return 'السبت';
-      case 7: return 'الأحد';
-      default: return '';
+      case 1:
+        return 'الاثنين';
+      case 2:
+        return 'الثلاثاء';
+      case 3:
+        return 'الأربعاء';
+      case 4:
+        return 'الخميس';
+      case 5:
+        return 'الجمعة';
+      case 6:
+        return 'السبت';
+      case 7:
+        return 'الأحد';
+      default:
+        return '';
     }
   }
 
@@ -192,11 +206,16 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
     }
 
     List<String> workingDays = [];
-    
+
     scheduleMap.forEach((day, value) {
       // التحقق من أن اليوم موجود في قائمة الأيام العربية
-      if (day == 'الأحد' || day == 'الاثنين' || day == 'الثلاثاء' || 
-          day == 'الأربعاء' || day == 'الخميس' || day == 'الجمعة' || day == 'السبت') {
+      if (day == 'الأحد' ||
+          day == 'الاثنين' ||
+          day == 'الثلاثاء' ||
+          day == 'الأربعاء' ||
+          day == 'الخميس' ||
+          day == 'الجمعة' ||
+          day == 'السبت') {
         // إذا كان اليوم موجود في الجدول، فهو يوم عمل
         workingDays.add(day);
       }
@@ -207,8 +226,18 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
     }
 
     // ترتيب الأيام حسب ترتيبها في الأسبوع
-    final dayOrder = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
-    workingDays.sort((a, b) => dayOrder.indexOf(a).compareTo(dayOrder.indexOf(b)));
+    final dayOrder = [
+      'الأحد',
+      'الاثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت',
+    ];
+    workingDays.sort(
+      (a, b) => dayOrder.indexOf(a).compareTo(dayOrder.indexOf(b)),
+    );
 
     // تقسيم الأيام على أسطر متعددة إذا كانت كثيرة
     String result;
@@ -230,7 +259,7 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
         result += '\n$thirdLine';
       }
     }
-    
+
     return result;
   }
 
@@ -255,54 +284,58 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
           actions: [
             _isSearching
                 ? IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _isSearching = false;
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                    icon: Icon(Icons.close, color: Color.fromARGB(255, 156, 208, 235)),
-                  )
-                : IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _isSearching = true;
-                      });
-                    },
-                    icon: Icon(Icons.search, color: Color.fromARGB(255, 156, 208, 235)),
-                  ),
-          ],
-          title: _isSearching
-              ? TextField(
-                  controller: _searchController,
-                  onChanged: (value) {
+                  onPressed: () {
                     setState(() {
-                      _searchQuery = value;
+                      _isSearching = false;
+                      _searchQuery = '';
+                      _searchController.clear();
                     });
                   },
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: 'البحث عن طبيب...',
-                    border: InputBorder.none,
-                    hintStyle: TextStyle(
-                      color: Colors.grey[400],
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
+                  icon: Icon(
+                    Icons.close,
+                    color: Color.fromARGB(255, 34, 96, 129),
                   ),
                 )
-              : Text(
-                  "أطباء ${widget.specializationName}",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color.fromARGB(255, 156, 208, 235),
-                    fontSize: 20,
+                : IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _isSearching = true;
+                    });
+                  },
+                  icon: Icon(
+                    Icons.search,
+                    color: Color.fromARGB(255, 34, 96, 129),
                   ),
                 ),
+          ],
+          title:
+              _isSearching
+                  ? TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'البحث عن طبيب...',
+                      border: InputBorder.none,
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 16,
+                      ),
+                    ),
+                    style: TextStyle(color: Colors.black, fontSize: 16),
+                  )
+                  : Text(
+                    "أطباء ${widget.specializationName}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color.fromARGB(255, 34, 96, 129),
+                      fontSize: 20,
+                    ),
+                  ),
         ),
         body: SafeArea(
           child: StreamBuilder<QuerySnapshot>(
@@ -311,7 +344,7 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const OptimizedLoadingWidget(
                   message: 'جاري تحميل الأطباء...',
-                  color: Color.fromARGB(255, 156, 208, 235),
+                  color: Color.fromARGB(255, 34, 96, 129),
                 );
               }
 
@@ -341,7 +374,7 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
 
               _allDoctors = snapshot.data!.docs;
               final doctors = getFilteredDoctors();
-              
+
               // إذا لم يكن هناك أطباء مفعلين
               if (doctors.isEmpty) {
                 return Center(
@@ -366,17 +399,13 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
                   ),
                 );
               }
-              
+
               if (_searchQuery.isNotEmpty && doctors.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.search_off,
-                        size: 64,
-                        color: Colors.grey[400],
-                      ),
+                      Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
                       const SizedBox(height: 16),
                       Text(
                         'لا يوجد أطباء تطابق البحث',
@@ -398,22 +427,29 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
                   final doctorData = doc.data() as Map<String, dynamic>;
                   final doctorName = doctorData['docName'] ?? 'طبيب غير معروف';
                   final dynamic rawPhoto = doctorData['photoUrl'];
-                  final String photoUrl = (rawPhoto is String) ? rawPhoto.trim() : '';
+                  final String photoUrl =
+                      (rawPhoto is String) ? rawPhoto.trim() : '';
                   final bool hasValidPhoto = photoUrl.startsWith('http');
-                  const String fallbackUrl = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
-                  final String effectiveUrl = hasValidPhoto ? photoUrl : fallbackUrl;
+                  const String fallbackUrl =
+                      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
+                  final String effectiveUrl =
+                      hasValidPhoto ? photoUrl : fallbackUrl;
                   // حالة العمل غداً وإتاحة الحجز
-                  final List<String> workingDays = _getWorkingDaysList(doctorData['workingSchedule'] ?? {});
-                  final String tomorrow = _getArabicDayName(DateTime.now().weekday == 7 ? 1 : DateTime.now().weekday + 1);
+                  final List<String> workingDays = _getWorkingDaysList(
+                    doctorData['workingSchedule'] ?? {},
+                  );
+                  final String tomorrow = _getArabicDayName(
+                    DateTime.now().weekday == 7
+                        ? 1
+                        : DateTime.now().weekday + 1,
+                  );
                   final bool worksTomorrow = workingDays.contains(tomorrow);
-                  final bool isBookingEnabled = (doctorData['isBookingEnabled'] != false);
-                  final Color statusColor = !isBookingEnabled
-                      ? Colors.red
-                      : (worksTomorrow ? Colors.green : Colors.red);
-                  
-
-                  
-
+                  final bool isBookingEnabled =
+                      (doctorData['isBookingEnabled'] != false);
+                  final Color statusColor =
+                      !isBookingEnabled
+                          ? Colors.red
+                          : (worksTomorrow ? Colors.green : Colors.red);
 
                   return GestureDetector(
                     key: ValueKey(doc.id),
@@ -428,14 +464,22 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
                                 doctorId: doc.id,
                                 name: doctorName,
                                 workingSchedule: Map<String, dynamic>.from(
-                                  (doc.data() as Map<String, dynamic>)['workingSchedule'] ?? {},
+                                  (doc.data()
+                                          as Map<
+                                            String,
+                                            dynamic
+                                          >)['workingSchedule'] ??
+                                      {},
                                 ),
                               ),
                         ),
                       );
                     },
                     child: Card(
-                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      margin: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       elevation: 6,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
@@ -458,7 +502,10 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
                                         errorBuilder: (context, error, stack) {
                                           return Container(
                                             color: Colors.grey[300],
-                                            child: const Icon(Icons.person, color: Colors.grey),
+                                            child: const Icon(
+                                              Icons.person,
+                                              color: Colors.grey,
+                                            ),
                                           );
                                         },
                                       ),
@@ -504,7 +551,9 @@ class _CallcenterDoctorsScreenState extends State<CallcenterDoctorsScreen> {
                                   ),
                                   SizedBox(height: 4),
                                   Text(
-                                    _getWorkingDaysText(doctorData['workingSchedule'] ?? {}),
+                                    _getWorkingDaysText(
+                                      doctorData['workingSchedule'] ?? {},
+                                    ),
                                     style: TextStyle(
                                       color: Colors.grey[600],
                                       fontSize: 12,

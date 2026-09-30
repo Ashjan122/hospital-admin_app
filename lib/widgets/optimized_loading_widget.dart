@@ -22,7 +22,7 @@ class OptimizedLoadingWidget extends StatelessWidget {
             width: size,
             height: size,
             child: CircularProgressIndicator(
-              color: color ?? const Color(0xFF2FBDAF),
+              color: color ?? const Color.fromARGB(255, 34, 96, 129),
               strokeWidth: 3.0,
             ),
           ),

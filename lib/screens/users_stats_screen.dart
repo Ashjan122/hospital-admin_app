@@ -511,26 +511,47 @@ class _UsersStatsScreenState extends State<UsersStatsScreen> {
     Future<_RoleDetailData> loadDetails() async {
       final DateTime now = DateTime.now();
 
+      // ========================================================
+      // Users
+      // ========================================================
+
       final usersSnap =
           await FirebaseFirestore.instance.collection('users').get();
 
       final List<Map<String, dynamic>> users =
           usersSnap.docs.map((doc) => doc.data()).toList();
 
-      final List<Map<String, dynamic>> fetched =
-          roleKey == 'all'
-              ? users
-              : users
-                  .where((u) => (u['userType']?.toString() ?? '') == roleKey)
-                  .toList();
+      // ========================================================
+      // لو "الكل" → نضيف المرضى أيضاً
+      // ========================================================
+
+      List<Map<String, dynamic>> fetched;
+
+      if (roleKey == 'all') {
+        final patientsSnap =
+            await FirebaseFirestore.instance.collection('patients').get();
+
+        final List<Map<String, dynamic>> patients =
+            patientsSnap.docs.map((doc) => doc.data()).toList();
+
+        fetched = [...users, ...patients];
+      } else {
+        fetched =
+            users
+                .where((u) => (u['userType']?.toString() ?? '') == roleKey)
+                .toList();
+      }
 
       // ========================================================
-      // IMPORTANT:
-      // Online = lastSeenAt within 5 minutes
+      // المتصلون الآن
       // ========================================================
 
       final List<Map<String, dynamic>> online =
           fetched.where((u) => _isOnline(u, now)).toList();
+
+      // ========================================================
+      // تسجيلات اليوم
+      // ========================================================
 
       final List<Map<String, dynamic>> logins =
           fetched.where((u) => _loggedInToday(u, now)).toList();

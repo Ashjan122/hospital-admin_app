@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:hospital_admin_app/widgets/optimized_loading_widget.dart';
 import 'package:hospital_admin_app/services/central_data_service.dart';
+import 'package:hospital_admin_app/widgets/optimized_loading_widget.dart';
 
 class AdminSpecialtiesScreen extends StatefulWidget {
   final String centerId;
@@ -46,7 +46,7 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
     try {
       // جلب جميع التخصصات من قاعدة البيانات المركزية
       final allSpecialties = await CentralDataService.getAllSpecialties();
-      
+
       // جلب التخصصات الموجودة في المركز
       final centerSpecialtiesSnapshot = await FirebaseFirestore.instance
           .collection('medicalFacilities')
@@ -55,24 +55,28 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
           .get()
           .timeout(const Duration(seconds: 8));
 
-      final centerSpecialties = centerSpecialtiesSnapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'name': data['specName'] ?? doc.id,
-          'isActive': data['isActive'] ?? true,
-          'order': (data['order'] is int)
-              ? data['order'] as int
-              : int.tryParse('${data['order']}') ?? 999,
-        };
-      }).toList();
+      final centerSpecialties =
+          centerSpecialtiesSnapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'name': data['specName'] ?? doc.id,
+              'isActive': data['isActive'] ?? true,
+              'order':
+                  (data['order'] is int)
+                      ? data['order'] as int
+                      : int.tryParse('${data['order']}') ?? 999,
+            };
+          }).toList();
 
       // ترتيب القائمة حسب order ثم بالاسم
       centerSpecialties.sort((a, b) {
         final ao = (a['order'] as int?) ?? 999;
         final bo = (b['order'] as int?) ?? 999;
         if (ao != bo) return ao.compareTo(bo);
-        return (a['name'] as String).toLowerCase().compareTo((b['name'] as String).toLowerCase());
+        return (a['name'] as String).toLowerCase().compareTo(
+          (b['name'] as String).toLowerCase(),
+        );
       });
 
       setState(() {
@@ -91,10 +95,12 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
 
   void _updateAvailableSpecialties() {
     // التخصصات المتاحة للإضافة (غير موجودة في المركز)
-    final centerSpecialtyIds = _centerSpecialties.map((spec) => spec['id']).toSet();
-    _availableSpecialties = _allSpecialties
-        .where((specialty) => !centerSpecialtyIds.contains(specialty['id']))
-        .toList();
+    final centerSpecialtyIds =
+        _centerSpecialties.map((spec) => spec['id']).toSet();
+    _availableSpecialties =
+        _allSpecialties
+            .where((specialty) => !centerSpecialtyIds.contains(specialty['id']))
+            .toList();
   }
 
   int _getNextOrder() {
@@ -112,7 +118,10 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
     });
 
     try {
-      await CentralDataService.addSpecialtyToCenter(widget.centerId, specialtyId);
+      await CentralDataService.addSpecialtyToCenter(
+        widget.centerId,
+        specialtyId,
+      );
       // عيّن ترتيباً افتراضياً للتخصص المضاف (أعلى من الموجود)
       final nextOrder = _getNextOrder();
       await FirebaseFirestore.instance
@@ -121,10 +130,10 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
           .collection('specializations')
           .doc(specialtyId)
           .set({'order': nextOrder}, SetOptions(merge: true));
-      
+
       // إعادة تحميل البيانات
       await _loadData();
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('تم إضافة التخصص بنجاح'),
@@ -145,7 +154,10 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
     }
   }
 
-  Future<void> toggleSpecialtyStatus(String specialtyId, bool currentStatus) async {
+  Future<void> toggleSpecialtyStatus(
+    String specialtyId,
+    bool currentStatus,
+  ) async {
     setState(() {
       _isLoading = true;
     });
@@ -156,13 +168,13 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
           .doc(widget.centerId)
           .collection('specializations')
           .doc(specialtyId)
-          .update({
-        'isActive': !currentStatus,
-      });
+          .update({'isActive': !currentStatus});
 
       // تحديث القائمة المحلية
       setState(() {
-        final index = _centerSpecialties.indexWhere((spec) => spec['id'] == specialtyId);
+        final index = _centerSpecialties.indexWhere(
+          (spec) => spec['id'] == specialtyId,
+        );
         if (index != -1) {
           _centerSpecialties[index]['isActive'] = !currentStatus;
         }
@@ -188,9 +200,13 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
     }
   }
 
-  Future<void> _onReorderSpecialties(List<Map<String, dynamic>> specialties, int oldIndex, int newIndex) async {
+  Future<void> _onReorderSpecialties(
+    List<Map<String, dynamic>> specialties,
+    int oldIndex,
+    int newIndex,
+  ) async {
     if (oldIndex == newIndex) return;
-    
+
     try {
       // إعادة ترقيم order للجميع
       final batch = FirebaseFirestore.instance.batch();
@@ -198,20 +214,22 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
           .collection('medicalFacilities')
           .doc(widget.centerId)
           .collection('specializations');
-      
+
       for (int i = 0; i < specialties.length; i++) {
         final specialty = specialties[i];
         final docRef = centerRef.doc(specialty['id'] as String);
         batch.update(docRef, {'order': i + 1});
       }
-      
+
       await batch.commit();
-      
+
       // تحديث الحالة المحلية - تحديث order لكل تخصص
       setState(() {
         for (int i = 0; i < specialties.length; i++) {
           final specialtyId = specialties[i]['id'] as String;
-          final index = _centerSpecialties.indexWhere((s) => s['id'] == specialtyId);
+          final index = _centerSpecialties.indexWhere(
+            (s) => s['id'] == specialtyId,
+          );
           if (index != -1) {
             _centerSpecialties[index]['order'] = i + 1;
           }
@@ -221,10 +239,12 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
           final ao = (a['order'] as int?) ?? 999;
           final bo = (b['order'] as int?) ?? 999;
           if (ao != bo) return ao.compareTo(bo);
-          return (a['name'] as String).toLowerCase().compareTo((b['name'] as String).toLowerCase());
+          return (a['name'] as String).toLowerCase().compareTo(
+            (b['name'] as String).toLowerCase(),
+          );
         });
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -246,45 +266,50 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
   }
 
   Future<void> _editSpecialtyOrder(String specialtyId, int currentOrder) async {
-    final TextEditingController orderController = TextEditingController(text: currentOrder > 0 ? '$currentOrder' : '');
+    final TextEditingController orderController = TextEditingController(
+      text: currentOrder > 0 ? '$currentOrder' : '',
+    );
     final formKey = GlobalKey<FormState>();
     final result = await showDialog<int>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تعديل ترتيب التخصص'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: orderController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'الترتيب (رقم موجب)',
-              border: OutlineInputBorder(),
-              hintText: 'مثال: 1 للمركز الأول'
+      builder:
+          (context) => AlertDialog(
+            title: const Text('تعديل ترتيب التخصص'),
+            content: Form(
+              key: formKey,
+              child: TextFormField(
+                controller: orderController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'الترتيب (رقم موجب)',
+                  border: OutlineInputBorder(),
+                  hintText: 'مثال: 1 للمركز الأول',
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'يرجى إدخال ترتيب';
+                  final n = int.tryParse(v.trim());
+                  if (n == null || n <= 0) return 'يرجى إدخال رقم صحيح موجب';
+                  return null;
+                },
+              ),
             ),
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'يرجى إدخال ترتيب';
-              final n = int.tryParse(v.trim());
-              if (n == null || n <= 0) return 'يرجى إدخال رقم صحيح موجب';
-              return null;
-            },
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (formKey.currentState?.validate() == true) {
+                    Navigator.of(
+                      context,
+                    ).pop(int.parse(orderController.text.trim()));
+                  }
+                },
+                child: const Text('حفظ'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() == true) {
-                Navigator.of(context).pop(int.parse(orderController.text.trim()));
-              }
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
-      ),
     );
 
     if (result != null) {
@@ -293,21 +318,28 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
       });
       try {
         // بناء ترتيب جديد بدون تكرارات عبر إدراج العنصر في الموضع المطلوب وإعادة ترقيم الجميع
-        final List<Map<String, dynamic>> newOrderList = List<Map<String, dynamic>>.from(_centerSpecialties);
+        final List<Map<String, dynamic>> newOrderList =
+            List<Map<String, dynamic>>.from(_centerSpecialties);
         // تأكد من ترتيب القائمة الحالية بحسب order ثم الاسم
         newOrderList.sort((a, b) {
           final ao = (a['order'] as int?) ?? 999;
           final bo = (b['order'] as int?) ?? 999;
           if (ao != bo) return ao.compareTo(bo);
-          return (a['name'] as String).toLowerCase().compareTo((b['name'] as String).toLowerCase());
+          return (a['name'] as String).toLowerCase().compareTo(
+            (b['name'] as String).toLowerCase(),
+          );
         });
 
         final int maxIndex = newOrderList.length - 1;
         int targetIndex = (result - 1).clamp(0, maxIndex);
 
-        final int currentIndex = newOrderList.indexWhere((s) => s['id'] == specialtyId);
+        final int currentIndex = newOrderList.indexWhere(
+          (s) => s['id'] == specialtyId,
+        );
         if (currentIndex != -1) {
-          final item = Map<String, dynamic>.from(newOrderList.removeAt(currentIndex));
+          final item = Map<String, dynamic>.from(
+            newOrderList.removeAt(currentIndex),
+          );
           newOrderList.insert(targetIndex, item);
         }
 
@@ -324,7 +356,9 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
             .collection('specializations');
         for (final spec in newOrderList) {
           final docRef = centerRef.doc(spec['id'] as String);
-          batch.set(docRef, {'order': spec['order'] as int}, SetOptions(merge: true));
+          batch.set(docRef, {
+            'order': spec['order'] as int,
+          }, SetOptions(merge: true));
         }
         await batch.commit();
 
@@ -410,69 +444,98 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
     String localQuery = '';
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('إضافة تخصص جديد'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'بحث عن تخصص...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.search),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: const Text('إضافة تخصص جديد'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    height: MediaQuery.of(context).size.height * 0.55,
+                    child: Column(
+                      children: [
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'بحث عن تخصص...',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                          onChanged: (v) => setState(() => localQuery = v),
+                        ),
+                        const SizedBox(height: 3),
+                        Expanded(
+                          child: ListView(
+                            shrinkWrap: true,
+                            children:
+                                _availableSpecialties
+                                    .where(
+                                      (s) =>
+                                          localQuery.isEmpty ||
+                                          (s['name'] as String)
+                                              .toLowerCase()
+                                              .contains(
+                                                localQuery.toLowerCase(),
+                                              ),
+                                    )
+                                    .map(
+                                      (s) => ListTile(
+                                        dense: true,
+                                        visualDensity: const VisualDensity(
+                                          vertical: -2,
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 5,
+                                            ),
+                                        title: Text(
+                                          s['name'],
+                                          style: const TextStyle(fontSize: 15),
+                                        ),
+                                        onTap: () {
+                                          Navigator.of(context).pop();
+                                          addSpecialty(s['id']);
+                                        },
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  onChanged: (v) => setState(() => localQuery = v),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('إلغاء'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 300),
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: _availableSpecialties
-                        .where((s) => localQuery.isEmpty || (s['name'] as String).toLowerCase().contains(localQuery.toLowerCase()))
-                        .map((s) => ListTile(
-                              title: Text(s['name']),
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                addSpecialty(s['id']);
-                              },
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('إلغاء'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
-  List<Map<String, dynamic>> filterSpecialties(List<Map<String, dynamic>> specialties) {
+  List<Map<String, dynamic>> filterSpecialties(
+    List<Map<String, dynamic>> specialties,
+  ) {
     if (_searchQuery.isEmpty) return specialties;
-    
+
     return specialties.where((specialty) {
       final name = specialty['name']?.toString().toLowerCase() ?? '';
       return name.contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
-  Widget _buildSubSpecialtyDropdown(String specialtyId, Set<String> centerSubIds) {
+  Widget _buildSubSpecialtyDropdown(
+    String specialtyId,
+    Set<String> centerSubIds,
+  ) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('medicalSpecialties')
-          .doc(specialtyId)
-          .collection('subSpecialties')
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('medicalSpecialties')
+              .doc(specialtyId)
+              .collection('subSpecialties')
+              .snapshots(),
       builder: (context, availableSubSnapshot) {
         if (availableSubSnapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -481,16 +544,13 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
         final availableSubs = availableSubSnapshot.data?.docs ?? [];
 
         // التخصصات الفرعية المتاحة (غير مضافة في المركز)
-        final availableSubsList = availableSubs
-            .where((doc) => !centerSubIds.contains(doc.id))
-            .map((doc) {
+        final availableSubsList =
+            availableSubs.where((doc) => !centerSubIds.contains(doc.id)).map((
+              doc,
+            ) {
               final data = doc.data() as Map<String, dynamic>;
-              return {
-                'id': doc.id,
-                'name': data['name'] ?? '',
-              };
-            })
-            .toList();
+              return {'id': doc.id, 'name': data['name'] ?? ''};
+            }).toList();
 
         if (availableSubsList.isEmpty) {
           return const Padding(
@@ -513,18 +573,26 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
               ),
               value: selectedValue,
               hint: const Text('اختر تخصص فرعي'),
-              items: availableSubsList.map((sub) {
-                return DropdownMenuItem<String>(
-                  value: sub['id'] as String,
-                  child: Text(sub['name'] as String),
-                );
-              }).toList(),
+              items:
+                  availableSubsList.map((sub) {
+                    return DropdownMenuItem<String>(
+                      value: sub['id'] as String,
+                      child: Text(sub['name'] as String),
+                    );
+                  }).toList(),
               onChanged: (value) {
                 if (value != null) {
                   setState(() {
                     selectedValue = null; // إعادة تعيين القيمة
                   });
-                  _addSubSpecialty(specialtyId, value, availableSubsList.firstWhere((s) => s['id'] == value)['name'] as String);
+                  _addSubSpecialty(
+                    specialtyId,
+                    value,
+                    availableSubsList.firstWhere(
+                          (s) => s['id'] == value,
+                        )['name']
+                        as String,
+                  );
                 }
               },
             );
@@ -534,7 +602,11 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
     );
   }
 
-  Future<void> _addSubSpecialty(String specialtyId, String subSpecialtyId, String subSpecialtyName) async {
+  Future<void> _addSubSpecialty(
+    String specialtyId,
+    String subSpecialtyId,
+    String subSpecialtyName,
+  ) async {
     setState(() {
       _isLoading = true;
     });
@@ -548,9 +620,9 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
           .collection('subSpecialties')
           .doc(subSpecialtyId)
           .set({
-        'name': subSpecialtyName,
-        'addedAt': FieldValue.serverTimestamp(),
-      });
+            'name': subSpecialtyName,
+            'addedAt': FieldValue.serverTimestamp(),
+          });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -581,9 +653,7 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoadingData) {
-      return const Scaffold(
-        body: Center(child: OptimizedLoadingWidget()),
-      );
+      return const Scaffold(body: Center(child: OptimizedLoadingWidget()));
     }
 
     final filteredCenterSpecialties = filterSpecialties(_centerSpecialties);
@@ -592,22 +662,23 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title:Column(children: [ Text(
-            'إدارة التخصصات',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          title: Column(
+            children: [
+              Text(
+                'إدارة التخصصات',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                '${widget.centerName}',
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
+            ],
           ),
-          Text('${widget.centerName}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-            ),
-            ),
-          ]),
           centerTitle: true,
-          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -649,207 +720,265 @@ class _AdminSpecialtiesScreenState extends State<AdminSpecialtiesScreen> {
             ),
             // Specialties list
             Expanded(
-              child: _isLoading
-                  ? const Center(child: OptimizedLoadingWidget())
-                  : filteredCenterSpecialties.isEmpty
+              child:
+                  _isLoading
+                      ? const Center(child: OptimizedLoadingWidget())
+                      : filteredCenterSpecialties.isEmpty
                       ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _searchQuery.isEmpty ? Icons.medical_services_outlined : Icons.search_off,
-                                size: 64,
-                                color: Colors.grey[400],
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _searchQuery.isEmpty
+                                  ? Icons.medical_services_outlined
+                                  : Icons.search_off,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchQuery.isEmpty
+                                  ? 'لا توجد تخصصات في هذا المركز'
+                                  : 'لم يتم العثور على تخصصات تطابق البحث',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
                               ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _searchQuery.isEmpty
-                                    ? 'لا توجد تخصصات في هذا المركز'
-                                    : 'لم يتم العثور على تخصصات تطابق البحث',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey[600],
-                                ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _searchQuery.isEmpty
+                                  ? 'لم يتم العثور على أي تخصصات مسجلة'
+                                  : 'جرب البحث بكلمات مختلفة',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _searchQuery.isEmpty
-                                    ? 'لم يتم العثور على أي تخصصات مسجلة'
-                                    : 'جرب البحث بكلمات مختلفة',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : StatefulBuilder(
-                          builder: (context, setStateLocal) {
-                            List<Map<String, dynamic>> localSpecialties = List.from(filteredCenterSpecialties);
-
-                            return ReorderableListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: localSpecialties.length,
-                              onReorder: (oldIndex, newIndex) {
-                                if (newIndex > oldIndex) {
-                                  newIndex -= 1;
-                                }
-                                setStateLocal(() {
-                                  final item = localSpecialties.removeAt(oldIndex);
-                                  localSpecialties.insert(newIndex, item);
-                                });
-                                _onReorderSpecialties(localSpecialties, oldIndex, newIndex);
-                              },
-                              itemBuilder: (context, index) {
-                                final specialty = localSpecialties[index];
-                                final isActive = specialty['isActive'] ?? true;
-                                final specialtyId = specialty['id'] as String;
-
-                                return Card(
-                                  key: ValueKey(specialtyId),
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: ExpansionTile(
-                                leading: Text(
-                                  '${(specialty['order'] as int?) ?? 999}',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                title: Text(
-                                  specialty['name'],
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isActive ? Colors.black : Colors.grey,
-                                  ),
-                                ),
-                                subtitle: Row(
-                                  children: [
-                                    Text(
-                                      isActive ? 'نشط' : 'غير نشط',
-                                      style: TextStyle(
-                                        color: isActive ? Colors.green : Colors.grey,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    const Icon(Icons.sort, size: 16, color: Color(0xFF0D47A1)),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'ترتيب: ${(specialty['order'] as int?) ?? 999}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF0D47A1),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) async {
-                                    switch (value) {
-                                      case 'toggle':
-                                        await toggleSpecialtyStatus(specialty['id'], isActive);
-                                        break;
-                                      case 'edit_order':
-                                        await _editSpecialtyOrder(
-                                          specialty['id'],
-                                          (specialty['order'] as int?) ?? 999,
-                                        );
-                                        break;
-                                      case 'delete':
-                                        await deleteSpecialty(specialty['id']);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'toggle',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            isActive ? Icons.block : Icons.check_circle,
-                                            color: isActive ? Colors.orange : Colors.green,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(isActive ? 'تعطيل' : 'تفعيل'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'edit_order',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.sort, color: Color(0xFF0D47A1)),
-                                          SizedBox(width: 8),
-                                          Text('تعديل الترتيب'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.delete, color: Colors.red),
-                                          SizedBox(width: 8),
-                                          Text('حذف'),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                children: [
-                                  // التخصصات الفرعية المضافة في المركز
-                                  StreamBuilder<QuerySnapshot>(
-                                    stream: FirebaseFirestore.instance
-                                        .collection('medicalFacilities')
-                                        .doc(widget.centerId)
-                                        .collection('specializations')
-                                        .doc(specialtyId)
-                                        .collection('subSpecialties')
-                                        .snapshots(),
-                                    builder: (context, subSnapshot) {
-                                      if (subSnapshot.connectionState == ConnectionState.waiting) {
-                                        return const Padding(
-                                          padding: EdgeInsets.all(16.0),
-                                          child: Center(child: CircularProgressIndicator()),
-                                        );
-                                      }
-
-                                      final subSpecialties = subSnapshot.data?.docs ?? [];
-                                      final centerSubIds = subSpecialties.map((doc) => doc.id).toSet();
-                                      
-                                      return Column(
-                                        children: [
-                                          // قائمة التخصصات الفرعية المضافة
-                                          if (subSpecialties.isNotEmpty)
-                                            ...subSpecialties.map((subDoc) {
-                                              final subData = subDoc.data() as Map<String, dynamic>;
-                                              return ListTile(
-                                                dense: true,
-                                                leading: const Icon(Icons.arrow_left, size: 16),
-                                                title: Text(subData['name'] ?? ''),
-                                              );
-                                            }).toList(),
-                                          
-                                          // Dropdown لإضافة تخصص فرعي جديد
-                                          Padding(
-                                            padding: const EdgeInsets.all(16.0),
-                                            child: _buildSubSpecialtyDropdown(specialtyId, centerSubIds),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                              },
-                            );
-                          },
+                            ),
+                          ],
                         ),
+                      )
+                      : StatefulBuilder(
+                        builder: (context, setStateLocal) {
+                          List<Map<String, dynamic>> localSpecialties =
+                              List.from(filteredCenterSpecialties);
+
+                          return ReorderableListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: localSpecialties.length,
+                            onReorder: (oldIndex, newIndex) {
+                              if (newIndex > oldIndex) {
+                                newIndex -= 1;
+                              }
+                              setStateLocal(() {
+                                final item = localSpecialties.removeAt(
+                                  oldIndex,
+                                );
+                                localSpecialties.insert(newIndex, item);
+                              });
+                              _onReorderSpecialties(
+                                localSpecialties,
+                                oldIndex,
+                                newIndex,
+                              );
+                            },
+                            itemBuilder: (context, index) {
+                              final specialty = localSpecialties[index];
+                              final isActive = specialty['isActive'] ?? true;
+                              final specialtyId = specialty['id'] as String;
+
+                              return Card(
+                                key: ValueKey(specialtyId),
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ExpansionTile(
+                                  leading: Text(
+                                    '${(specialty['order'] as int?) ?? 999}',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    specialty['name'],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          isActive ? Colors.black : Colors.grey,
+                                    ),
+                                  ),
+                                  subtitle: Row(
+                                    children: [
+                                      Text(
+                                        isActive ? 'نشط' : 'غير نشط',
+                                        style: TextStyle(
+                                          color:
+                                              isActive
+                                                  ? Colors.green
+                                                  : Colors.grey,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      const Icon(
+                                        Icons.sort,
+                                        size: 16,
+                                        color: Color(0xFF0D47A1),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'ترتيب: ${(specialty['order'] as int?) ?? 999}',
+                                        style: const TextStyle(
+                                          color: Color(0xFF0D47A1),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (value) async {
+                                      switch (value) {
+                                        case 'toggle':
+                                          await toggleSpecialtyStatus(
+                                            specialty['id'],
+                                            isActive,
+                                          );
+                                          break;
+                                        case 'edit_order':
+                                          await _editSpecialtyOrder(
+                                            specialty['id'],
+                                            (specialty['order'] as int?) ?? 999,
+                                          );
+                                          break;
+                                        case 'delete':
+                                          await deleteSpecialty(
+                                            specialty['id'],
+                                          );
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder:
+                                        (context) => [
+                                          PopupMenuItem(
+                                            value: 'toggle',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  isActive
+                                                      ? Icons.block
+                                                      : Icons.check_circle,
+                                                  color:
+                                                      isActive
+                                                          ? Colors.orange
+                                                          : Colors.green,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  isActive ? 'تعطيل' : 'تفعيل',
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'edit_order',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.sort,
+                                                  color: Color(0xFF0D47A1),
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('تعديل الترتيب'),
+                                              ],
+                                            ),
+                                          ),
+                                          const PopupMenuItem(
+                                            value: 'delete',
+                                            child: Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                ),
+                                                SizedBox(width: 8),
+                                                Text('حذف'),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                  ),
+                                  children: [
+                                    // التخصصات الفرعية المضافة في المركز
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream:
+                                          FirebaseFirestore.instance
+                                              .collection('medicalFacilities')
+                                              .doc(widget.centerId)
+                                              .collection('specializations')
+                                              .doc(specialtyId)
+                                              .collection('subSpecialties')
+                                              .snapshots(),
+                                      builder: (context, subSnapshot) {
+                                        if (subSnapshot.connectionState ==
+                                            ConnectionState.waiting) {
+                                          return const Padding(
+                                            padding: EdgeInsets.all(16.0),
+                                            child: Center(
+                                              child:
+                                                  CircularProgressIndicator(),
+                                            ),
+                                          );
+                                        }
+
+                                        final subSpecialties =
+                                            subSnapshot.data?.docs ?? [];
+                                        final centerSubIds =
+                                            subSpecialties
+                                                .map((doc) => doc.id)
+                                                .toSet();
+
+                                        return Column(
+                                          children: [
+                                            // قائمة التخصصات الفرعية المضافة
+                                            if (subSpecialties.isNotEmpty)
+                                              ...subSpecialties.map((subDoc) {
+                                                final subData =
+                                                    subDoc.data()
+                                                        as Map<String, dynamic>;
+                                                return ListTile(
+                                                  dense: true,
+                                                  leading: const Icon(
+                                                    Icons.arrow_left,
+                                                    size: 16,
+                                                  ),
+                                                  title: Text(
+                                                    subData['name'] ?? '',
+                                                  ),
+                                                );
+                                              }).toList(),
+
+                                            // Dropdown لإضافة تخصص فرعي جديد
+                                            Padding(
+                                              padding: const EdgeInsets.all(
+                                                16.0,
+                                              ),
+                                              child: _buildSubSpecialtyDropdown(
+                                                specialtyId,
+                                                centerSubIds,
+                                              ),
+                                            ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
             ),
           ],
         ),

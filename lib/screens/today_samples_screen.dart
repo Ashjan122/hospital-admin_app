@@ -1,13 +1,11 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/patient_visit_tests_screen.dart';
 import 'package:intl/intl.dart' as intl;
 
-
-
 class TodaySamplesScreen extends StatefulWidget {
-  
   const TodaySamplesScreen({super.key});
 
   @override
@@ -23,7 +21,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
 
   final TextEditingController _searchController = TextEditingController();
   final Color _color1 = const Color.fromARGB(255, 215, 213, 219);
-  final Color _color2 = const  Color.fromARGB(255, 156, 208, 235);
+  final Color _color2 = const Color.fromARGB(255, 34, 96, 129);
 
   int? currentShiftId;
   int? latestShiftId;
@@ -48,7 +46,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
     if (e is DioException) {
       if (e.response != null && e.response!.data != null) {
         final data = e.response!.data;
-        
+
         // محاولة استخراج الرسالة من حقول مختلفة
         if (data is Map) {
           // محاولة الحصول على message
@@ -59,7 +57,8 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
           if (data['error'] != null) {
             if (data['error'] is String) {
               return data['error'];
-            } else if (data['error'] is Map && data['error']['message'] != null) {
+            } else if (data['error'] is Map &&
+                data['error']['message'] != null) {
               return data['error']['message'].toString();
             }
           }
@@ -78,15 +77,15 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             }
           }
         }
-        
+
         // إذا لم نجد رسالة واضحة، نعيد status code
         return 'خطأ ${e.response!.statusCode}: ${e.response!.statusMessage ?? 'حدث خطأ'}';
       }
-      
+
       // إذا لم يكن هناك response، نعيد رسالة الاتصال
       return 'خطأ في الاتصال بالسيرفر: ${e.message ?? 'يرجى التحقق من الاتصال بالإنترنت'}';
     }
-    
+
     return 'حدث خطأ غير متوقع: $e';
   }
 
@@ -97,13 +96,10 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
     });
 
     try {
-      final dio =
-          Dio()
-            ..options.headers['Accept'] = 'application/json';
+      final dio = Dio()..options.headers['Accept'] = 'application/json';
 
-      final url = 
-        'https://alroomy.a.pinggy.link/jawda-medical/public/api/lab/pending-queue';
-      
+      final url =
+          'https://alroomy.a.pinggy.link/jawda-medical/public/api/lab/pending-queue';
 
       final response = await dio.get(
         url,
@@ -133,7 +129,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
                 : (shiftId ?? currentShiftId);
 
         if (onlyToday && data.isNotEmpty) latestShiftId = currentShiftId;
-       
+
         print(' رقم الوردية: $currentShiftId');
 
         setState(() {
@@ -152,10 +148,12 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
           } else if (responseData['error'] != null) {
             if (responseData['error'] is String) {
               errorMsg = responseData['error'];
-            } else if (responseData['error'] is Map && responseData['error']['message'] != null) {
+            } else if (responseData['error'] is Map &&
+                responseData['error']['message'] != null) {
               errorMsg = responseData['error']['message'].toString();
             }
-          } else if (responseData['errors'] != null && responseData['errors'] is Map) {
+          } else if (responseData['errors'] != null &&
+              responseData['errors'] is Map) {
             final errors = responseData['errors'] as Map;
             if (errors.isNotEmpty) {
               final firstError = errors.values.first;
@@ -167,7 +165,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             }
           }
         }
-        
+
         setState(() {
           errorMessage = errorMsg;
           isLoading = false;
@@ -208,13 +206,10 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
     });
 
     try {
-      final dio =
-          Dio()
-            ..options.headers['Accept'] = 'application/json';
+      final dio = Dio()..options.headers['Accept'] = 'application/json';
 
       final url =
-        'https://alroomy.a.pinggy.link/jawda-medical/public/api/doctor-visits/search-by-patient';
-      
+          'https://alroomy.a.pinggy.link/jawda-medical/public/api/doctor-visits/search-by-patient';
 
       final response = await dio.get(
         url,
@@ -244,10 +239,12 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
           } else if (responseData['error'] != null) {
             if (responseData['error'] is String) {
               errorMsg = responseData['error'];
-            } else if (responseData['error'] is Map && responseData['error']['message'] != null) {
+            } else if (responseData['error'] is Map &&
+                responseData['error']['message'] != null) {
               errorMsg = responseData['error']['message'].toString();
             }
-          } else if (responseData['errors'] != null && responseData['errors'] is Map) {
+          } else if (responseData['errors'] != null &&
+              responseData['errors'] is Map) {
             final errors = responseData['errors'] as Map;
             if (errors.isNotEmpty) {
               final firstError = errors.values.first;
@@ -259,7 +256,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             }
           }
         }
-        
+
         setState(() {
           errorMessage = errorMsg;
           isLoading = false;
@@ -299,8 +296,8 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
-          backgroundColor: const  Color.fromARGB(255, 156, 208, 235),
-        
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
+
           actions: [
             IconButton(
               icon: Icon(_isGrid ? Icons.view_list : Icons.grid_view),
@@ -312,7 +309,7 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
                 });
               },
             ),
-            
+
             IconButton(
               icon: const Icon(Icons.arrow_back_ios),
               color:
@@ -335,47 +332,46 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
             ),
           ],
         ),
-        body:  SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'البحث باسم المريض...',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: const OutlineInputBorder(),
-                    ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'البحث باسم المريض...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: const OutlineInputBorder(),
                   ),
                 ),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh:
-                        () => _fetchSamples(
-                          shiftId: currentShiftId,
-                          onlyToday: currentShiftId == null,
-                        ),
-                    color: const Color.fromARGB(255, 156, 208, 235),
-                    child:
-                        isLoading
-                            ? const Center(child: CircularProgressIndicator())
-                            : errorMessage.isNotEmpty
-                            ? Center(child: Text(errorMessage))
-                            : filteredSamples.isEmpty
-                            ? const Center(child: Text('لا توجد بيانات'))
-                            : _isGrid
-                            ? _buildGridView(context)
-                            : _buildListView(context),
-                  ),
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh:
+                      () => _fetchSamples(
+                        shiftId: currentShiftId,
+                        onlyToday: currentShiftId == null,
+                      ),
+                  color: const Color.fromARGB(255, 34, 96, 129),
+                  child:
+                      isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : errorMessage.isNotEmpty
+                          ? Center(child: Text(errorMessage))
+                          : filteredSamples.isEmpty
+                          ? const Center(child: Text('لا توجد بيانات'))
+                          : _isGrid
+                          ? _buildGridView(context)
+                          : _buildListView(context),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      
+      ),
     );
   }
 
@@ -392,7 +388,9 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
         // جلب معرف المريض من السطر
         final dynamic rawPid = sample['pid'] ?? sample['patient_id'];
         final int? patientId =
-            rawPid is int ? rawPid : (rawPid is String ? int.tryParse(rawPid) : null);
+            rawPid is int
+                ? rawPid
+                : (rawPid is String ? int.tryParse(rawPid) : null);
 
         return SampleListTile(
           visitId: visitId,
@@ -413,10 +411,11 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => PatientVisitTestsScreen(
-                    patientId: visitId,
-                    patientPhone: '',
-                  ),
+                  builder:
+                      (_) => PatientVisitTestsScreen(
+                        patientId: visitId,
+                        patientPhone: '',
+                      ),
                 ),
               );
             }
@@ -460,10 +459,11 @@ class _TodaySamplesScreenState extends State<TodaySamplesScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => PatientVisitTestsScreen(
-                    patientId: visitId,
-                    patientPhone: patientPhone,
-                  ),
+                  builder:
+                      (_) => PatientVisitTestsScreen(
+                        patientId: visitId,
+                        patientPhone: patientPhone,
+                      ),
                 ),
               );
             }
@@ -494,7 +494,7 @@ class _SampleListTileState extends State<SampleListTile>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
-  final Color appColor = const Color.fromARGB(255, 156, 208, 235);
+  final Color appColor = const Color.fromARGB(255, 34, 96, 129);
   bool isLoadingDetails = false;
 
   @override
@@ -559,14 +559,12 @@ class _SampleListTileState extends State<SampleListTile>
   }
 
   Future<void> _showPatientDetails(int patientId) async {
-    final dio =
-        Dio()
-          ..options.headers['Accept'] = 'application/json';
+    final dio = Dio()..options.headers['Accept'] = 'application/json';
 
     try {
-      final url = 
-        'https://alroomy.a.pinggy.link/jawda-medical/public/api/patients/$patientId';
-      
+      final url =
+          'https://alroomy.a.pinggy.link/jawda-medical/public/api/patients/$patientId';
+
       final response = await dio.get(url);
 
       if (response.statusCode == 200 && response.data != null) {
@@ -712,12 +710,11 @@ class _SampleListTileState extends State<SampleListTile>
                                 ),
                               ),
 
-                            
                             if (hasAuthDate || hasCompany)
                               Positioned(
                                 bottom: -2,
                                 right: -2,
-                                child:Container(
+                                child: Container(
                                   width: 14,
                                   height: 14,
                                   decoration: BoxDecoration(
@@ -725,15 +722,18 @@ class _SampleListTileState extends State<SampleListTile>
                                     shape: BoxShape.circle,
                                   ),
 
-                                  child:  Icon(
-                                  hasAuthDate ? Icons.shield_outlined : Icons.favorite,
-                                  color:
-                                      hasAuthDate
-                                          ? Colors.grey.shade600
-                                          : Colors.red.shade600,
-                                  size: 14,
+                                  child: Icon(
+                                    hasAuthDate
+                                        ? Icons.shield_outlined
+                                        : Icons.favorite,
+                                    color:
+                                        hasAuthDate
+                                            ? Colors.grey.shade600
+                                            : Colors.red.shade600,
+                                    size: 14,
+                                  ),
                                 ),
-                              ),),
+                              ),
                           ],
                         ),
                       );
@@ -821,42 +821,47 @@ class _SampleListTileState extends State<SampleListTile>
                           color: Colors.teal,
                         ),
                       )
-                      :Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [ IconButton(
-                        icon: const Icon(
-                          Icons.info_outline,
-                          color: Colors.teal,
-                        ),
-                        tooltip: 'معلومات المريض',
-                        onPressed: () async {
-                          final dynamic pid = widget.sample['patient_id'];
-                          final int? patientId =
-                              pid is int
-                                  ? pid
-                                  : (pid is String ? int.tryParse(pid) : null);
-                          if (patientId != null) {
-                            setState(() => isLoadingDetails = true);
-                            await _showPatientDetails(patientId);
-                            setState(() => isLoadingDetails = false);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('لا يوجد معرف مريض صالح'),
-                              ),
-                            );
-                          }
-                        },
+                      : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.info_outline,
+                              color: Colors.teal,
+                            ),
+                            tooltip: 'معلومات المريض',
+                            onPressed: () async {
+                              final dynamic pid = widget.sample['patient_id'];
+                              final int? patientId =
+                                  pid is int
+                                      ? pid
+                                      : (pid is String
+                                          ? int.tryParse(pid)
+                                          : null);
+                              if (patientId != null) {
+                                setState(() => isLoadingDetails = true);
+                                await _showPatientDetails(patientId);
+                                setState(() => isLoadingDetails = false);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('لا يوجد معرف مريض صالح'),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+
+                          Text(
+                            widget.visitId.toString(),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
-                      
-                      Text(
-            widget.visitId.toString(),
-            style: const TextStyle(
-              fontSize: 10,
-              color: Colors.grey,
-            ),
-          ),
-                ],),],
+                ],
               ),
             ),
           ),
@@ -911,7 +916,7 @@ class _SampleGridTileState extends State<SampleGridTile>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _animation;
-  final Color appColor = const Color.fromARGB(255, 156, 208, 235);
+  final Color appColor = const Color.fromARGB(255, 34, 96, 129);
 
   @override
   void initState() {
@@ -940,7 +945,8 @@ class _SampleGridTileState extends State<SampleGridTile>
   Widget build(BuildContext context) {
     final int testCount = widget.sample['test_count'] ?? 0;
     final bool isPrinted = widget.sample['is_printed'] == true;
-    final bool hasLabToLabObjectId = widget.sample['lab_to_lab_object_id'] != null;
+    final bool hasLabToLabObjectId =
+        widget.sample['lab_to_lab_object_id'] != null;
     final bool hasCompany = widget.sample['company'] != null;
     final bool hasAuthDate = widget.sample['auth_date'] != null;
     final String labNumber = (widget.sample['lab_number'] ?? '').toString();
@@ -952,7 +958,10 @@ class _SampleGridTileState extends State<SampleGridTile>
         animation: _animation,
         builder: (context, child) {
           return Transform.scale(
-            scale: widget.sample['pending_result_count'] == 1 ? _animation.value : 1.0,
+            scale:
+                widget.sample['pending_result_count'] == 1
+                    ? _animation.value
+                    : 1.0,
             child: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -1011,7 +1020,10 @@ class _SampleGridTileState extends State<SampleGridTile>
                       ),
                       child: Icon(
                         hasAuthDate ? Icons.shield_outlined : Icons.favorite,
-                        color: hasAuthDate ? Colors.grey.shade600 : Colors.red.shade600,
+                        color:
+                            hasAuthDate
+                                ? Colors.grey.shade600
+                                : Colors.red.shade600,
                         size: 16,
                       ),
                     ),
@@ -1021,7 +1033,10 @@ class _SampleGridTileState extends State<SampleGridTile>
                     top: 2,
                     right: 2,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: appColor,
                         borderRadius: BorderRadius.circular(10),

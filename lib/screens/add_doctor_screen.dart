@@ -1,20 +1,17 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
-import 'package:path/path.dart' as path;
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/services/central_data_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
 
 class AddDoctorScreen extends StatefulWidget {
   final String centerId;
   final String? centerName;
 
-  const AddDoctorScreen({
-    super.key,
-    required this.centerId,
-    this.centerName,
-  });
+  const AddDoctorScreen({super.key, required this.centerId, this.centerName});
 
   @override
   State<AddDoctorScreen> createState() => _AddDoctorScreenState();
@@ -28,7 +25,8 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
   String? _selectedDoctor;
   String _selectedDoctorPhone = '';
   String _selectedDoctorSpecName = '';
-  String _selectedPhotoUrl = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
+  String _selectedPhotoUrl =
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
   bool _isLoading = false;
   bool _isUploadingImage = false;
   File? _selectedImageFile;
@@ -39,57 +37,96 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
   bool _isLoadingData = true;
   Set<String> _centerDoctorIds = {};
 
-
-
   void _showDoctorPickerDialog() {
     String localQuery = '';
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('اختر الطبيب'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'بحث...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.search),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: const Text('اختر الطبيب'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    height: MediaQuery.of(context).size.height * 0.5,
+                    child: Column(
+                      children: [
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'بحث...',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                          onChanged: (v) => setState(() => localQuery = v),
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        Expanded(
+                          child: ListView(
+                            children:
+                                _availableDoctors
+                                    .where(
+                                      (d) =>
+                                          localQuery.isEmpty ||
+                                          (d['name'] as String)
+                                              .toLowerCase()
+                                              .contains(
+                                                localQuery.toLowerCase(),
+                                              ),
+                                    )
+                                    .map(
+                                      (d) => InkWell(
+                                        onTap: () async {
+                                          Navigator.of(context).pop();
+                                          await _populateFromDoctor(d);
+                                        },
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  d['name'] as String,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Text(
+                                                (d['phoneNumber'] as String?) ??
+                                                    '',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  onChanged: (v) => setState(() => localQuery = v),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('إلغاء'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 300),
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: _availableDoctors
-                        .where((d) => localQuery.isEmpty || (d['name'] as String).toLowerCase().contains(localQuery.toLowerCase()))
-                        .map((d) => ListTile(
-                              title: Text(d['name'] as String),
-                              subtitle: Text((d['phoneNumber'] as String?) ?? ''),
-                              onTap: () async {
-                                Navigator.of(context).pop();
-                                await _populateFromDoctor(d);
-                              },
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('إلغاء'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -124,19 +161,20 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
       final allDoctors = results[1] as List<Map<String, dynamic>>;
       final existingDoctorIds = results[2] as Set<String>;
 
-      final specializations = specializationsSnapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>?;
-        return {
-          'id': doc.id,
-          'name': data?['specName'] ?? doc.id,
-        };
-      }).toList();
+      final specializations =
+          specializationsSnapshot.docs.map((doc) {
+            final data = doc.data() as Map<String, dynamic>?;
+            return {'id': doc.id, 'name': data?['specName'] ?? doc.id};
+          }).toList();
 
       setState(() {
         _specializations = specializations;
         _allDoctors = allDoctors;
         _centerDoctorIds = existingDoctorIds;
-        _availableDoctors = _allDoctors.where((d) => !_centerDoctorIds.contains(d['id'] as String)).toList();
+        _availableDoctors =
+            _allDoctors
+                .where((d) => !_centerDoctorIds.contains(d['id'] as String))
+                .toList();
         _isLoadingData = false;
       });
     } catch (e) {
@@ -147,9 +185,6 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
     }
   }
 
-
-
-
   Future<Set<String>> _collectExistingCenterDoctorIds(String centerId) async {
     try {
       final Set<String> ids = {};
@@ -159,10 +194,10 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
           .collection('specializations')
           .get()
           .timeout(const Duration(seconds: 5));
-      
+
       // جلب الأطباء من جميع التخصصات بشكل متوازي
       final List<Future<void>> futures = [];
-      
+
       for (final spec in specsSnap.docs) {
         futures.add(
           FirebaseFirestore.instance
@@ -180,7 +215,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
               }),
         );
       }
-      
+
       await Future.wait(futures);
       return ids;
     } catch (e) {
@@ -197,12 +232,12 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImageFile = File(image.path);
         });
-        
+
         // رفع الصورة إلى Firebase Storage
         await _uploadImage();
       }
@@ -220,30 +255,31 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
 
   Future<void> _uploadImage() async {
     if (_selectedImageFile == null) return;
-    
+
     setState(() {
       _isUploadingImage = true;
     });
-    
+
     try {
       // إنشاء اسم فريد للصورة
-      final fileName = 'doctors/${DateTime.now().millisecondsSinceEpoch}_${path.basename(_selectedImageFile!.path)}';
-      
+      final fileName =
+          'doctors/${DateTime.now().millisecondsSinceEpoch}_${path.basename(_selectedImageFile!.path)}';
+
       // رفع الصورة إلى Firebase Storage
       final storageRef = FirebaseStorage.instance.ref().child(fileName);
       final uploadTask = storageRef.putFile(_selectedImageFile!);
-      
+
       // انتظار اكتمال الرفع
       final snapshot = await uploadTask;
-      
+
       // الحصول على رابط التحميل
       final downloadUrl = await snapshot.ref.getDownloadURL();
-      
+
       setState(() {
         _selectedPhotoUrl = downloadUrl;
         _isUploadingImage = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -256,7 +292,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
       setState(() {
         _isUploadingImage = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -273,7 +309,11 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
     String specName = '';
     try {
       if (specId.isNotEmpty) {
-        final doc = await FirebaseFirestore.instance.collection('medicalSpecialties').doc(specId).get();
+        final doc =
+            await FirebaseFirestore.instance
+                .collection('medicalSpecialties')
+                .doc(specId)
+                .get();
         if (doc.exists) {
           specName = (doc.data()?['name'] as String?) ?? '';
         }
@@ -302,19 +342,18 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
           'createdAt': FieldValue.serverTimestamp(),
         });
         // أعد تحميل قائمة التخصصات المحلية لعرض الاسم مباشرة
-        final specializationsSnapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .get();
+        final specializationsSnapshot =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .get();
         setState(() {
-          _specializations = specializationsSnapshot.docs.map((doc) {
-            final data = doc.data();
-            return {
-              'id': doc.id,
-              'name': data['specName'] ?? doc.id,
-            };
-          }).toList();
+          _specializations =
+              specializationsSnapshot.docs.map((doc) {
+                final data = doc.data();
+                return {'id': doc.id, 'name': data['specName'] ?? doc.id};
+              }).toList();
         });
       }
     }
@@ -323,30 +362,31 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
   void _showImageSourceDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('اختر مصدر الصورة'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('الكاميرا'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
+      builder:
+          (context) => AlertDialog(
+            title: const Text('اختر مصدر الصورة'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('الكاميرا'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('المعرض'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('المعرض'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -382,8 +422,10 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
         _selectedSpecialization!,
         _selectedDoctor!,
         {
-          'morningPatientLimit': int.tryParse(_morningLimitController.text) ?? 5,
-          'eveningPatientLimit': int.tryParse(_eveningLimitController.text) ?? 5,
+          'morningPatientLimit':
+              int.tryParse(_morningLimitController.text) ?? 5,
+          'eveningPatientLimit':
+              int.tryParse(_eveningLimitController.text) ?? 5,
           'photoUrl': _selectedPhotoUrl,
         },
       );
@@ -417,9 +459,7 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoadingData) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Directionality(
@@ -427,13 +467,15 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            widget.centerName != null ? 'إضافة طبيب - ${widget.centerName}' : 'إضافة طبيب',
+            widget.centerName != null
+                ? 'إضافة طبيب - ${widget.centerName}'
+                : 'إضافة طبيب',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           foregroundColor: Colors.white,
           elevation: 0,
         ),
@@ -441,206 +483,233 @@ class _AddDoctorScreenState extends State<AddDoctorScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Profile image section
-                Center(
-                  child: Column(
-                    children: [
-                      GestureDetector(
-                        onTap: _showImageSourceDialog,
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color.fromARGB(255, 156, 208, 235),
-                              width: 3,
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Profile image section
+                  Center(
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: _showImageSourceDialog,
+                          child: Container(
+                            width: 120,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color.fromARGB(255, 34, 96, 129),
+                                width: 3,
+                              ),
+                            ),
+                            child: ClipOval(
+                              child:
+                                  _isUploadingImage
+                                      ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
+                                      : Image.network(
+                                        _selectedPhotoUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (
+                                          context,
+                                          error,
+                                          stackTrace,
+                                        ) {
+                                          return Container(
+                                            color: Colors.grey[300],
+                                            child: const Icon(
+                                              Icons.person,
+                                              size: 60,
+                                              color: Colors.grey,
+                                            ),
+                                          );
+                                        },
+                                      ),
                             ),
                           ),
-                          child: ClipOval(
-                            child: _isUploadingImage
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : Image.network(
-                                    _selectedPhotoUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        color: Colors.grey[300],
-                                        child: const Icon(
-                                          Icons.person,
-                                          size: 60,
-                                          color: Colors.grey,
-                                        ),
-                                      );
-                                    },
-                                  ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _showImageSourceDialog,
+                          icon: const Icon(Icons.camera_alt),
+                          label: const Text('تغيير الصورة'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color.fromARGB(
+                              255,
+                              34,
+                              96,
+                              129,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        onPressed: _showImageSourceDialog,
-                        icon: const Icon(Icons.camera_alt),
-                        label: const Text('تغيير الصورة'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color.fromARGB(255, 156, 208, 235),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Form fields
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                                                    color: Colors.grey.withAlpha(26),
-                        spreadRadius: 1,
-                        blurRadius: 10,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'معلومات الطبيب',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                  // Form fields
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withAlpha(26),
+                          spreadRadius: 1,
+                          blurRadius: 10,
+                          offset: Offset(0, 2),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Doctor searchable picker (first)
-                      TextFormField(
-                        readOnly: true,
-                        decoration: InputDecoration(
-                          labelText: 'اختر الطبيب',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'معلومات الطبيب',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
-                          prefixIcon: const Icon(Icons.person),
-                          suffixIcon: const Icon(Icons.arrow_drop_down),
                         ),
-                        controller: TextEditingController(
-                          text: _selectedDoctor == null
-                              ? ''
-                              : (_availableDoctors.firstWhere(
-                                      (d) => d['id'] == _selectedDoctor,
-                                      orElse: () => {'name': ''})['name'] as String? ?? ''),
-                        ),
-                        onTap: _showDoctorPickerDialog,
-                        validator: (_) => _selectedDoctor == null ? 'يرجى اختيار الطبيب' : null,
-                      ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 20),
 
-                      // تم إخفاء حقول التخصص ورقم الهاتف من نموذج الإضافة حسب الطلب
-
-                      // Morning patient limit
-                      TextFormField(
-                        controller: _morningLimitController,
-                        decoration: InputDecoration(
-                          labelText: 'الحد الأقصى للمرضى في الفترة الصباحية',
-                          floatingLabelBehavior: FloatingLabelBehavior.always,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            gapPadding: 8,
-                          ),
-                          prefixIcon: Icon(Icons.wb_sunny),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'يرجى إدخال الحد الأقصى';
-                          }
-                          final number = int.tryParse(value);
-                          if (number == null || number <= 0) {
-                            return 'يرجى إدخال رقم صحيح موجب';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Evening patient limit
-                      TextFormField(
-                        controller: _eveningLimitController,
-                        decoration: InputDecoration(
-                          labelText: 'الحد الأقصى للمرضى في الفترة المسائية',
-                          floatingLabelBehavior: FloatingLabelBehavior.always,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            gapPadding: 8,
-                          ),
-                          prefixIcon: Icon(Icons.nightlight),
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'يرجى إدخال الحد الأقصى';
-                          }
-                          final number = int.tryParse(value);
-                          if (number == null || number <= 0) {
-                            return 'يرجى إدخال رقم صحيح موجب';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Add button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _addDoctor,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromARGB(255, 156, 208, 235),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
+                        // Doctor searchable picker (first)
+                        TextFormField(
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: 'اختر الطبيب',
+                            border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
+                            prefixIcon: const Icon(Icons.person),
+                            suffixIcon: const Icon(Icons.arrow_drop_down),
                           ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : const Text(
-                                  'إضافة الطبيب',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                          controller: TextEditingController(
+                            text:
+                                _selectedDoctor == null
+                                    ? ''
+                                    : (_availableDoctors.firstWhere(
+                                              (d) => d['id'] == _selectedDoctor,
+                                              orElse: () => {'name': ''},
+                                            )['name']
+                                            as String? ??
+                                        ''),
+                          ),
+                          onTap: _showDoctorPickerDialog,
+                          validator:
+                              (_) =>
+                                  _selectedDoctor == null
+                                      ? 'يرجى اختيار الطبيب'
+                                      : null,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+
+                        // تم إخفاء حقول التخصص ورقم الهاتف من نموذج الإضافة حسب الطلب
+
+                        // Morning patient limit
+                        TextFormField(
+                          controller: _morningLimitController,
+                          decoration: InputDecoration(
+                            labelText: 'الحد الأقصى للمرضى في الفترة الصباحية',
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              gapPadding: 8,
+                            ),
+                            prefixIcon: Icon(Icons.wb_sunny),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'يرجى إدخال الحد الأقصى';
+                            }
+                            final number = int.tryParse(value);
+                            if (number == null || number <= 0) {
+                              return 'يرجى إدخال رقم صحيح موجب';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Evening patient limit
+                        TextFormField(
+                          controller: _eveningLimitController,
+                          decoration: InputDecoration(
+                            labelText: 'الحد الأقصى للمرضى في الفترة المسائية',
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              gapPadding: 8,
+                            ),
+                            prefixIcon: Icon(Icons.nightlight),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'يرجى إدخال الحد الأقصى';
+                            }
+                            final number = int.tryParse(value);
+                            if (number == null || number <= 0) {
+                              return 'يرجى إدخال رقم صحيح موجب';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Add button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _addDoctor,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color.fromARGB(
+                                255,
+                                34,
+                                96,
+                                129,
+                              ),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child:
+                                _isLoading
+                                    ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                    : const Text(
+                                      'إضافة الطبيب',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
         ),
       ),
     );

@@ -1,14 +1,14 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 class PdfViewScreen extends StatefulWidget {
   final String pdfUrl;
-  
 
-  const PdfViewScreen({super.key, required this.pdfUrl, });
+  const PdfViewScreen({super.key, required this.pdfUrl});
 
   @override
   State<PdfViewScreen> createState() => _PdfViewScreenState();
@@ -28,7 +28,8 @@ class _PdfViewScreenState extends State<PdfViewScreen> {
   Future<void> _loadPdf() async {
     try {
       final dir = await getTemporaryDirectory();
-      final filePath = '${dir.path}/lab_result_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final filePath =
+          '${dir.path}/lab_result_${DateTime.now().millisecondsSinceEpoch}.pdf';
       final dio = Dio();
 
       // 👇 نحمل الملف بالرابط مع التوكن
@@ -36,10 +37,7 @@ class _PdfViewScreenState extends State<PdfViewScreen> {
         widget.pdfUrl,
         options: Options(
           responseType: ResponseType.bytes,
-          headers: {
-            
-            'Accept': 'application/pdf',
-          },
+          headers: {'Accept': 'application/pdf'},
         ),
       );
 
@@ -61,13 +59,21 @@ class _PdfViewScreenState extends State<PdfViewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('نتيجة التحاليل',style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),),
-        backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+        title: const Text(
+          'نتيجة التحاليل',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: const Color.fromARGB(255, 34, 96, 129),
         centerTitle: true,
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color.fromARGB(255, 156, 208, 235)))
-          : error != null
+      body:
+          isLoading
+              ? const Center(
+                child: CircularProgressIndicator(
+                  color: Color.fromARGB(255, 34, 96, 129),
+                ),
+              )
+              : error != null
               ? Center(child: Text('فشل تحميل الملف:\n$error'))
               : SfPdfViewer.file(localPdf!),
     );

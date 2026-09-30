@@ -125,7 +125,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('جاري الانتقال إلى حجوزات د. ${notification['doctorName']}'),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -319,7 +319,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -340,7 +340,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           child: _loading
               ? const Center(
                   child: CircularProgressIndicator(
-                    color: Color(0xFF2FBDAF),
+                    color: Color.fromARGB(255, 34, 96, 129),
                   ),
                 )
               : _notifications.isEmpty

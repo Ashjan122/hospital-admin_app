@@ -1,14 +1,15 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
-import 'package:path/path.dart' as path;
-import 'package:hospital_admin_app/screens/doctor_bookings_screen.dart';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/screens/admin_doctors_schedule_screen.dart';
-import 'package:intl/intl.dart' as intl;
-import 'package:intl/date_symbol_data_local.dart';
+import 'package:hospital_admin_app/screens/doctor_bookings_screen.dart';
 import 'package:hospital_admin_app/widgets/optimized_loading_widget.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart' as intl;
+import 'package:path/path.dart' as path;
 
 class AdminDoctorDetailsScreen extends StatefulWidget {
   final String doctorId;
@@ -39,7 +40,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
   File? _selectedImageFile;
   final ImagePicker _picker = ImagePicker();
   String? _currentPhotoUrl;
-  
+
   // متغيرات إيقاف الحجز
   DateTime? _selectedBlockDate;
   String? _selectedBlockPeriod; // 'morning', 'evening', 'all'
@@ -58,9 +59,9 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
       // جلب التخصصات والطبيب بشكل متوازي لتحسين الأداء
       final specializationsSnapshot =
           await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
               .get();
 
       // جلب بيانات الطبيب من قاعدة البيانات المركزية بشكل متوازي
@@ -75,19 +76,19 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
           specializationsSnapshot.docs.map((specDoc) async {
             final doctorDoc =
                 await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(widget.centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(widget.doctorId)
+                    .collection('medicalFacilities')
+                    .doc(widget.centerId)
+                    .collection('specializations')
+                    .doc(specDoc.id)
+                    .collection('doctors')
+                    .doc(widget.doctorId)
                     .get();
 
-          if (doctorDoc.exists) {
+            if (doctorDoc.exists) {
               return {'doctorData': doctorDoc.data()!, 'specDoc': specDoc};
-        }
-        return null;
-      }).toList();
+            }
+            return null;
+          }).toList();
 
       // انتظار جميع الطلبات بشكل متوازي
       final results = await Future.wait(doctorFutures);
@@ -121,8 +122,8 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
               '';
           doctorData['photoUrl'] =
               centralDoctorData['photoUrl'] ??
-                doctorData['photoUrl'] ?? 
-                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
+              doctorData['photoUrl'] ??
+              'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
           // حفظ التخصص الرئيسي من البيانات المركزية
           centralSpecializationId =
               centralDoctorData['specialization']?.toString();
@@ -131,11 +132,11 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
             doctorData['subSpecializationId'] =
                 centralDoctorData['subSpecialization'];
           }
-          } else {
+        } else {
           // استخدام البيانات المحلية إذا لم تكن موجودة في المركزية
           doctorData['name'] =
               doctorData['docName'] ?? doctorData['name'] ?? widget.doctorId;
-            doctorData['phoneNumber'] = doctorData['phoneNumber'] ?? '';
+          doctorData['phoneNumber'] = doctorData['phoneNumber'] ?? '';
           doctorData['photoUrl'] =
               doctorData['photoUrl'] ??
               'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
@@ -147,14 +148,14 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
         doctorData['phoneNumber'] = doctorData['phoneNumber'] ?? '';
         doctorData['photoUrl'] =
             doctorData['photoUrl'] ??
-                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
-          }
-          
+            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
+      }
+
       // إضافة اسم التخصص للبيانات
       final specializationData = specDoc.data() as Map<String, dynamic>;
       doctorData['specialization'] =
           specializationData['specName'] ?? specDoc.id;
-          doctorData['specializationId'] = specDoc.id;
+      doctorData['specializationId'] = specDoc.id;
       // جلب التخصص الفرعي (id) من البيانات
       final subSpecializationId =
           doctorData['subSpecializationId'] ??
@@ -214,12 +215,12 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImageFile = File(image.path);
         });
-        
+
         // رفع الصورة إلى Firebase Storage
         await _uploadImage();
       }
@@ -237,29 +238,29 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
 
   Future<void> _uploadImage() async {
     if (_selectedImageFile == null) return;
-    
+
     setState(() {
       _isUploadingImage = true;
     });
-    
+
     try {
       // Starting image upload in details page
       // File path: ${_selectedImageFile!.path}
-      
+
       // التحقق من وجود الملف
       if (!await _selectedImageFile!.exists()) {
         throw Exception('الملف غير موجود في المسار المحدد');
       }
-      
+
       // إنشاء اسم فريد للصورة
       final fileName =
           'doctors/${DateTime.now().millisecondsSinceEpoch}_${path.basename(_selectedImageFile!.path)}';
       // File name in Storage: $fileName
-      
+
       // رفع الصورة إلى Firebase Storage
       final storageRef = FirebaseStorage.instance.ref().child(fileName);
       // Storage reference: ${storageRef.fullPath}
-      
+
       // إضافة metadata للصورة
       final metadata = SettableMetadata(
         contentType: 'image/jpeg',
@@ -268,28 +269,28 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
           'doctor_id': widget.doctorId,
         },
       );
-      
+
       final uploadTask = storageRef.putFile(_selectedImageFile!, metadata);
-      
+
       // مراقبة تقدم الرفع (بدون استخدام متغيرات محلية لتفادي تحذيرات اللينتر)
       uploadTask.snapshotEvents.listen((_) {});
-      
+
       // انتظار اكتمال الرفع
       final snapshot = await uploadTask;
       // Image uploaded successfully
-      
+
       // الحصول على رابط التحميل
       final downloadUrl = await snapshot.ref.getDownloadURL();
       // Download URL: $downloadUrl
-      
+
       // تحديث رابط الصورة في قاعدة البيانات
       await _updateDoctorPhoto(downloadUrl);
-      
+
       setState(() {
         _currentPhotoUrl = downloadUrl;
         _isUploadingImage = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -301,13 +302,13 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
     } catch (e) {
       // Error uploading image: $e
       // Error type: ${e.runtimeType}
-      
+
       setState(() {
         _isUploadingImage = false;
       });
-      
+
       String errorMessage = 'خطأ في رفع الصورة';
-      
+
       if (e.toString().contains('permission')) {
         errorMessage =
             'خطأ في الأذونات - تأكد من قواعد الأمان في Firebase Storage';
@@ -318,7 +319,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
       } else if (e.toString().contains('file')) {
         errorMessage = 'خطأ في الملف - تأكد من صحة الصورة';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -338,25 +339,25 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
           .collection('allDoctors')
           .doc(widget.doctorId)
           .update({'photoUrl': photoUrl});
-      
+
       // تحديث الصورة في قاعدة البيانات المحلية أيضاً
       final specializationsSnapshot =
           await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
 
       for (var specDoc in specializationsSnapshot.docs) {
         final doctorDoc =
             await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .get();
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .doc(widget.doctorId)
+                .get();
 
         if (doctorDoc.exists) {
           // تحديث رابط الصورة
@@ -381,29 +382,29 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-        title: const Text('اختر مصدر الصورة'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('الكاميرا'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
+            title: const Text('اختر مصدر الصورة'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt),
+                  title: const Text('الكاميرا'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library),
+                  title: const Text('المعرض'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+              ],
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('المعرض'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
@@ -416,21 +417,21 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
       // البحث عن الطبيب في جميع التخصصات
       final specializationsSnapshot =
           await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
 
       for (var specDoc in specializationsSnapshot.docs) {
         final doctorDoc =
             await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .get();
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .doc(widget.doctorId)
+                .get();
 
         if (doctorDoc.exists) {
           // تحديث البيانات - فقط الحد الأقصى للحجوزات
@@ -573,20 +574,20 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
     try {
       final blockedSnapshot =
           await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .doc(_doctorData!['specializationId'])
-          .collection('doctors')
-          .doc(widget.doctorId)
-          .collection('blockedDates')
-          .get();
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(_doctorData!['specializationId'])
+              .collection('doctors')
+              .doc(widget.doctorId)
+              .collection('blockedDates')
+              .get();
 
       if (blockedSnapshot.docs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('لا توجد أيام محظورة'),
-            backgroundColor: const Color(0xFF2FBDAF),
+            backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           ),
         );
         return;
@@ -596,44 +597,44 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
         context: context,
         builder:
             (context) => AlertDialog(
-          title: const Text('الأيام المحظورة'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: blockedSnapshot.docs.length,
-              itemBuilder: (context, index) {
-                final doc = blockedSnapshot.docs[index];
-                final data = doc.data();
-                final dateStr = data['date'] as String;
-                final period = data['period'] as String;
+              title: const Text('الأيام المحظورة'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: blockedSnapshot.docs.length,
+                  itemBuilder: (context, index) {
+                    final doc = blockedSnapshot.docs[index];
+                    final data = doc.data();
+                    final dateStr = data['date'] as String;
+                    final period = data['period'] as String;
 
                     final periodText =
                         period == 'all'
                             ? 'اليوم كاملاً'
                             : (period == 'morning' ? 'صباحاً' : 'مساءً');
-                
-                return ListTile(
-                  title: Text(dateStr),
-                  subtitle: Text('الفترة: $periodText'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _unblockBooking(dateStr);
-                    },
-                  ),
-                );
-              },
+
+                    return ListTile(
+                      title: Text(dateStr),
+                      subtitle: Text('الفترة: $periodText'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _unblockBooking(dateStr);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('إغلاق'),
+                ),
+              ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إغلاق'),
-            ),
-          ],
-        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -669,7 +670,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
               : (_selectedBlockPeriod == 'morning'
                   ? 'الفترة الصباحية'
                   : 'الفترة المسائية');
-      
+
       // حفظ إيقاف الحجز في Firestore
       await FirebaseFirestore.instance
           .collection('medicalFacilities')
@@ -681,12 +682,12 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
           .collection('blockedDates')
           .doc(dateStr)
           .set({
-        'date': dateStr,
-        'period': _selectedBlockPeriod,
-        'blockedAt': FieldValue.serverTimestamp(),
-        'blockedBy': 'admin', // يمكن إضافة معرف المدير لاحقاً
-        'reason': 'إيقاف الحجز من قبل المدير',
-      });
+            'date': dateStr,
+            'period': _selectedBlockPeriod,
+            'blockedAt': FieldValue.serverTimestamp(),
+            'blockedBy': 'admin', // يمكن إضافة معرف المدير لاحقاً
+            'reason': 'إيقاف الحجز من قبل المدير',
+          });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -723,146 +724,269 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-        title: const Text('إيقاف الحجز'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // اختيار التاريخ
-            ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('اختر التاريخ'),
+            title: const Text('إيقاف الحجز'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // اختيار التاريخ
+                ListTile(
+                  leading: const Icon(Icons.calendar_today),
+                  title: const Text('اختر التاريخ'),
                   subtitle: Text(
                     _selectedBlockDate != null
-                  ? '${_selectedBlockDate!.year}/${_selectedBlockDate!.month}/${_selectedBlockDate!.day}'
+                        ? '${_selectedBlockDate!.year}/${_selectedBlockDate!.month}/${_selectedBlockDate!.day}'
                         : 'لم يتم الاختيار',
                   ),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                  selectableDayPredicate: (date) {
-                    // فحص إذا كان اليوم متاح في جدول الطبيب
-                    if (_doctorData == null) return true;
-                    
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      selectableDayPredicate: (date) {
+                        // فحص إذا كان اليوم متاح في جدول الطبيب
+                        if (_doctorData == null) return true;
+
                         final workingSchedule =
                             _doctorData!['workingSchedule']
                                 as Map<String, dynamic>?;
-                    if (workingSchedule == null) return true;
-                    
-                    final dayName = _getArabicDayName(date);
-                    final schedule = workingSchedule[dayName];
-                    
+                        if (workingSchedule == null) return true;
+
+                        final dayName = _getArabicDayName(date);
+                        final schedule = workingSchedule[dayName];
+
                         if (schedule != null &&
                             schedule is Map<String, dynamic>) {
-                      final morning = schedule['morning'];
-                      final evening = schedule['evening'];
-                      
+                          final morning = schedule['morning'];
+                          final evening = schedule['evening'];
+
                           return (morning != null &&
                                   morning is Map &&
                                   morning.isNotEmpty) ||
                               (evening != null &&
                                   evening is Map &&
                                   evening.isNotEmpty);
-                    }
-                    
-                    return false;
-                  },
-                  builder: (context, child) {
-                    return Theme(
-                      data: Theme.of(context).copyWith(
-                        colorScheme: ColorScheme.light(
-                          primary: const Color(0xFF2FBDAF),
-                          onPrimary: Colors.white,
-                          onSurface: Colors.black,
-                        ),
-                        textButtonTheme: TextButtonThemeData(
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFF2FBDAF),
+                        }
+
+                        return false;
+                      },
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: ColorScheme.light(
+                              primary: const Color.fromARGB(255, 34, 96, 129),
+                              onPrimary: Colors.white,
+                              onSurface: Colors.black,
+                            ),
+                            textButtonTheme: TextButtonThemeData(
+                              style: TextButton.styleFrom(
+                                foregroundColor: const Color.fromARGB(
+                                  255,
+                                  34,
+                                  96,
+                                  129,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      child: child!,
+                          child: child!,
+                        );
+                      },
                     );
+                    if (date != null) {
+                      setState(() {
+                        _selectedBlockDate = date;
+                      });
+                      Navigator.pop(context);
+                      _showBlockBookingDialog();
+                    }
                   },
-                );
-                if (date != null) {
-                  setState(() {
-                    _selectedBlockDate = date;
-                  });
-                  Navigator.pop(context);
-                  _showBlockBookingDialog();
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-            
-            // اختيار الفترة
+                ),
+                const SizedBox(height: 16),
+
+                // اختيار الفترة
                 const Text(
                   'اختر الفترة:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                ChoiceChip(
-                  label: const Text('صباحاً'),
-                  selected: _selectedBlockPeriod == 'morning',
-                  onSelected: (selected) {
-                    setState(() {
-                      _selectedBlockPeriod = selected ? 'morning' : null;
-                    });
-                    Navigator.pop(context);
-                    _showBlockBookingDialog();
-                  },
-                ),
-                ChoiceChip(
-                  label: const Text('مساءً'),
-                  selected: _selectedBlockPeriod == 'evening',
-                  onSelected: (selected) {
-                    setState(() {
-                      _selectedBlockPeriod = selected ? 'evening' : null;
-                    });
-                    Navigator.pop(context);
-                    _showBlockBookingDialog();
-                  },
-                ),
-                ChoiceChip(
-                  label: const Text('اليوم كاملاً'),
-                  selected: _selectedBlockPeriod == 'all',
-                  onSelected: (selected) {
-                    setState(() {
-                      _selectedBlockPeriod = selected ? 'all' : null;
-                    });
-                    Navigator.pop(context);
-                    _showBlockBookingDialog();
-                  },
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('صباحاً'),
+                      selected: _selectedBlockPeriod == 'morning',
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedBlockPeriod = selected ? 'morning' : null;
+                        });
+                        Navigator.pop(context);
+                        _showBlockBookingDialog();
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('مساءً'),
+                      selected: _selectedBlockPeriod == 'evening',
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedBlockPeriod = selected ? 'evening' : null;
+                        });
+                        Navigator.pop(context);
+                        _showBlockBookingDialog();
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('اليوم كاملاً'),
+                      selected: _selectedBlockPeriod == 'all',
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedBlockPeriod = selected ? 'all' : null;
+                        });
+                        Navigator.pop(context);
+                        _showBlockBookingDialog();
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: _isBlockingBooking ? null : _blockBooking,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: _isBlockingBooking ? null : _blockBooking,
                 child:
                     _isBlockingBooking
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('إيقاف الحجز'),
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Text('إيقاف الحجز'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
+  }
+
+  Future<void> _confirmToggleDoctorStatus(bool currentIsActive) async {
+    final newStatus = !currentIsActive;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            newStatus ? 'تفعيل الطبيب' : 'تعطيل الطبيب',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            newStatus
+                ? 'هل أنت متأكد من تفعيل الطبيب؟\n\nسيصبح الطبيب نشطاً و متاحا للمرضى '
+                : 'هل أنت متأكد من تعطيل الطبيب؟\n\nلن يظهر الطبيب في قائمة الاطباء، ولن يتمكن المرضى من حجز موعد معه.',
+            style: const TextStyle(fontSize: 15, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 34, 96, 129),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'تأكيد',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isTogglingStatus = true;
+      if (_doctorData != null) {
+        _doctorData!['isActive'] = newStatus;
+      }
+    });
+
+    await toggleDoctorStatus(newStatus, skipSetState: true);
+
+    if (mounted) {
+      setState(() {
+        _isTogglingStatus = false;
+      });
+    }
+  }
+
+  Future<void> _confirmToggleDoctorBooking(bool currentIsBookingEnabled) async {
+    final newStatus = !currentIsBookingEnabled;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            newStatus ? 'تفعيل الحجز' : 'إيقاف الحجز',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: Text(
+            newStatus
+                ? 'هل أنت متأكد من تفعيل الحجز للطبيب؟\n\nسيتمكن المرضى من حجز المواعيد مع الطبيب حسب جدول عمله.'
+                : 'هل أنت متأكد من إيقاف الحجز للطبيب؟\n\nلن يتمكن المرضى من إنشاء حجوزات جديدة مع هذا الطبيب.',
+            style: const TextStyle(fontSize: 15, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 34, 96, 129),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'تأكيد',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isTogglingBooking = true;
+      if (_doctorData != null) {
+        _doctorData!['isBookingEnabled'] = newStatus;
+      }
+    });
+
+    await toggleDoctorBooking(newStatus, skipSetState: true);
+
+    if (mounted) {
+      setState(() {
+        _isTogglingBooking = false;
+      });
+    }
   }
 
   Future<void> toggleDoctorStatus(
@@ -870,7 +994,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
     bool skipSetState = false,
   }) async {
     if (!skipSetState) {
-    setState(() {
+      setState(() {
         _isTogglingStatus = true;
       });
     }
@@ -890,26 +1014,26 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
             .update({'isActive': isActive});
       } else {
         // إذا لم يكن متوفراً، ابحث بشكل متوازي في جميع التخصصات
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
+        final specializationsSnapshot = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
             .get()
             .timeout(const Duration(seconds: 3));
 
         final futures =
             specializationsSnapshot.docs.map((specDoc) async {
-        final doctorDoc = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
+              final doctorDoc = await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(widget.centerId)
+                  .collection('specializations')
+                  .doc(specDoc.id)
+                  .collection('doctors')
+                  .doc(widget.doctorId)
                   .get()
                   .timeout(const Duration(seconds: 2));
 
-        if (doctorDoc.exists) {
+              if (doctorDoc.exists) {
                 return specDoc.id;
               }
               return null;
@@ -939,25 +1063,25 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
       }
 
       if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(isActive ? 'تم تفعيل الطبيب' : 'تم تعطيل الطبيب'),
-              backgroundColor: Colors.green,
-            ),
-          );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isActive ? 'تم تفعيل الطبيب' : 'تم تعطيل الطبيب'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ في تحديث حالة الطبيب'),
-          backgroundColor: Colors.red,
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ في تحديث حالة الطبيب'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted && !skipSetState) {
-      setState(() {
+        setState(() {
           _isTogglingStatus = false;
         });
       }
@@ -969,7 +1093,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
     bool skipSetState = false,
   }) async {
     if (!skipSetState) {
-    setState(() {
+      setState(() {
         _isTogglingBooking = true;
       });
     }
@@ -989,26 +1113,26 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
             .update({'isBookingEnabled': isEnabled});
       } else {
         // إذا لم يكن متوفراً، ابحث بشكل متوازي في جميع التخصصات
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
+        final specializationsSnapshot = await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
             .get()
             .timeout(const Duration(seconds: 3));
 
         final futures =
             specializationsSnapshot.docs.map((specDoc) async {
-        final doctorDoc = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
+              final doctorDoc = await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(widget.centerId)
+                  .collection('specializations')
+                  .doc(specDoc.id)
+                  .collection('doctors')
+                  .doc(widget.doctorId)
                   .get()
                   .timeout(const Duration(seconds: 2));
 
-        if (doctorDoc.exists) {
+              if (doctorDoc.exists) {
                 return specDoc.id;
               }
               return null;
@@ -1032,35 +1156,35 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
         }
       }
 
-          // تحديث البيانات المحلية
-          if (_doctorData != null) {
-            _doctorData!['isBookingEnabled'] = isEnabled;
-          }
+      // تحديث البيانات المحلية
+      if (_doctorData != null) {
+        _doctorData!['isBookingEnabled'] = isEnabled;
+      }
 
       if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
             content: Text(
               isEnabled ? 'تم تفعيل الحجز للطبيب' : 'تم إيقاف الحجز للطبيب',
             ),
-              backgroundColor: Colors.green,
-            ),
-          );
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ في تحديث حالة الحجز'),
-          backgroundColor: Colors.red,
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('حدث خطأ في تحديث حالة الحجز'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } finally {
       if (mounted && !skipSetState) {
-      setState(() {
+        setState(() {
           _isTogglingBooking = false;
-      });
+        });
       }
     }
   }
@@ -1083,7 +1207,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
               fontSize: 24,
             ),
           ),
-          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           foregroundColor: Colors.white,
           centerTitle: true,
           elevation: 0,
@@ -1110,70 +1234,70 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
         body: SafeArea(
           child: FutureBuilder<Map<String, dynamic>?>(
             future: fetchDoctorDetails(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const OptimizedLoadingWidget(
-                message: 'جاري تحميل بيانات الطبيب...',
-                color: Color(0xFF2FBDAF),
-              );
-            }
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const OptimizedLoadingWidget(
+                  message: 'جاري تحميل بيانات الطبيب...',
+                  color: Color.fromARGB(255, 34, 96, 129),
+                );
+              }
 
-            if (snapshot.hasError) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'حدث خطأ في تحميل البيانات',
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'حدث خطأ في تحميل البيانات',
                         style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              );
-            }
+                      ),
+                    ],
+                  ),
+                );
+              }
 
-            if (!snapshot.hasData || snapshot.data == null) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'لم يتم العثور على بيانات الطبيب',
+              if (!snapshot.hasData || snapshot.data == null) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'لم يتم العثور على بيانات الطبيب',
                         style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              );
-            }
+                      ),
+                    ],
+                  ),
+                );
+              }
 
               // استخدام البيانات المحلية المحدثة إذا كانت متاحة، وإلا استخدام البيانات من snapshot
               final doctorData = _doctorData ?? snapshot.data!;
-            
-            // استخراج بيانات الطبيب من قاعدة البيانات
+
+              // استخراج بيانات الطبيب من قاعدة البيانات
               final doctorName =
                   doctorData['name'] ??
                   doctorData['docName'] ??
                   'طبيب غير معروف';
-            final specialization = doctorData['specialization'] ?? 'غير محدد';
+              final specialization = doctorData['specialization'] ?? 'غير محدد';
               final subSpecialization = doctorData['subSpecialization'];
               final photoUrl =
                   doctorData['photoUrl'] ??
-                'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
-            final phoneNumber = doctorData['phoneNumber'] ?? 'غير متوفر';
-            final isActive = doctorData['isActive'] ?? true;
-            final isBookingEnabled = doctorData['isBookingEnabled'] ?? true;
+                  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
+              final phoneNumber = doctorData['phoneNumber'] ?? 'غير متوفر';
+              final isActive = doctorData['isActive'] ?? true;
+              final isBookingEnabled = doctorData['isBookingEnabled'] ?? true;
 
               // تعيين القيم في controllers
               _nameController.text = doctorName;
@@ -1188,36 +1312,36 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Doctor profile card
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withAlpha(26),
-                          spreadRadius: 1,
-                          blurRadius: 10,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        // Profile image
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Doctor profile card
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withAlpha(26),
+                                  spreadRadius: 1,
+                                  blurRadius: 10,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                // Profile image
                                 GestureDetector(
                                   onTap: () {
                                     _showImagePickerDialog(context);
                                   },
                                   child: Stack(
-                          children: [
-                            CircleAvatar(
+                                    children: [
+                                      CircleAvatar(
                                         radius: 45,
                                         backgroundColor: Colors.grey[200],
                                         child: ClipOval(
@@ -1261,9 +1385,9 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                                             color:
                                                                 const Color.fromARGB(
                                                                   255,
-                                                                  156,
-                                                                  208,
-                                                                  235,
+                                                                  34,
+                                                                  96,
+                                                                  129,
                                                                 ),
                                                           ),
                                                         ),
@@ -1302,93 +1426,93 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                                     },
                                                   ),
                                         ),
-                            ),
-                            if (_isUploadingImage)
-                              Positioned.fill(
-                                child: Container(
-                                  decoration: BoxDecoration(
+                                      ),
+                                      if (_isUploadingImage)
+                                        Positioned.fill(
+                                          child: Container(
+                                            decoration: BoxDecoration(
                                               color: Colors.black.withAlpha(
                                                 128,
                                               ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Center(
+                                              child: CircularProgressIndicator(
                                                 valueColor:
                                                     AlwaysStoppedAnimation<
                                                       Color
                                                     >(Colors.white),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
                                           padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
+                                          decoration: BoxDecoration(
                                             color: const Color.fromARGB(
                                               255,
-                                              156,
-                                              208,
-                                              235,
+                                              34,
+                                              96,
+                                              129,
                                             ),
-                                    shape: BoxShape.circle,
-                                  ),
+                                            shape: BoxShape.circle,
+                                          ),
                                           child: Icon(
                                             _isUploadingImage
                                                 ? Icons.hourglass_empty
                                                 : Icons.camera_alt,
-                                      color: Colors.white,
-                                      size: 20,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                          ],
+                                const SizedBox(height: 20),
+
+                                // Doctor name
+                                Text(
+                                  doctorName,
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
                                   ),
-                        ),
-                        const SizedBox(height: 20),
-                        
-                        // Doctor name
-                        Text(
-                          doctorName,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        
-                        // Specialization
-                        Container(
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+
+                                // Specialization
+                                Container(
                                   padding: EdgeInsets.symmetric(
                                     horizontal: 16,
                                     vertical: 8,
                                   ),
-                          decoration: BoxDecoration(
+                                  decoration: BoxDecoration(
                                     color: const Color.fromARGB(
                                       255,
                                       156,
                                       208,
                                       235,
                                     ).withAlpha(26),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
                                     subSpecialization != null &&
                                             subSpecialization
                                                 .toString()
                                                 .isNotEmpty
                                         ? '$specialization - $subSpecialization'
                                         : specialization,
-                            style: TextStyle(
-                              fontSize: 16,
+                                    style: TextStyle(
+                                      fontSize: 16,
                                       color: Colors.grey[800],
-                              fontWeight: FontWeight.w600,
-                            ),
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -1411,7 +1535,7 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                       onTap: () {
                                         _showEditLimitDialog(
                                           'morning',
-                          'الحد الأقصى للمرضى - الفترة الصباحية', 
+                                          'الحد الأقصى للمرضى - الفترة الصباحية',
                                           doctorData['morningPatientLimit'] ??
                                               5,
                                         );
@@ -1421,13 +1545,13 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                           horizontal: 14,
                                           vertical: 10,
                                         ),
-                    decoration: BoxDecoration(
-                      border: Border.all(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
                                             color: Color.fromARGB(
                                               255,
-                                              156,
-                                              208,
-                                              235,
+                                              34,
+                                              96,
+                                              129,
                                             ),
                                             width: 1.5,
                                           ),
@@ -1435,25 +1559,25 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                             12,
                                           ),
                                           color: Colors.white,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
                                               Icons.wb_sunny,
                                               color: Colors.orange,
                                               size: 18,
-                        ),
+                                            ),
                                             SizedBox(width: 6),
-                        Text(
+                                            Text(
                                               'صباح: ${doctorData['morningPatientLimit'] ?? 5} مرضى',
-                          style: TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 14,
                                                 color: Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
 
                                     SizedBox(width: 20),
@@ -1468,18 +1592,18 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                               5,
                                         );
                                       },
-                    child: Container(
+                                      child: Container(
                                         padding: EdgeInsets.symmetric(
                                           horizontal: 14,
                                           vertical: 10,
                                         ),
-                      decoration: BoxDecoration(
-                        border: Border.all(
+                                        decoration: BoxDecoration(
+                                          border: Border.all(
                                             color: Color.fromARGB(
                                               255,
-                                              156,
-                                              208,
-                                              235,
+                                              34,
+                                              96,
+                                              129,
                                             ),
                                             width: 1.5,
                                           ),
@@ -1487,33 +1611,38 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                             12,
                                           ),
                                           color: Colors.white,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
                                               Icons.brightness_2,
-                                              color: Colors.blueGrey,
+                                              color: Color.fromARGB(
+                                                255,
+                                                2,
+                                                67,
+                                                99,
+                                              ),
                                               size: 18,
                                             ),
                                             SizedBox(width: 6),
-                                Text(
+                                            Text(
                                               'مساء: ${doctorData['eveningPatientLimit'] ?? 5} مرضى',
-                                  style: TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 14,
                                                 color: Colors.black,
-                                  ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
-                            ),
-                        ],
-                      ),
-                              ],
-                    ),
-                  ),
 
-                  const SizedBox(height: 24),
+                          const SizedBox(height: 24),
 
                           StatefulBuilder(
                             builder: (context, setStateLocal) {
@@ -1525,31 +1654,16 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                   isBookingEnabled;
 
                               return Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
                                       onPressed:
                                           _isTogglingStatus
                                               ? null
-                                              : () async {
-                                                final newStatus =
-                                                    !currentIsActive;
-                                                setStateLocal(() {
-                                                  _isTogglingStatus = true;
-                                                  if (_doctorData != null) {
-                                                    _doctorData!['isActive'] =
-                                                        newStatus;
-                                                  }
-                                                });
-                                                await toggleDoctorStatus(
-                                                  newStatus,
-                                                  skipSetState: true,
+                                              : () {
+                                                _confirmToggleDoctorStatus(
+                                                  currentIsActive,
                                                 );
-                                                if (mounted) {
-                                                  setStateLocal(() {
-                                                    _isTogglingStatus = false;
-                                                  });
-                                                }
                                               },
                                       icon:
                                           _isTogglingStatus
@@ -1565,113 +1679,96 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                                                 ),
                                               )
                                               : Icon(
-                                                (_doctorData?['isActive'] ??
-                                                        currentIsActive)
+                                                currentIsActive
                                                     ? Icons.block
                                                     : Icons.check_circle,
+                                                color: Colors.white,
                                               ),
                                       label: Text(
-                                        (_doctorData?['isActive'] ??
-                                                currentIsActive)
+                                        currentIsActive
                                             ? 'تعطيل الطبيب'
                                             : 'تفعيل الطبيب',
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                              style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color.fromARGB(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color.fromARGB(
                                           255,
-                                          156,
-                                          208,
-                                          235,
+                                          34,
+                                          96,
+                                          129,
                                         ),
-                                foregroundColor: Colors.white,
-                                        padding: EdgeInsets.symmetric(
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
                                           vertical: 12,
                                         ),
-                                shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                ),
-                              ),
-                            ),
-                          ),
-                                  ),
-                                  SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                                      onPressed:
-                                          _isTogglingBooking
-                                              ? null
-                                              : () async {
-                                                final newStatus =
-                                                    !currentIsBookingEnabled;
-                                                setStateLocal(() {
-                                                  _isTogglingBooking = true;
-                                                  if (_doctorData != null) {
-                                                    _doctorData!['isBookingEnabled'] =
-                                                        newStatus;
-                                                  }
-                                                });
-                                                await toggleDoctorBooking(
-                                                  newStatus,
-                                                  skipSetState: true,
-                                                );
-                                                if (mounted) {
-                                                  setStateLocal(() {
-                                                    _isTogglingBooking = false;
-                                                  });
-                                                }
-                                              },
-                                      icon:
-                                          _isTogglingBooking
-                                              ? const SizedBox(
-                                                width: 16,
-                                                height: 16,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation<
-                                                        Color
-                                                      >(Colors.white),
-                                                ),
-                                              )
-                                              : Icon(
-                                                (_doctorData?['isBookingEnabled'] ??
-                                                        currentIsBookingEnabled)
-                                                    ? Icons.lock_open
-                                                    : Icons.lock,
-                                              ),
-                                      label: Text(
-                                        (_doctorData?['isBookingEnabled'] ??
-                                                currentIsBookingEnabled)
-                                            ? 'الحجز مفعل'
-                                            : 'الحجز متوقف',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                              style: ElevatedButton.styleFrom(
-                                        backgroundColor: Color.fromARGB(
-                                          255,
-                                          156,
-                                          208,
-                                          235,
-                                        ),
-                                foregroundColor: Colors.white,
-                                        padding: EdgeInsets.symmetric(
-                                          vertical: 12,
-                                        ),
-                                shape: RoundedRectangleBorder(
+                                        shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed:
+                                          _isTogglingBooking
+                                              ? null
+                                              : () {
+                                                _confirmToggleDoctorBooking(
+                                                  currentIsBookingEnabled,
+                                                );
+                                              },
+                                      icon:
+                                          _isTogglingBooking
+                                              ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  valueColor:
+                                                      AlwaysStoppedAnimation<
+                                                        Color
+                                                      >(Colors.white),
+                                                ),
+                                              )
+                                              : Icon(
+                                                currentIsBookingEnabled
+                                                    ? Icons.lock_open
+                                                    : Icons.lock,
+                                                color: Colors.white,
+                                              ),
+                                      label: Text(
+                                        currentIsBookingEnabled
+                                            ? 'الحجز مفعل'
+                                            : 'الحجز متوقف',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color.fromARGB(
+                                          255,
+                                          34,
+                                          96,
+                                          129,
+                                        ),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               );
                             },
                           ),
@@ -1684,22 +1781,22 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                     padding: EdgeInsets.all(16),
                     child: SizedBox(
                       width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
                               builder:
                                   (context) => DoctorBookingsScreen(
                                     doctorId: widget.doctorId,
-                                      centerId: widget.centerId,
-                                      centerName: widget.centerName,
+                                    centerId: widget.centerId,
+                                    centerName: widget.centerName,
                                     doctorName: doctorName,
-                                    ),
                                   ),
-                                );
-                              },
-                        icon: Icon(Icons.calendar_today),
+                            ),
+                          );
+                        },
+                        icon: Icon(Icons.calendar_today, color: Colors.white),
                         label: Text(
                           'حجوزات الطبيب',
                           style: TextStyle(
@@ -1707,22 +1804,22 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
                             fontSize: 16,
                           ),
                         ),
-                              style: ElevatedButton.styleFrom(
-                          backgroundColor: Color.fromARGB(255, 156, 208, 235),
-                                foregroundColor: Colors.white,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color.fromARGB(255, 34, 96, 129),
+                          foregroundColor: Colors.white,
                           padding: EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
+                        ),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
                 ],
-            );
-          },
-        ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -1771,12 +1868,12 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 156, 208, 235).withAlpha(26),
+              color: const Color.fromARGB(255, 34, 96, 129).withAlpha(26),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               icon,
-              color: const Color.fromARGB(255, 156, 208, 235),
+              color: const Color.fromARGB(255, 34, 96, 129),
               size: 20,
             ),
           ),
@@ -1824,12 +1921,12 @@ class _AdminDoctorDetailsScreenState extends State<AdminDoctorDetailsScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 156, 208, 235).withAlpha(26),
+              color: const Color.fromARGB(255, 34, 96, 129).withAlpha(26),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               icon,
-              color: const Color.fromARGB(255, 156, 208, 235),
+              color: const Color.fromARGB(255, 34, 96, 129),
               size: 20,
             ),
           ),

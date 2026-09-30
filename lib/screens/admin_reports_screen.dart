@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 class AdminReportsScreen extends StatefulWidget {
   final String centerId;
@@ -21,7 +21,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   String _selectedPeriod = 'today'; // today, week, month, all
   String _loadingMessage = 'جاري تحميل الإحصائيات...';
   bool _showDoctorsWithoutSchedule = false; // التحكم في إظهار/إخفاء القائمة
-  
+
   // متغيرات لتتبع حالة تحميل كل إحصائية
   Map<String, bool> _loadingStates = {
     'specializations': true,
@@ -58,7 +58,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
 
   Future<void> _loadStatistics() async {
     if (_isLoading) return; // منع التحميل المتكرر
-    
+
     setState(() {
       // إعادة تعيين جميع حالات التحميل
       _loadingStates.forEach((key, value) {
@@ -84,12 +84,13 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   // تحميل عدد التخصصات
   Future<void> _loadSpecializationsCount() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
-      
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
+
       if (mounted) {
         setState(() {
           _statistics['specializations'] = snapshot.docs.length;
@@ -109,13 +110,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   // تحميل عدد شركات التأمين النشطة
   Future<void> _loadInsuranceCompaniesCount() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('insuranceCompanies')
-          .where('isActive', isEqualTo: true)
-          .get();
-      
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('insuranceCompanies')
+              .where('isActive', isEqualTo: true)
+              .get();
+
       if (mounted) {
         setState(() {
           _statistics['insuranceCompanies'] = snapshot.docs.length;
@@ -135,11 +137,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   // تحميل عدد المستخدمين
   Future<void> _loadUsersCount() async {
     try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('centerId', isEqualTo: widget.centerId)
-          .get();
-      
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('centerId', isEqualTo: widget.centerId)
+              .get();
+
       if (mounted) {
         setState(() {
           _statistics['users'] = snapshot.docs.length;
@@ -160,11 +163,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   Future<void> _loadDoctorsAndBookings() async {
     try {
       // جلب التخصصات أولاً
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
 
       int totalDoctors = 0;
       int todayBookings = 0;
@@ -189,12 +193,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               .collection('specializations')
               .doc(specDoc.id)
               .collection('doctors')
-              .get()
+              .get(),
         );
       }
 
       final doctorSnapshots = await Future.wait(doctorFutures);
-      
+
       // حساب عدد الأطباء
       for (var doctorsSnapshot in doctorSnapshots) {
         totalDoctors += doctorsSnapshot.docs.length;
@@ -224,8 +228,11 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 .collection('doctors')
                 .doc(doctorDoc.id)
                 .collection('appointments')
-                .where('date', isGreaterThanOrEqualTo: monthAgo.toIso8601String())
-                .get()
+                .where(
+                  'date',
+                  isGreaterThanOrEqualTo: monthAgo.toIso8601String(),
+                )
+                .get(),
           );
         }
       }
@@ -235,7 +242,8 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       // معالجة الحجوزات
       for (var appointmentsSnapshot in appointmentSnapshots) {
         for (var appointmentDoc in appointmentsSnapshot.docs) {
-          final appointmentData = appointmentDoc.data() as Map<String, dynamic>?;
+          final appointmentData =
+              appointmentDoc.data() as Map<String, dynamic>?;
           final date = appointmentData?['date'] ?? '';
           final status = appointmentData?['status'] ?? 'pending';
           final isConfirmed = appointmentData?['isConfirmed'] ?? false;
@@ -254,18 +262,24 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
           if (date.isNotEmpty) {
             try {
               final appointmentDate = DateTime.parse(date);
-              
+
               if (appointmentDate.year == today.year &&
                   appointmentDate.month == today.month &&
                   appointmentDate.day == today.day) {
                 todayBookings++;
               }
-              
-              if (appointmentDate.isAfter(weekAgo) && appointmentDate.isBefore(today.add(const Duration(days: 1)))) {
+
+              if (appointmentDate.isAfter(weekAgo) &&
+                  appointmentDate.isBefore(
+                    today.add(const Duration(days: 1)),
+                  )) {
                 weekBookings++;
               }
-              
-              if (appointmentDate.isAfter(monthAgo) && appointmentDate.isBefore(today.add(const Duration(days: 1)))) {
+
+              if (appointmentDate.isAfter(monthAgo) &&
+                  appointmentDate.isBefore(
+                    today.add(const Duration(days: 1)),
+                  )) {
                 monthBookings++;
               }
             } catch (e) {
@@ -301,25 +315,27 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   // تحميل عدد المرضى
   Future<void> _loadPatientsCount() async {
     try {
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
 
       Set<String> uniquePatients = {};
 
       // جلب جميع الحجوزات بالتوازي
       List<Future<QuerySnapshot>> appointmentFutures = [];
-      
+
       for (var specDoc in specializationsSnapshot.docs) {
-        final doctorsSnapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .get();
+        final doctorsSnapshot =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .get();
 
         for (var doctorDoc in doctorsSnapshot.docs) {
           appointmentFutures.add(
@@ -331,7 +347,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 .collection('doctors')
                 .doc(doctorDoc.id)
                 .collection('appointments')
-                .get()
+                .get(),
           );
         }
       }
@@ -341,15 +357,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       // معالجة الحجوزات
       for (var appointmentsSnapshot in appointmentSnapshots) {
         for (var appointmentDoc in appointmentsSnapshot.docs) {
-          final appointmentData = appointmentDoc.data() as Map<String, dynamic>?;
+          final appointmentData =
+              appointmentDoc.data() as Map<String, dynamic>?;
           final patientName = appointmentData?['patientName'] ?? '';
           final status = appointmentData?['status'] ?? 'pending';
-          
+
           // تجاهل الحجوزات الملغاة أو المحذوفة
           if (status == 'cancelled' || status == 'deleted') {
             continue;
           }
-          
+
           if (patientName.isNotEmpty) {
             uniquePatients.add(patientName);
           }
@@ -375,11 +392,12 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   // تحميل الأطباء النشطين الذين ليس لديهم جدول
   Future<void> _loadDoctorsWithoutSchedule() async {
     try {
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
 
       List<Map<String, dynamic>> doctorsWithoutSchedule = [];
 
@@ -387,23 +405,25 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
         final specializationData = specDoc.data();
         final specializationName = specializationData['specName'] ?? specDoc.id;
 
-        final doctorsSnapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .where('isActive', isEqualTo: true)
-            .get();
+        final doctorsSnapshot =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .where('isActive', isEqualTo: true)
+                .get();
 
         for (var doctorDoc in doctorsSnapshot.docs) {
           final doctorData = doctorDoc.data();
           final doctorName = doctorData['docName'] ?? 'طبيب غير معروف';
-          final workingSchedule = doctorData['workingSchedule'] as Map<String, dynamic>?;
+          final workingSchedule =
+              doctorData['workingSchedule'] as Map<String, dynamic>?;
 
           // التحقق من وجود جدول للطبيب
           bool hasSchedule = false;
-          
+
           if (workingSchedule != null && workingSchedule.isNotEmpty) {
             // التحقق من وجود أيام بها جدول عمل
             for (var day in workingSchedule.keys) {
@@ -411,14 +431,14 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
               if (daySchedule != null) {
                 final morning = daySchedule['morning'] as Map<String, dynamic>?;
                 final evening = daySchedule['evening'] as Map<String, dynamic>?;
-                
+
                 // التحقق من وجود أوقات عمل في الصباح أو المساء
-                if ((morning != null && 
-                     (morning['start']?.toString().isNotEmpty == true || 
-                      morning['end']?.toString().isNotEmpty == true)) ||
-                    (evening != null && 
-                     (evening['start']?.toString().isNotEmpty == true || 
-                      evening['end']?.toString().isNotEmpty == true))) {
+                if ((morning != null &&
+                        (morning['start']?.toString().isNotEmpty == true ||
+                            morning['end']?.toString().isNotEmpty == true)) ||
+                    (evening != null &&
+                        (evening['start']?.toString().isNotEmpty == true ||
+                            evening['end']?.toString().isNotEmpty == true))) {
                   hasSchedule = true;
                   break;
                 }
@@ -456,29 +476,29 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title:Column(children: [ Text(
-            'التقارير والإحصائيات ',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          title: Column(
+            children: [
+              Text(
+                'التقارير والإحصائيات ',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                '${widget.centerName}',
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
+            ],
           ),
-          Text( '${widget.centerName}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-            ),
-            ),
-          ]),
           centerTitle: true,
-          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -488,476 +508,557 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
             ),
           ],
         ),
-                 body: SafeArea(
-           child: _statistics.isEmpty
-               ? Center(
-                   child: Column(
-                     mainAxisAlignment: MainAxisAlignment.center,
-                     children: [
-                       const CircularProgressIndicator(
-                         color: Color.fromARGB(255, 156, 208, 235),
-                       ),
-                       const SizedBox(height: 16),
-                       Text(
-                         _loadingMessage,
-                         style: TextStyle(
-                           fontSize: 16,
-                           color: Colors.grey,
-                         ),
-                       ),
-                     ],
-                   ),
-                 )
-               : _statistics.isEmpty
-                   ? Center(
-                       child: Column(
-                         mainAxisAlignment: MainAxisAlignment.center,
-                         children: [
-                           Icon(
-                             Icons.analytics_outlined,
-                             size: 64,
-                             color: Colors.grey[400],
-                           ),
-                           const SizedBox(height: 16),
-                           Text(
-                             'لا توجد بيانات متاحة',
-                             style: TextStyle(
-                               fontSize: 18,
-                               color: Colors.grey[600],
-                             ),
-                           ),
-                           const SizedBox(height: 8),
-                           Text(
-                             'لم يتم العثور على أي إحصائيات لهذا المركز',
-                             style: TextStyle(
-                               fontSize: 14,
-                               color: Colors.grey[500],
-                             ),
-                           ),
-                           const SizedBox(height: 16),
-                           ElevatedButton.icon(
-                             onPressed: _loadStatistics,
-                             icon: const Icon(Icons.refresh),
-                             label: const Text('إعادة المحاولة'),
-                             style: ElevatedButton.styleFrom(
-                               backgroundColor: const Color.fromARGB(255, 156, 208, 235),
-                               foregroundColor: Colors.white,
-                             ),
-                           ),
-                         ],
-                       ),
-                     )
-                   : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-
-                      // Doctors Without Schedule - Collapsible at the top
-                      Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                          border: Border.all(color: Colors.grey[200]!),
+        body: SafeArea(
+          child:
+              _statistics.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const CircularProgressIndicator(
+                          color: Color.fromARGB(255, 34, 96, 129),
                         ),
-                        child: Column(
-                          children: [
-                            InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _showDoctorsWithoutSchedule = !_showDoctorsWithoutSchedule;
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.warning_amber_rounded,
-                                      color: Colors.orange[600],
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'الأطباء النشطين بدون جدول',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.orange[700],
-                                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _loadingMessage,
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  )
+                  : _statistics.isEmpty
+                  ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.analytics_outlined,
+                          size: 64,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'لا توجد بيانات متاحة',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'لم يتم العثور على أي إحصائيات لهذا المركز',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: _loadStatistics,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('إعادة المحاولة'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color.fromARGB(
+                              255,
+                              34,
+                              96,
+                              129,
+                            ),
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Doctors Without Schedule - Collapsible at the top
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: Column(
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _showDoctorsWithoutSchedule =
+                                        !_showDoctorsWithoutSchedule;
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.warning_amber_rounded,
+                                        color: Colors.orange[600],
+                                        size: 22,
                                       ),
-                                    ),
-                                    if (_loadingStates['doctorsWithoutSchedule'] == true)
-                                      SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.orange[600]!),
-                                        ),
-                                      )
-                                    else
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange[100],
-                                          borderRadius: BorderRadius.circular(10),
-                                        ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
                                         child: Text(
-                                          '${_statistics['doctorsWithoutSchedule']}',
+                                          'الأطباء النشطين بدون جدول',
                                           style: TextStyle(
-                                            color: Colors.orange[700],
+                                            fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 12,
+                                            color: Colors.orange[700],
                                           ),
                                         ),
                                       ),
-                                    const SizedBox(width: 8),
-                                    Icon(
-                                      _showDoctorsWithoutSchedule ? Icons.expand_less : Icons.expand_more,
-                                      color: Colors.orange[700],
-                                    ),
-                                  ],
+                                      if (_loadingStates['doctorsWithoutSchedule'] ==
+                                          true)
+                                        SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.orange[600]!,
+                                                ),
+                                          ),
+                                        )
+                                      else
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange[100],
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${_statistics['doctorsWithoutSchedule']}',
+                                            style: TextStyle(
+                                              color: Colors.orange[700],
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        _showDoctorsWithoutSchedule
+                                            ? Icons.expand_less
+                                            : Icons.expand_more,
+                                        color: Colors.orange[700],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            if (_showDoctorsWithoutSchedule && (_statistics['doctorsWithoutSchedule'] ?? 0) > 0)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Divider(height: 1),
-                                    const SizedBox(height: 12),
-                                    Text(
-                                      'الأطباء التالية أسماؤهم نشطين ولكن ليس لديهم جدول عمل محدد:',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    ...(_statistics['doctorsWithoutScheduleList'] as List<dynamic>).map((doctor) {
-                                      return Container(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange[50],
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.orange[200]!),
+                              if (_showDoctorsWithoutSchedule &&
+                                  (_statistics['doctorsWithoutSchedule'] ?? 0) >
+                                      0)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    0,
+                                    16,
+                                    12,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Divider(height: 1),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'الأطباء التالية أسماؤهم نشطين ولكن ليس لديهم جدول عمل محدد:',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey[600],
                                         ),
-                                        child: Row(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: 18,
-                                              backgroundColor: Colors.orange[100],
-                                              child: Text(
-                                                (doctor['doctorName'] as String).substring(0, 1),
-                                                style: TextStyle(
-                                                  color: Colors.orange[700],
-                                                  fontWeight: FontWeight.bold,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ...(_statistics['doctorsWithoutScheduleList']
+                                              as List<dynamic>)
+                                          .map((doctor) {
+                                            return Container(
+                                              margin: const EdgeInsets.only(
+                                                bottom: 8,
+                                              ),
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange[50],
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: Colors.orange[200]!,
                                                 ),
                                               ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                              child: Row(
                                                 children: [
-                                                  Text(
-                                                    doctor['doctorName'],
-                                                    style: const TextStyle(
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 14,
+                                                  CircleAvatar(
+                                                    radius: 18,
+                                                    backgroundColor:
+                                                        Colors.orange[100],
+                                                    child: Text(
+                                                      (doctor['doctorName']
+                                                              as String)
+                                                          .substring(0, 1),
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors.orange[700],
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                     ),
                                                   ),
-                                                  Text(
-                                                    doctor['specialization'],
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          doctor['doctorName'],
+                                                          style:
+                                                              const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontSize: 14,
+                                                              ),
+                                                        ),
+                                                        Text(
+                                                          doctor['specialization'],
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color:
+                                                                Colors
+                                                                    .grey[600],
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
+                                                  ),
+                                                  Icon(
+                                                    Icons.schedule,
+                                                    color: Colors.orange[600],
+                                                    size: 18,
                                                   ),
                                                 ],
                                               ),
-                                            ),
-                                            Icon(
-                                              Icons.schedule,
-                                              color: Colors.orange[600],
-                                              size: 18,
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ],
+                                            );
+                                          })
+                                          .toList(),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
 
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                       // Period Selection
-                       Container(
-                         width: double.infinity,
-                         padding: const EdgeInsets.all(16),
-                         decoration: BoxDecoration(
-                           color: Colors.white,
-                           borderRadius: BorderRadius.circular(16),
-                           boxShadow: [
-                             BoxShadow(
-                               color: Colors.grey.withOpacity(0.1),
-                               blurRadius: 10,
-                               offset: const Offset(0, 4),
-                             ),
-                           ],
-                           border: Border.all(color: Colors.grey[200]!),
-                         ),
-                         child: Column(
-                           crossAxisAlignment: CrossAxisAlignment.start,
-                           children: [
-                             const Text(
-                               'اختر الفترة الزمنية',
-                               style: TextStyle(
-                                 fontSize: 16,
-                                 fontWeight: FontWeight.bold,
-                                 color: Color.fromARGB(255, 156, 208, 235),
-                               ),
-                             ),
-                             const SizedBox(height: 12),
-                             Row(
-                               children: [
-                                 Expanded(
-                                   child: _buildPeriodButton('اليوم', 'today', Icons.today),
-                                 ),
-                                 const SizedBox(width: 8),
-                                 Expanded(
-                                   child: _buildPeriodButton('الأسبوع', 'week', Icons.view_week),
-                                 ),
-                                 const SizedBox(width: 8),
-                                 Expanded(
-                                   child: _buildPeriodButton('الشهر', 'month', Icons.calendar_month),
-                                 ),
-                               ],
-                             ),
-                           ],
-                         ),
-                       ),
-
-                       const SizedBox(height: 24),
-
-                       // Statistics Grid
-                      Column(
-                        children: [
-                          // الصف الأول
-                          Row(
+                        // Period Selection
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: _buildStatCard(
-                                  'التخصصات الطبية',
-                                  _statistics['specializations']?.toString() ?? '0',
-                                  Icons.medical_services,
-                                  Colors.blue,
-                                  loadingKey: 'specializations',
+                              const Text(
+                                'اختر الفترة الزمنية',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color.fromARGB(255, 34, 96, 129),
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildStatCard(
-                                  'الأطباء',
-                                  _statistics['doctors']?.toString() ?? '0',
-                                  Icons.person,
-                                  Colors.green,
-                                  loadingKey: 'doctors',
-                                ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildPeriodButton(
+                                      'اليوم',
+                                      'today',
+                                      Icons.today,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildPeriodButton(
+                                      'الأسبوع',
+                                      'week',
+                                      Icons.view_week,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildPeriodButton(
+                                      'الشهر',
+                                      'month',
+                                      Icons.calendar_month,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          // الصف الثاني
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildStatCard(
-                                  'شركات التأمين',
-                                  _statistics['insuranceCompanies']?.toString() ?? '0',
-                                  Icons.security,
-                                  Colors.orange,
-                                  loadingKey: 'insuranceCompanies',
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildStatCard(
-                                  'المستخدمين',
-                                  _statistics['users']?.toString() ?? '0',
-                                  Icons.people,
-                                  Colors.purple,
-                                  loadingKey: 'users',
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          // الصف الثالث - كارد المرضى يأخذ عرض كامل
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 2, // يأخذ مساحة كاردين
-                                child: _buildStatCard(
-                                  'المرضى',
-                                  _statistics['patients']?.toString() ?? '0',
-                                  Icons.people_outline,
-                                  Colors.teal,
-                                  loadingKey: 'patients',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Booking Statistics
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                          border: Border.all(color: Colors.grey[200]!),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+
+                        const SizedBox(height: 24),
+
+                        // Statistics Grid
+                        Column(
                           children: [
-                            const Text(
-                              'إحصائيات الحجوزات',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Color.fromARGB(255, 156, 208, 235),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
+                            // الصف الأول
                             Row(
                               children: [
                                 Expanded(
-                                  child: _buildBookingStat(
-                                    'إجمالي الحجوزات',
-                                    _statistics['totalBookings']?.toString() ?? '0',
-                                    Icons.calendar_today,
+                                  child: _buildStatCard(
+                                    'التخصصات الطبية',
+                                    _statistics['specializations']
+                                            ?.toString() ??
+                                        '0',
+                                    Icons.medical_services,
                                     Colors.blue,
-                                    loadingKey: 'bookings',
+                                    loadingKey: 'specializations',
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
-                                  child: _buildBookingStat(
-                                    'الحجوزات المؤكدة',
-                                    _statistics['confirmedBookings']?.toString() ?? '0',
-                                    Icons.check_circle,
+                                  child: _buildStatCard(
+                                    'الأطباء',
+                                    _statistics['doctors']?.toString() ?? '0',
+                                    Icons.person,
                                     Colors.green,
-                                    loadingKey: 'bookings',
+                                    loadingKey: 'doctors',
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 16),
+                            // الصف الثاني
                             Row(
                               children: [
                                 Expanded(
-                                  child: _buildBookingStat(
-                                    'نسبة التأكيد',
-                                    _calculateConfirmationRate(),
-                                    Icons.percent,
+                                  child: _buildStatCard(
+                                    'شركات التأمين',
+                                    _statistics['insuranceCompanies']
+                                            ?.toString() ??
+                                        '0',
+                                    Icons.security,
                                     Colors.orange,
-                                    loadingKey: 'bookings',
+                                    loadingKey: 'insuranceCompanies',
                                   ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
-                                  child: _buildBookingStat(
-                                    'حجوزات اليوم',
-                                    _statistics['todayBookings']?.toString() ?? '0',
-                                    Icons.today,
-                                    Colors.red,
-                                    loadingKey: 'bookings',
+                                  child: _buildStatCard(
+                                    'المستخدمين',
+                                    _statistics['users']?.toString() ?? '0',
+                                    Icons.people,
+                                    Colors.purple,
+                                    loadingKey: 'users',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            // الصف الثالث - كارد المرضى يأخذ عرض كامل
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 2, // يأخذ مساحة كاردين
+                                  child: _buildStatCard(
+                                    'المرضى',
+                                    _statistics['patients']?.toString() ?? '0',
+                                    Icons.people_outline,
+                                    Colors.teal,
+                                    loadingKey: 'patients',
                                   ),
                                 ),
                               ],
                             ),
                           ],
                         ),
-                      ),
 
-                      // تمت إضافة هذا القسم للأعلى ليكون قابل للطي/الفتح
+                        const SizedBox(height: 24),
 
-                      // Summary Card
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF2FBDAF).withOpacity(0.3)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'ملخص المركز',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color.fromARGB(255, 156, 208, 235),
+                        // Booking Statistics
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'يحتوي المركز على ${_statistics['specializations'] ?? 0} تخصص طبي، '
-                              'ويعمل فيه ${_statistics['doctors'] ?? 0} طبيب، '
-                              'ويخدم ${_statistics['patients'] ?? 0} مريض، '
-                              'ويتعامل مع ${_statistics['insuranceCompanies'] ?? 0} شركات تأمين.'
-                              '${_statistics['doctorsWithoutSchedule'] > 0 ? ' يوجد ${_statistics['doctorsWithoutSchedule']} طبيب نشط بدون جدول عمل.' : ''}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                                height: 1.5,
+                            ],
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'إحصائيات الحجوزات',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color.fromARGB(255, 34, 96, 129),
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildBookingStat(
+                                      'إجمالي الحجوزات',
+                                      _statistics['totalBookings']
+                                              ?.toString() ??
+                                          '0',
+                                      Icons.calendar_today,
+                                      Colors.blue,
+                                      loadingKey: 'bookings',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _buildBookingStat(
+                                      'الحجوزات المؤكدة',
+                                      _statistics['confirmedBookings']
+                                              ?.toString() ??
+                                          '0',
+                                      Icons.check_circle,
+                                      Colors.green,
+                                      loadingKey: 'bookings',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildBookingStat(
+                                      'نسبة التأكيد',
+                                      _calculateConfirmationRate(),
+                                      Icons.percent,
+                                      Colors.orange,
+                                      loadingKey: 'bookings',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _buildBookingStat(
+                                      'حجوزات اليوم',
+                                      _statistics['todayBookings']
+                                              ?.toString() ??
+                                          '0',
+                                      Icons.today,
+                                      Colors.red,
+                                      loadingKey: 'bookings',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+
+                        // تمت إضافة هذا القسم للأعلى ليكون قابل للطي/الفتح
+
+                        // Summary Card
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(
+                              255,
+                              34,
+                              96,
+                              129,
+                            ).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color.fromARGB(255, 34, 96, 129).withOpacity(0.3),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'ملخص المركز',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color.fromARGB(255, 34, 96, 129),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'يحتوي المركز على ${_statistics['specializations'] ?? 0} تخصص طبي، '
+                                'ويعمل فيه ${_statistics['doctors'] ?? 0} طبيب، '
+                                'ويخدم ${_statistics['patients'] ?? 0} مريض، '
+                                'ويتعامل مع ${_statistics['insuranceCompanies'] ?? 0} شركات تأمين.'
+                                '${_statistics['doctorsWithoutSchedule'] > 0 ? ' يوجد ${_statistics['doctorsWithoutSchedule']} طبيب نشط بدون جدول عمل.' : ''}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
         ),
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, {String? loadingKey}) {
-    final isLoading = loadingKey != null && (_loadingStates[loadingKey] ?? true);
-    
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    String? loadingKey,
+  }) {
+    final isLoading =
+        loadingKey != null && (_loadingStates[loadingKey] ?? true);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -967,11 +1068,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
+          Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
           if (isLoading)
             SizedBox(
@@ -994,10 +1091,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
           const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 12,
-              color: color.withOpacity(0.8),
-            ),
+            style: TextStyle(fontSize: 12, color: color.withOpacity(0.8)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1005,9 +1099,16 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
     );
   }
 
-  Widget _buildBookingStat(String title, String value, IconData icon, Color color, {String? loadingKey}) {
-    final isLoading = loadingKey != null && (_loadingStates[loadingKey] ?? true);
-    
+  Widget _buildBookingStat(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    String? loadingKey,
+  }) {
+    final isLoading =
+        loadingKey != null && (_loadingStates[loadingKey] ?? true);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1017,11 +1118,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       ),
       child: Column(
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
+          Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
           if (isLoading)
             SizedBox(
@@ -1044,10 +1141,7 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
           const SizedBox(height: 4),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 12,
-              color: color.withOpacity(0.8),
-            ),
+            style: TextStyle(fontSize: 12, color: color.withOpacity(0.8)),
             textAlign: TextAlign.center,
           ),
         ],
@@ -1058,9 +1152,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
   String _calculateConfirmationRate() {
     final total = _statistics['totalBookings'] ?? 0;
     final confirmed = _statistics['confirmedBookings'] ?? 0;
-    
+
     if (total == 0) return '0%';
-    
+
     final rate = (confirmed / total * 100).round();
     return '$rate%';
   }
@@ -1076,10 +1170,10 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2FBDAF) : Colors.grey[100],
+          color: isSelected ? const Color.fromARGB(255, 34, 96, 129) : Colors.grey[100],
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? const Color(0xFF2FBDAF) : Colors.grey[300]!,
+            color: isSelected ? const Color.fromARGB(255, 34, 96, 129) : Colors.grey[300]!,
           ),
         ),
         child: Column(
@@ -1103,5 +1197,4 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
       ),
     );
   }
-
 }

@@ -370,6 +370,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
           centerTitle: true,
         ),
         drawer: Drawer(
+          
           child: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

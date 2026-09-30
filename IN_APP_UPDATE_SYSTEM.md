@@ -77,7 +77,7 @@ Future<void> _performRealUpdate() async {
 LinearProgressIndicator(
   value: _downloadProgress,
   backgroundColor: Colors.grey[300],
-  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2FBDAF)),
+  valueColor: AlwaysStoppedAnimation<Color>(Color.fromARGB(255, 34, 96, 129),),
 )
 ```
 

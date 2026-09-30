@@ -65,36 +65,48 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^31.1.2
   lottie: ^3.3.1
   sms_autofill: ^2.5.0
+  local_auth: ^2.3.0
+  flutter_secure_storage: ^10.3.4
+  image: ^4.10.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
 
 dependency_overrides:
   syncfusion_pdfviewer_platform_interface: ^31.1.2
+flutter_native_splash:
+  color: "#E9F7F4"
+  image: assets/images/splash_icon.png
+  android: true
+  ios: true
+  web: false
 
+  android_12:
+    color: "#E9F7F4"
+    image: assets/images/splash_icon.png
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/logo.png"
+  image_path: "assets/images/icon.png"
   min_sdk_android: 21
   web:
     generate: true
-    image_path: "assets/images/logo.png"
+    image_path: "assets/images/icon.png"
     background_color: "#2FBDAF"
     theme_color: "#2FBDAF"
   windows:
     generate: true
-    image_path: "assets/images/logo.png"
+    image_path: "assets/images/icon.png"
     icon_size: 48
   macos:
     generate: true
-    image_path: "assets/images/logo.png"
+    image_path: "assets/images/icon.png"
   linux:
     generate: true
-    image_path: "assets/images/logo.png"
-
+    image_path: "assets/images/icon.png"
 # The "flutter_lints" package below contains a set of recommended lints to
 # encourage good coding practices. The lint set provided by the package is
 # activated in the `analysis_options.yaml` file located at the root of your

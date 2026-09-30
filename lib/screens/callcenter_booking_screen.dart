@@ -1,10 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:hospital_admin_app/screens/patient_info_screen.dart';
-
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart' as intl;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class BookingScreen extends StatefulWidget {
@@ -105,26 +104,27 @@ class _BookingScreenState extends State<BookingScreen> {
     for (int i = 0; i <= 7; i++) {
       final day = today.add(Duration(days: i));
       final dayStr = intl.DateFormat('yyyy-MM-dd').format(day);
-      
+
       if (blockedDates.contains(dayStr)) continue;
-      
+
       if (_hasScheduleOn(day)) {
         final dayName = intl.DateFormat('EEEE', 'ar').format(day).trim();
-      final schedule = widget.workingSchedule[dayName] as Map<String, dynamic>?;
+        final schedule =
+            widget.workingSchedule[dayName] as Map<String, dynamic>?;
 
-      bool hasValidPeriod = false;
+        bool hasValidPeriod = false;
 
-      final morning = schedule?['morning'] as Map<String, dynamic>?;
-      if (morning != null && morning.isNotEmpty) {
-        hasValidPeriod = true;
-      }
+        final morning = schedule?['morning'] as Map<String, dynamic>?;
+        if (morning != null && morning.isNotEmpty) {
+          hasValidPeriod = true;
+        }
 
-      final evening = schedule?['evening'] as Map<String, dynamic>?;
-      if (evening != null && evening.isNotEmpty) {
-        hasValidPeriod = true;
-      }
+        final evening = schedule?['evening'] as Map<String, dynamic>?;
+        if (evening != null && evening.isNotEmpty) {
+          hasValidPeriod = true;
+        }
 
-      if (hasValidPeriod) {
+        if (hasValidPeriod) {
           allowed.add(dayStr);
         }
       }
@@ -334,12 +334,13 @@ class _BookingScreenState extends State<BookingScreen> {
       // جلب اسم التخصص من قاعدة البيانات إذا لم يتم تمريره
       if (widget.doctorSpecialty == null || widget.doctorSpecialty!.isEmpty) {
         try {
-          final specDoc = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(widget.centerId)
-              .collection('specializations')
-              .doc(widget.specializationId)
-              .get();
+          final specDoc =
+              await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(widget.centerId)
+                  .collection('specializations')
+                  .doc(widget.specializationId)
+                  .get();
           if (specDoc.exists) {
             final specData = specDoc.data();
             final specName = specData?['specName']?.toString();
@@ -809,7 +810,7 @@ class _BookingScreenState extends State<BookingScreen> {
               }
               Navigator.push(
                 context,
-               MaterialPageRoute(
+                MaterialPageRoute(
                   builder:
                       (_) => PatientInfoScreen(
                         centerId: widget.centerId,
@@ -825,8 +826,11 @@ class _BookingScreenState extends State<BookingScreen> {
               );
             },
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: const Color.fromARGB(255, 156, 208, 235), width: 2),
-              foregroundColor: const Color.fromARGB(255, 156, 208, 235),
+              side: BorderSide(
+                color: const Color.fromARGB(255, 34, 96, 129),
+                width: 2,
+              ),
+              foregroundColor: const Color.fromARGB(255, 34, 96, 129),
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -913,7 +917,7 @@ class _BookingScreenState extends State<BookingScreen> {
                         widget.name,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: const Color.fromARGB(255, 156, 208, 235),
+                          color: const Color.fromARGB(255, 34, 96, 129),
                           fontSize: 20,
                         ),
                       ),
@@ -932,7 +936,7 @@ class _BookingScreenState extends State<BookingScreen> {
                     "اختيار الموعد",
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: const Color.fromARGB(255, 156, 208, 235),
+                      color: const Color.fromARGB(255, 34, 96, 129),
                       fontSize: 30,
                     ),
                   ),
@@ -950,8 +954,8 @@ class _BookingScreenState extends State<BookingScreen> {
                       height: 24,
                       errorBuilder: (context, error, stackTrace) {
                         return Icon(
-  FontAwesomeIcons.whatsapp,
-  color: Colors.green,
+                          FontAwesomeIcons.whatsapp,
+                          color: Colors.green,
                           size: 24,
                         );
                       },
@@ -961,7 +965,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       'مشاركة الجدول',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Color.fromARGB(255, 156, 208, 235),
+                        color: Color.fromARGB(255, 34, 96, 129),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -996,26 +1000,29 @@ class _BookingScreenState extends State<BookingScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color:  Colors.black,
+                          color: Colors.black,
                         ),
                       ),
                       // التخصص (subtitle)
                       const SizedBox(height: 4),
                       Text(
-                        widget.doctorSpecialty ?? _loadedSpecialty ?? 'غير محدد',
+                        widget.doctorSpecialty ??
+                            _loadedSpecialty ??
+                            'غير محدد',
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[700],
                           fontWeight: FontWeight.w500,
                         ),
                       ),
+
                       // ملاحظة الحجز
-                     /* const SizedBox(height: 12),
+                      /* const SizedBox(height: 12),
                        Row(
                           children: [
                             Icon(
                               Icons.info_outline,
-                              color: Color(0xFF2FBDAF),
+                              color: Color.fromARGB(255, 34, 96, 129),,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
@@ -1024,14 +1031,13 @@ class _BookingScreenState extends State<BookingScreen> {
                                 _getBookingAvailabilityMessage(),
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Color(0xFF2FBDAF),
+                                  color: Color.fromARGB(255, 34, 96, 129),,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
                           ],
                         ),*/
-                      
                     ],
                   ),
                 ),
@@ -1039,8 +1045,7 @@ class _BookingScreenState extends State<BookingScreen> {
                   "اختر يوم من الأيام المتاحة:",
                   style: TextStyle(fontSize: 18),
                 ),
-                
-               
+
                 const SizedBox(height: 10),
                 Expanded(
                   child: SingleChildScrollView(
@@ -1082,7 +1087,12 @@ class _BookingScreenState extends State<BookingScreen> {
                                   icon: const Icon(Icons.arrow_back),
                                   label: const Text('العودة لاختيار طبيب آخر'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+                                    backgroundColor: const Color.fromARGB(
+                                      255,
+                                      34,
+                                      96,
+                                      129,
+                                    ),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 24,

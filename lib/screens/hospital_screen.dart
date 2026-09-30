@@ -186,7 +186,7 @@ class _HospitalScreenState extends State<HospitalScreen> {
                     _searchController.clear();
                   });
                 },
-                icon: Icon(Icons.close, color: Color(0xFF2FBDAF)),
+                icon: Icon(Icons.close, color: Color.fromARGB(255, 34, 96, 129),),
               )
             : IconButton(
                 onPressed: () {
@@ -194,7 +194,7 @@ class _HospitalScreenState extends State<HospitalScreen> {
                     _isSearching = true;
                   });
                 },
-                icon: Icon(Icons.search, color: Color(0xFF2FBDAF)),
+                icon: Icon(Icons.search, color: Color.fromARGB(255, 34, 96, 129),),
               ),
         actions: [
           if (!_isSearching)
@@ -202,7 +202,7 @@ class _HospitalScreenState extends State<HospitalScreen> {
               onPressed: () {
                 Navigator.pop(context);
               },
-              icon: Icon(Icons.arrow_back, color: Color(0xFF2FBDAF)),
+              icon: Icon(Icons.arrow_back, color: Color.fromARGB(255, 34, 96, 129),),
             ),
         ],
         title: _isSearching
@@ -231,7 +231,7 @@ class _HospitalScreenState extends State<HospitalScreen> {
                 "المرافق الطبية",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2FBDAF),
+                  color: const Color.fromARGB(255, 34, 96, 129),
                   fontSize: 30,
                 ),
               ),
@@ -249,7 +249,7 @@ class _HospitalScreenState extends State<HospitalScreen> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const OptimizedLoadingWidget(
                   message: 'جاري تحميل المرافق الطبية...',
-                  color: Color(0xFF2FBDAF),
+                  color: Color.fromARGB(255, 34, 96, 129),
                 );
               }
               
@@ -432,7 +432,7 @@ class _HospitalScreenState extends State<HospitalScreen> {
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: isAvailable
-                                          ? Color(0xFF2FBDAF)
+                                          ? Color.fromARGB(255, 34, 96, 129)
                                           : Colors.grey,
                                       width: 2,
                                     ),

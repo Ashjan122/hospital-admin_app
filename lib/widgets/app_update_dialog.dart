@@ -26,7 +26,7 @@ class AppUpdateDialog extends StatelessWidget {
           children: [
             Icon(
               Icons.system_update,
-              color: const Color(0xFF2FBDAF),
+              color: const Color.fromARGB(255, 34, 96, 129),
               size: 28,
             ),
             const SizedBox(width: 8),
@@ -34,7 +34,7 @@ class AppUpdateDialog extends StatelessWidget {
               'تحديث التطبيق',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF2FBDAF),
+                color: Color.fromARGB(255, 34, 96, 129),
               ),
             ),
           ],
@@ -58,7 +58,7 @@ class AppUpdateDialog extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: const Color(0xFF2FBDAF),
+                    color: const Color.fromARGB(255, 34, 96, 129),
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -155,7 +155,7 @@ class AppUpdateDialog extends StatelessWidget {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2FBDAF),
+              backgroundColor: const Color.fromARGB(255, 34, 96, 129),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),

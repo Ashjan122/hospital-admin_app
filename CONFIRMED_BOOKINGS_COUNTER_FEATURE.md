@@ -159,11 +159,11 @@ Future<void> _initializeData() async {
 Container(
   padding: const EdgeInsets.all(12),
   decoration: BoxDecoration(
-    color: const Color(0xFF2FBDAF),
+    color: const Color.fromARGB(255, 34, 96, 129),
     borderRadius: BorderRadius.circular(12),
     boxShadow: [
       BoxShadow(
-        color: const Color(0xFF2FBDAF).withOpacity(0.3),
+        color: const Color.fromARGB(255, 34, 96, 129),.withOpacity(0.3),
         spreadRadius: 1,
         blurRadius: 8,
         offset: const Offset(0, 2),

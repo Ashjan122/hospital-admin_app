@@ -1,9 +1,15 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hospital_admin_app/screens/call_center_screen.dart';
 import 'package:hospital_admin_app/screens/control_panel_screen.dart';
 import 'package:hospital_admin_app/screens/dashboard_screen.dart';
+import 'package:hospital_admin_app/screens/doctor_user_screen.dart';
+import 'package:hospital_admin_app/screens/reception_staff_screen.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,7 +24,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
+  final LocalAuthentication _localAuth = LocalAuthentication();
+  final FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const String _biometricUsersKey = 'biometric_users';
+  bool _biometricAvailable = false;
+  bool _isBiometricChecking = false;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   String _version = '';
@@ -26,8 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _checkLoginStatus();
     _getVersionInfo();
+    _checkBiometric();
   }
 
   Future<void> _getVersionInfo() async {
@@ -39,6 +49,44 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     } catch (e) {
       print("Version error: $e");
+    }
+  }
+
+  Future<void> _checkBiometric() async {
+    if (_isBiometricChecking) return;
+
+    _isBiometricChecking = true;
+
+    try {
+      final canCheckBiometrics = await _localAuth.canCheckBiometrics;
+      final isDeviceSupported = await _localAuth.isDeviceSupported();
+
+      if (!mounted) return;
+
+      setState(() {
+        _biometricAvailable = canCheckBiometrics && isDeviceSupported;
+      });
+
+      if (!_biometricAvailable) return;
+
+      final biometricUsers = await _getBiometricUsers();
+      await _secureStorage.delete(key: 'biometric_enabled');
+      await _secureStorage.delete(key: 'biometric_email');
+      await _secureStorage.delete(key: 'biometric_password');
+
+      if (biometricUsers.isNotEmpty) {
+        await _biometricLogin();
+      }
+    } catch (e) {
+      print('Biometric check error: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _biometricAvailable = false;
+      });
+    } finally {
+      _isBiometricChecking = false;
     }
   }
 
@@ -70,29 +118,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       print("🔥 Firestore error: $e");
       rethrow;
-    }
-  }
-
-  // ✅ التحقق من تسجيل الدخول
-  Future<void> _checkLoginStatus() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      final data = await _getUserData(user.uid);
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('userId', user.uid);
-      await prefs.setString('userName', data['displayName'] ?? '');
-      await prefs.setString('userType', data['userType'] ?? '');
-      await prefs.setString('role', data['role'] ?? '');
-      await prefs.setString('centerId', data['facilityId'] ?? '');
-      await prefs.setString('centerName', data['displayName'] ?? '');
-
-      _navigateUser(data);
-    } catch (e) {
-      print("Check login error: $e");
     }
   }
 
@@ -152,8 +177,80 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
+    // =========================================================
+    // موظف الاستقبال
+    // =========================================================
+    if (data['userType'] == 'reception') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => ReceptionStaffScreen(
+                centerId: centerId,
+                centerName: centerName,
+                userId: FirebaseAuth.instance.currentUser!.uid,
+                userName: data['displayName'] ?? '',
+              ),
+        ),
+      );
+      return;
+    }
+    // =========================================================
+    // الطبيب
+    // =========================================================
+    if (data['userType'] == 'doctor') {
+      final doctorId = data['doctorId']?.toString() ?? '';
+      final doctorName = data['doctorName']?.toString() ?? '';
+
+      if (doctorId.isEmpty) {
+        print("❌ Doctor ID is missing for this user");
+        return;
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => DoctorUserScreen(
+                doctorId: doctorId,
+                centerId: centerId,
+                centerName: centerName,
+                doctorName: doctorName,
+              ),
+        ),
+      );
+      return;
+    }
 
     print("❌ Unknown user role: $role");
+  }
+
+  Future<List<Map<String, dynamic>>> _getBiometricUsers() async {
+    final data = await _secureStorage.read(key: _biometricUsersKey);
+
+    if (data == null || data.isEmpty) {
+      return [];
+    }
+
+    try {
+      final decoded = jsonDecode(data);
+
+      if (decoded is! List) {
+        return [];
+      }
+
+      return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (e) {
+      print('Biometric users read error: $e');
+      return [];
+    }
+  }
+
+  Future<void> _saveBiometricUsers(List<Map<String, dynamic>> users) async {
+    await _secureStorage.write(
+      key: _biometricUsersKey,
+      value: jsonEncode(users),
+    );
   }
 
   // ✅ تسجيل الدخول
@@ -185,7 +282,78 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('centerName', data['displayName'] ?? '');
 
       if (!mounted) return;
+
       setState(() => _isLoading = false);
+
+      if (_biometricAvailable) {
+        final enableBiometric = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text(
+                'تفعيل تسجيل الدخول بالبصمة',
+                textAlign: TextAlign.right,
+              ),
+              content: const Text(
+                'هل تريد تفعيل تسجيل الدخول بالبصمة في المرات القادمة؟',
+                textAlign: TextAlign.right,
+                style: TextStyle(color: Colors.black),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context, false);
+                  },
+                  child: const Text(
+                    'ليس الآن',
+                    style: TextStyle(color: Colors.black),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context, true);
+                  },
+                  child: const Text(
+                    'تفعيل البصمة',
+                    style: TextStyle(color: Colors.black),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (enableBiometric == true) {
+          final authenticated = await _localAuth.authenticate(
+            localizedReason: 'تحقق من بصمتك لتفعيل تسجيل الدخول بالبصمة',
+            options: const AuthenticationOptions(
+              biometricOnly: true,
+              stickyAuth: true,
+              useErrorDialogs: true,
+            ),
+          );
+
+          if (authenticated) {
+            final biometricUsers = await _getBiometricUsers();
+
+            // حذف الحساب إذا كان محفوظًا مسبقًا
+            biometricUsers.removeWhere((item) => item['uid'] == user.uid);
+
+            // إضافة الحساب الحالي
+            biometricUsers.add({
+              'uid': user.uid,
+              'email': _emailController.text.trim(),
+              'password': _passwordController.text.trim(),
+              'name': data['displayName'] ?? '',
+            });
+
+            await _saveBiometricUsers(biometricUsers);
+          }
+        }
+      }
+
+      if (!mounted) return;
 
       _navigateUser(data);
     } on FirebaseAuthException catch (e) {
@@ -207,6 +375,136 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _biometricLogin() async {
+    if (!_biometricAvailable) return;
+
+    try {
+      final biometricUsers = await _getBiometricUsers();
+
+      if (biometricUsers.isEmpty) {
+        return;
+      }
+
+      final authenticated = await _localAuth.authenticate(
+        localizedReason: 'استخدم بصمتك لتسجيل الدخول',
+        options: const AuthenticationOptions(
+          biometricOnly: true,
+          stickyAuth: true,
+          useErrorDialogs: true,
+        ),
+      );
+
+      if (!authenticated) return;
+
+      Map<String, dynamic>? selectedUser;
+
+      if (biometricUsers.length == 1) {
+        selectedUser = biometricUsers.first;
+      } else {
+        selectedUser = await _showBiometricUsersDialog(biometricUsers);
+      }
+
+      if (selectedUser == null) {
+        return;
+      }
+
+      final email = selectedUser['email']?.toString();
+      final password = selectedUser['password']?.toString();
+
+      if (email == null || password == null) {
+        return;
+      }
+      setState(() => _isLoading = true);
+
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = credential.user;
+
+      if (user == null) {
+        throw Exception('فشل تسجيل الدخول');
+      }
+
+      final data = await _getUserData(user.uid);
+
+      final prefs = await SharedPreferences.getInstance();
+
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('userId', user.uid);
+      await prefs.setString('userName', data['displayName'] ?? '');
+      await prefs.setString('userType', data['userType'] ?? '');
+      await prefs.setString('role', data['role'] ?? '');
+      await prefs.setString('centerId', data['facilityId'] ?? '');
+      await prefs.setString('centerName', data['displayName'] ?? '');
+
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      _navigateUser(data);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.message ?? 'فشل تسجيل الدخول')));
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceAll('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>?> _showBiometricUsersDialog(
+    List<Map<String, dynamic>> users,
+  ) async {
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('اختر الحساب', textAlign: TextAlign.right),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: users.length,
+              separatorBuilder: (_, __) => const Divider(),
+              itemBuilder: (context, index) {
+                final user = users[index];
+
+                final name = user['name']?.toString() ?? '';
+                final email = user['email']?.toString() ?? '';
+
+                return ListTile(
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.person_outline),
+                  ),
+                  title: Text(
+                    name.isNotEmpty ? name : email,
+                    textAlign: TextAlign.right,
+                  ),
+                  subtitle: Text(email, textAlign: TextAlign.right),
+                  onTap: () {
+                    Navigator.pop(context, user);
+                  },
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -218,7 +516,7 @@ class _LoginScreenState extends State<LoginScreen> {
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                const Color.fromARGB(255, 156, 208, 235).withOpacity(0.1),
+                const Color.fromARGB(255, 71, 216, 185).withOpacity(0.1),
                 Colors.grey[50]!,
               ],
             ),
@@ -241,7 +539,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                             side: BorderSide(
-                              color: const Color(0xFF2FBDAF).withOpacity(0.08),
+                              color: const Color.fromARGB(
+                                255,
+                                34,
+                                96,
+                                129,
+                              ).withOpacity(0.08),
                               width: 1,
                             ),
                           ),
@@ -257,7 +560,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   // =========================
                                   Center(
                                     child: Image.asset(
-                                      'assets/images/logo.png',
+                                      'assets/images/icon.png',
                                       height: 120,
                                     ),
                                   ),
@@ -265,22 +568,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   const SizedBox(height: 18),
 
                                   const Text(
-                                    'إدارة المراكز الطبية',
+                                    'تطبيق الإدارة',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-
-                                  const SizedBox(height: 8),
-
-                                  Text(
-                                    'تسجيل الدخول',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
                                     ),
                                   ),
 
@@ -311,7 +603,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                       prefixIcon: const Icon(
                                         Icons.email_outlined,
-                                        color: Color(0xFF2FBDAF),
+                                        color: Color.fromARGB(255, 34, 96, 129),
                                       ),
                                       filled: true,
                                       fillColor: Colors.white,
@@ -335,7 +627,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: const BorderSide(
-                                          color: Color(0xFF2FBDAF),
+                                          color: Color.fromARGB(
+                                            255,
+                                            34,
+                                            96,
+                                            129,
+                                          ),
                                           width: 1.5,
                                         ),
                                       ),
@@ -385,7 +682,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                       prefixIcon: const Icon(
                                         Icons.lock_outline,
-                                        color: Color(0xFF2FBDAF),
+                                        color: Color.fromARGB(255, 34, 96, 129),
                                       ),
                                       suffixIcon: IconButton(
                                         icon: Icon(
@@ -423,7 +720,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: const BorderSide(
-                                          color: Color(0xFF2FBDAF),
+                                          color: Color.fromARGB(
+                                            255,
+                                            34,
+                                            96,
+                                            129,
+                                          ),
                                           width: 1.5,
                                         ),
                                       ),

@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:hospital_admin_app/services/central_data_service.dart';
 
 class AdminInsuranceCompaniesScreen extends StatefulWidget {
@@ -13,10 +13,12 @@ class AdminInsuranceCompaniesScreen extends StatefulWidget {
   });
 
   @override
-  State<AdminInsuranceCompaniesScreen> createState() => _AdminInsuranceCompaniesScreenState();
+  State<AdminInsuranceCompaniesScreen> createState() =>
+      _AdminInsuranceCompaniesScreenState();
 }
 
-class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesScreen> {
+class _AdminInsuranceCompaniesScreenState
+    extends State<AdminInsuranceCompaniesScreen> {
   String _searchQuery = '';
   bool _isLoading = false;
   List<Map<String, dynamic>> _allInsuranceCompanies = [];
@@ -37,26 +39,28 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
 
     try {
       // جلب جميع شركات التأمين من قاعدة البيانات المركزية
-      final allInsuranceCompanies = await CentralDataService.getAllInsuranceCompanies();
-      
+      final allInsuranceCompanies =
+          await CentralDataService.getAllInsuranceCompanies();
+
       // جلب شركات التأمين الموجودة في المركز
       final centerInsuranceSnapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('insuranceCompanies')
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('insuranceCompanies')
           .get()
           .timeout(const Duration(seconds: 8));
 
-      final centerInsuranceCompanies = centerInsuranceSnapshot.docs.map((doc) {
-        final data = doc.data();
-        return {
-          'id': doc.id,
-          'name': data['name'] ?? doc.id,
-          'description': data['description'] ?? '',
-          'phone': data['phone'] ?? '',
-          'isActive': data['isActive'] ?? true,
-        };
-      }).toList();
+      final centerInsuranceCompanies =
+          centerInsuranceSnapshot.docs.map((doc) {
+            final data = doc.data();
+            return {
+              'id': doc.id,
+              'name': data['name'] ?? doc.id,
+              'description': data['description'] ?? '',
+              'phone': data['phone'] ?? '',
+              'isActive': data['isActive'] ?? true,
+            };
+          }).toList();
 
       setState(() {
         _allInsuranceCompanies = allInsuranceCompanies;
@@ -74,10 +78,12 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
 
   void _updateAvailableInsuranceCompanies() {
     // شركات التأمين المتاحة للإضافة (غير موجودة في المركز)
-    final centerInsuranceIds = _centerInsuranceCompanies.map((insurance) => insurance['id']).toSet();
-    _availableInsuranceCompanies = _allInsuranceCompanies
-        .where((insurance) => !centerInsuranceIds.contains(insurance['id']))
-        .toList();
+    final centerInsuranceIds =
+        _centerInsuranceCompanies.map((insurance) => insurance['id']).toSet();
+    _availableInsuranceCompanies =
+        _allInsuranceCompanies
+            .where((insurance) => !centerInsuranceIds.contains(insurance['id']))
+            .toList();
   }
 
   Future<void> addInsuranceCompany(String insuranceId) async {
@@ -86,17 +92,20 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
     });
 
     try {
-      await CentralDataService.addInsuranceCompanyToCenter(widget.centerId, insuranceId);
-      
+      await CentralDataService.addInsuranceCompanyToCenter(
+        widget.centerId,
+        insuranceId,
+      );
+
       // إعادة تحميل البيانات
       await _loadData();
-      
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم إضافة شركة التأمين بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إضافة شركة التأمين بنجاح'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -111,7 +120,10 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
     }
   }
 
-  Future<void> toggleInsuranceStatus(String insuranceId, bool currentStatus) async {
+  Future<void> toggleInsuranceStatus(
+    String insuranceId,
+    bool currentStatus,
+  ) async {
     setState(() {
       _isLoading = true;
     });
@@ -122,13 +134,13 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
           .doc(widget.centerId)
           .collection('insuranceCompanies')
           .doc(insuranceId)
-          .update({
-        'isActive': !currentStatus,
-      });
+          .update({'isActive': !currentStatus});
 
       // تحديث القائمة المحلية
       setState(() {
-        final index = _centerInsuranceCompanies.indexWhere((insurance) => insurance['id'] == insuranceId);
+        final index = _centerInsuranceCompanies.indexWhere(
+          (insurance) => insurance['id'] == insuranceId,
+        );
         if (index != -1) {
           _centerInsuranceCompanies[index]['isActive'] = !currentStatus;
         }
@@ -136,17 +148,19 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(!currentStatus ? 'تم تفعيل شركة التأمين' : 'تم تعطيل شركة التأمين'),
+          content: Text(
+            !currentStatus ? 'تم تفعيل شركة التأمين' : 'تم تعطيل شركة التأمين',
+          ),
           backgroundColor: Colors.green,
         ),
       );
-      } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
           content: Text('حدث خطأ في تحديث حالة شركة التأمين'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       setState(() {
         _isLoading = false;
@@ -204,94 +218,122 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
     String localQuery = '';
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-        title: const Text('إضافة شركة تأمين جديدة'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  decoration: const InputDecoration(
-                    labelText: 'بحث عن شركة...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.search),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: const Text('إضافة شركة تأمين جديدة'),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    height: MediaQuery.of(context).size.height * 0.55,
+                    child: Column(
+                      children: [
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: 'بحث عن شركة...',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.search),
+                          ),
+                          onChanged: (v) => setState(() => localQuery = v),
+                        ),
+
+                        const SizedBox(height: 6),
+
+                        Expanded(
+                          child: ListView(
+                            children:
+                                _availableInsuranceCompanies
+                                    .where(
+                                      (c) =>
+                                          localQuery.isEmpty ||
+                                          (c['name'] as String)
+                                              .toLowerCase()
+                                              .contains(
+                                                localQuery.toLowerCase(),
+                                              ),
+                                    )
+                                    .map(
+                                      (c) => ListTile(
+                                        dense: true,
+                                        visualDensity: const VisualDensity(
+                                          vertical: -2,
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                            ),
+                                        title: Text(
+                                          c['name'],
+                                          style: const TextStyle(fontSize: 15),
+                                        ),
+                                        onTap: () {
+                                          Navigator.of(context).pop();
+                                          addInsuranceCompany(c['id']);
+                                        },
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  onChanged: (v) => setState(() => localQuery = v),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('إلغاء'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 300),
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: _availableInsuranceCompanies
-                        .where((c) => localQuery.isEmpty || (c['name'] as String).toLowerCase().contains(localQuery.toLowerCase()))
-                        .map((c) => ListTile(
-                              title: Text(c['name']),
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                addInsuranceCompany(c['id']);
-                              },
-                            ))
-                        .toList(),
-                  ),
-                ),
-              ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('إلغاء'),
-          ),
-          ],
-        ),
-      ),
     );
   }
 
-  List<Map<String, dynamic>> filterInsuranceCompanies(List<Map<String, dynamic>> insuranceCompanies) {
+  List<Map<String, dynamic>> filterInsuranceCompanies(
+    List<Map<String, dynamic>> insuranceCompanies,
+  ) {
     if (_searchQuery.isEmpty) return insuranceCompanies;
-    
+
     return insuranceCompanies.where((insurance) {
       final name = insurance['name']?.toString().toLowerCase() ?? '';
-      final description = insurance['description']?.toString().toLowerCase() ?? '';
+      final description =
+          insurance['description']?.toString().toLowerCase() ?? '';
       return name.contains(_searchQuery.toLowerCase()) ||
-             description.contains(_searchQuery.toLowerCase());
+          description.contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoadingData) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final filteredCenterInsuranceCompanies = filterInsuranceCompanies(_centerInsuranceCompanies);
+    final filteredCenterInsuranceCompanies = filterInsuranceCompanies(
+      _centerInsuranceCompanies,
+    );
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title:Column(children: [ Text(
-            'إدارة شركات التأمين',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          title: Column(
+            children: [
+              Text(
+                'إدارة شركات التأمين',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                '${widget.centerName}',
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
+            ],
           ),
-          Text('${widget.centerName}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-            ),
-            ),
-          ]),
           centerTitle: true,
-          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
@@ -303,13 +345,13 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
           ],
         ),
         body: Column(
-            children: [
+          children: [
             // Search and Add section
-              Container(
-                padding: const EdgeInsets.all(16),
+            Container(
+              padding: const EdgeInsets.all(16),
               color: Colors.grey[50],
               child: Column(
-                  children: [
+                children: [
                   // Search bar
                   TextField(
                     onChanged: (value) {
@@ -327,134 +369,157 @@ class _AdminInsuranceCompaniesScreenState extends State<AdminInsuranceCompaniesS
                       fillColor: Colors.white,
                     ),
                   ),
-                  ],
-                ),
+                ],
               ),
-              // Insurance companies list
-              Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : filteredCenterInsuranceCompanies.isEmpty
+            ),
+            // Insurance companies list
+            Expanded(
+              child:
+                  _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : filteredCenterInsuranceCompanies.isEmpty
                       ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                                _searchQuery.isEmpty ? Icons.business_outlined : Icons.search_off,
-                                size: 64,
+                              _searchQuery.isEmpty
+                                  ? Icons.business_outlined
+                                  : Icons.search_off,
+                              size: 64,
                               color: Colors.grey[400],
                             ),
                             const SizedBox(height: 16),
                             Text(
-                                _searchQuery.isEmpty
-                                    ? 'لا توجد شركات تأمين في هذا المركز'
-                                    : 'لم يتم العثور على شركات تأمين تطابق البحث',
+                              _searchQuery.isEmpty
+                                  ? 'لا توجد شركات تأمين في هذا المركز'
+                                  : 'لم يتم العثور على شركات تأمين تطابق البحث',
                               style: TextStyle(
                                 fontSize: 18,
                                 color: Colors.grey[600],
-                                ),
                               ),
+                            ),
                             const SizedBox(height: 8),
                             Text(
-                                _searchQuery.isEmpty
-                                    ? 'لم يتم العثور على أي شركات تأمين مسجلة'
-                                    : 'جرب البحث بكلمات مختلفة',
+                              _searchQuery.isEmpty
+                                  ? 'لم يتم العثور على أي شركات تأمين مسجلة'
+                                  : 'جرب البحث بكلمات مختلفة',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Colors.grey[500],
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: filteredCenterInsuranceCompanies.length,
-                          itemBuilder: (context, index) {
-                            final insurance = filteredCenterInsuranceCompanies[index];
-                            final isActive = insurance['isActive'] ?? true;
-
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                                leading: Text(
-                                  '${index + 1}',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                            title: Text(
-                                  insurance['name'],
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                    color: isActive ? Colors.black : Colors.grey,
                               ),
                             ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                    if (insurance['description']?.isNotEmpty == true)
-                                      Text(
-                                        insurance['description'],
-                                        style: TextStyle(
-                                          color: isActive ? Colors.grey[600] : Colors.grey,
-                                          fontSize: 12,
-                                        ),
-                                      ),
+                          ],
+                        ),
+                      )
+                      : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredCenterInsuranceCompanies.length,
+                        itemBuilder: (context, index) {
+                          final insurance =
+                              filteredCenterInsuranceCompanies[index];
+                          final isActive = insurance['isActive'] ?? true;
+
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ListTile(
+                              leading: Text(
+                                '${index + 1}',
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              title: Text(
+                                insurance['name'],
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isActive ? Colors.black : Colors.grey,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (insurance['description']?.isNotEmpty ==
+                                      true)
                                     Text(
-                                      isActive ? 'نشط' : 'غير نشط',
+                                      insurance['description'],
                                       style: TextStyle(
-                                        color: isActive ? Colors.green : Colors.grey,
+                                        color:
+                                            isActive
+                                                ? Colors.grey[600]
+                                                : Colors.grey,
                                         fontSize: 12,
                                       ),
                                     ),
-                                  ],
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) async {
-                                    switch (value) {
-                                      case 'toggle':
-                                        await toggleInsuranceStatus(insurance['id'], isActive);
-                                        break;
-                                      case 'delete':
-                                        await deleteInsuranceCompany(insurance['id']);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'toggle',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            isActive ? Icons.block : Icons.check_circle,
-                                            color: isActive ? Colors.orange : Colors.green,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(isActive ? 'تعطيل' : 'تفعيل'),
-                                        ],
-                                      ),
+                                  Text(
+                                    isActive ? 'نشط' : 'غير نشط',
+                                    style: TextStyle(
+                                      color:
+                                          isActive ? Colors.green : Colors.grey,
+                                      fontSize: 12,
                                     ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.delete, color: Colors.red),
-                                          SizedBox(width: 8),
-                                          Text('حذف'),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) async {
+                                  switch (value) {
+                                    case 'toggle':
+                                      await toggleInsuranceStatus(
+                                        insurance['id'],
+                                        isActive,
+                                      );
+                                      break;
+                                    case 'delete':
+                                      await deleteInsuranceCompany(
+                                        insurance['id'],
+                                      );
+                                      break;
+                                  }
+                                },
+                                itemBuilder:
+                                    (context) => [
+                                      PopupMenuItem(
+                                        value: 'toggle',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              isActive
+                                                  ? Icons.block
+                                                  : Icons.check_circle,
+                                              color:
+                                                  isActive
+                                                      ? Colors.orange
+                                                      : Colors.green,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(isActive ? 'تعطيل' : 'تفعيل'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete,
+                                              color: Colors.red,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text('حذف'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+            ),
+          ],
         ),
       ),
     );

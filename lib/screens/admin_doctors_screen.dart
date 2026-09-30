@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'admin_doctor_details_screen.dart';
-import 'add_doctor_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'add_doctor_screen.dart';
+import 'admin_doctor_details_screen.dart';
 
 class AdminDoctorsScreen extends StatefulWidget {
   final String? centerId;
@@ -27,17 +29,23 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
   bool _hasMoreData = true;
   bool _isInitialLoading = true; // متغير لتتبع التحميل الأولي
   int _currentPage = 0;
+  bool _isSelectionMode = false;
+  final Set<String> _selectedDoctorIds = {};
+  final Set<String> _alreadyAddedDoctorIds = {};
   static const int _pageSize = 10;
 
   // Cache keys and duration
   static const String _cacheKey = 'allDoctorsCache';
   static const String _cacheTimestampKey = 'doctorsCacheTimestamp';
-  static const Duration _cacheValidDuration = Duration(hours: 1); // Cache for 1 hour
+  static const Duration _cacheValidDuration = Duration(
+    hours: 1,
+  ); // Cache for 1 hour
 
   @override
   void initState() {
     super.initState();
     _loadDataWithCache();
+    _loadAlreadyAddedDoctors();
   }
 
   @override
@@ -45,7 +53,6 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     _searchController.dispose();
     super.dispose();
   }
-
 
   // دالة تحميل البيانات مع Cache
   Future<void> _loadDataWithCache() async {
@@ -60,7 +67,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
         _isInitialLoading = false;
       });
     }
-    
+
     // تحميل البيانات الجديدة من Firebase في الخلفية
     _fetchDataInBackground();
   }
@@ -71,11 +78,11 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
       final prefs = await SharedPreferences.getInstance();
       final cachedData = prefs.getString(_cacheKey);
       final timestamp = prefs.getInt(_cacheTimestampKey);
-      
+
       if (cachedData != null && timestamp != null) {
         final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
         final isValid = cacheAge < _cacheValidDuration.inMilliseconds;
-        
+
         if (isValid) {
           final List<dynamic> decoded = jsonDecode(cachedData);
           return decoded.cast<Map<String, dynamic>>();
@@ -94,13 +101,15 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
       final prefs = await SharedPreferences.getInstance();
       final encodedData = jsonEncode(doctors);
       await prefs.setString(_cacheKey, encodedData);
-      await prefs.setInt(_cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(
+        _cacheTimestampKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
       print('Doctors data cached successfully');
     } catch (e) {
       print('Error saving to cache: $e');
     }
   }
-
 
   // دالة تحميل البيانات في الخلفية
   Future<void> _fetchDataInBackground() async {
@@ -138,12 +147,18 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
 
       List<Map<String, dynamic>> allDoctors = [];
       List<Future<void>> futures = [];
-      
+
       for (var specDoc in specializationsSnapshot.docs) {
         futures.add(_fetchDoctorsFromSpecialization(specDoc, allDoctors));
       }
-      
+
       await Future.wait(futures);
+      allDoctors.sort((a, b) {
+        final nameA = a['name']?.toString() ?? '';
+        final nameB = b['name']?.toString() ?? '';
+
+        return nameA.compareTo(nameB);
+      });
       return allDoctors;
     } catch (e) {
       print('Error fetching doctors from Firebase: $e');
@@ -159,6 +174,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
         _hasMoreData = false;
         _isLoadingMore = false;
       });
+      await _loadAlreadyAddedDoctors();
       return;
     }
 
@@ -173,14 +189,20 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
 
       List<Map<String, dynamic>> allDoctors = [];
       List<Future<void>> futures = [];
-      
+
       // البحث في كل تخصص بشكل متوازي
       for (var specDoc in specializationsSnapshot.docs) {
         futures.add(_fetchDoctorsFromSpecialization(specDoc, allDoctors));
       }
-      
+
       await Future.wait(futures);
-      
+      allDoctors.sort((a, b) {
+        final nameA = a['name']?.toString() ?? '';
+        final nameB = b['name']?.toString() ?? '';
+
+        return nameA.compareTo(nameB);
+      });
+
       setState(() {
         _allDoctors = allDoctors;
         _currentPage = 0;
@@ -200,11 +222,14 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     }
   }
 
-  Future<void> _fetchDoctorsFromSpecialization(QueryDocumentSnapshot specDoc, List<Map<String, dynamic>> allDoctors) async {
+  Future<void> _fetchDoctorsFromSpecialization(
+    QueryDocumentSnapshot specDoc,
+    List<Map<String, dynamic>> allDoctors,
+  ) async {
     try {
       final specializationData = specDoc.data() as Map<String, dynamic>?;
       final specializationName = specializationData?['specName'] ?? specDoc.id;
-      
+
       final doctorsSnapshot = await FirebaseFirestore.instance
           .collection('medicalFacilities')
           .doc(widget.centerId)
@@ -213,23 +238,24 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
           .collection('doctors')
           .get()
           .timeout(const Duration(seconds: 5));
-      
+
       for (var doctorDoc in doctorsSnapshot.docs) {
         final doctorData = doctorDoc.data();
         final doctorId = doctorDoc.id;
-        
+
         // جلب معلومات الطبيب من قاعدة البيانات المركزية
         String doctorName = 'طبيب غير معروف';
         String doctorPhone = '';
-        String photoUrl = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
-        
+        String photoUrl =
+            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
+
         try {
           final centralDoctorDoc = await FirebaseFirestore.instance
               .collection('allDoctors')
               .doc(doctorId)
               .get()
               .timeout(const Duration(seconds: 3));
-          
+
           if (centralDoctorDoc.exists) {
             final centralDoctorData = centralDoctorDoc.data()!;
             doctorName = centralDoctorData['name'] ?? 'طبيب غير معروف';
@@ -240,7 +266,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
           // إذا فشل في جلب البيانات من المركزية، استخدم المعرف
           doctorName = doctorId;
         }
-        
+
         // إضافة معلومات إضافية لكل طبيب
         doctorData['name'] = doctorName;
         doctorData['phoneNumber'] = doctorPhone;
@@ -260,12 +286,12 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     final filteredDoctors = filterDoctors();
     final startIndex = 0;
     final endIndex = (_currentPage + 1) * _pageSize;
-    
+
     // إذا وصلنا لنهاية القائمة، نرجع جميع الأطباء
     if (endIndex >= filteredDoctors.length) {
       return filteredDoctors;
     }
-    
+
     // نرجع الأطباء من البداية حتى النقطة الحالية
     return filteredDoctors.sublist(startIndex, endIndex);
   }
@@ -283,14 +309,14 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
   // دالة تحميل المزيد من الأطباء (10 أطباء إضافية)
   Future<void> loadMoreDoctors() async {
     if (_isLoadingMore || !_hasMoreData) return;
-    
+
     setState(() {
       _isLoadingMore = true;
     });
-    
+
     // محاكاة تأخير للعرض (500 مللي ثانية)
     await Future.delayed(const Duration(milliseconds: 500));
-    
+
     setState(() {
       _currentPage++; // زيادة رقم الصفحة
       final filteredDoctors = filterDoctors();
@@ -301,16 +327,135 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     });
   }
 
+  Future<void> _loadAlreadyAddedDoctors() async {
+    if (widget.centerId == null) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+
+      if (userId == null || userId.isEmpty) {
+        return;
+      }
+
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('myDoctors')
+              .doc(userId)
+              .collection('doctors')
+              .get();
+
+      if (!mounted) return;
+
+      setState(() {
+        _alreadyAddedDoctorIds.clear();
+
+        for (final doc in snapshot.docs) {
+          _alreadyAddedDoctorIds.add(doc.id);
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading my doctors: $e');
+    }
+  }
+
+  Future<void> _saveSelectedDoctors() async {
+    if (widget.centerId == null) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('userId');
+
+      if (userId == null || userId.isEmpty) {
+        return;
+      }
+
+      final doctorsRef = FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('myDoctors')
+          .doc(userId)
+          .collection('doctors');
+
+      // الأطباء الموجودون حالياً في myDoctors
+      final currentAddedIds = Set<String>.from(_alreadyAddedDoctorIds);
+
+      // 1️⃣ إضافة الأطباء الجدد الذين تم تحديدهم
+      for (final doctorId in _selectedDoctorIds) {
+        // لو الطبيب مضاف أصلاً، لا نضيفه مرة ثانية
+        if (currentAddedIds.contains(doctorId)) {
+          continue;
+        }
+
+        final doctor = _allDoctors.firstWhere(
+          (doctor) => doctor['doctorId'] == doctorId,
+        );
+
+        await doctorsRef.doc(doctorId).set({
+          'doctorId': doctorId,
+          'name': doctor['name'] ?? 'طبيب غير معروف',
+          'photoUrl': doctor['photoUrl'] ?? '',
+          'specialization': doctor['specialization'] ?? 'غير محدد',
+          'specializationId': doctor['specializationId'] ?? '',
+          'phoneNumber': doctor['phoneNumber'] ?? '',
+          'isBookingEnabled': doctor['isBookingEnabled'] ?? true,
+          'isActive': doctor['isActive'] ?? true,
+          'addedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      // 2️⃣ حذف الأطباء الذين كانوا مضافين وتم إلغاء تحديدهم
+      for (final doctorId in currentAddedIds) {
+        if (!_selectedDoctorIds.contains(doctorId)) {
+          await doctorsRef.doc(doctorId).delete();
+        }
+      }
+
+      if (!mounted) return;
+
+      // تحديث القائمة المحلية بعد الحفظ
+      setState(() {
+        _alreadyAddedDoctorIds
+          ..clear()
+          ..addAll(_selectedDoctorIds);
+
+        _isSelectionMode = false;
+        _selectedDoctorIds.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم حفظ أطبائك بنجاح'),
+          backgroundColor: Color.fromARGB(255, 34, 96, 129),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error saving my doctors: $e');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('حدث خطأ أثناء حفظ الأطباء'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   List<Map<String, dynamic>> filterDoctors() {
     if (_searchQuery.isEmpty) return _allDoctors;
-    
+
     return _allDoctors.where((doctor) {
       final name = doctor['name']?.toString().toLowerCase() ?? '';
-      final specialization = doctor['specialization']?.toString().toLowerCase() ?? '';
+      final specialization =
+          doctor['specialization']?.toString().toLowerCase() ?? '';
       final phone = doctor['phoneNumber']?.toString().toLowerCase() ?? '';
       return name.contains(_searchQuery.toLowerCase()) ||
-             specialization.contains(_searchQuery.toLowerCase()) ||
-             phone.contains(_searchQuery.toLowerCase());
+          specialization.contains(_searchQuery.toLowerCase()) ||
+          phone.contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
@@ -320,41 +465,66 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title:Column(children: [ Text(
-            'إدارة الأطباء',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-           
+          title: Column(
+            children: [
+              Text(
+                _isSelectionMode ? 'اختيار أطبائي' : 'إدارة الأطباء',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                _isSelectionMode
+                    ? 'تم تحديد ${_selectedDoctorIds.length} طبيب'
+                    : '${widget.centerName}',
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
+            ],
           ),
-           Text( '${widget.centerName}',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.white,
-            ),
-            ),
-          ]),
           centerTitle: true,
-          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           foregroundColor: Colors.white,
           elevation: 0,
           actions: [
-            IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => AddDoctorScreen(
-                      centerId: widget.centerId!,
-                      centerName: widget.centerName!,
-                    ),
+            if (_isSelectionMode)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: _saveSelectedDoctors,
+                    icon: const Icon(Icons.check),
+                    tooltip: 'حفظ',
                   ),
-                );
-              },
-              icon: const Icon(Icons.add),
-              tooltip: 'إضافة طبيب جديد',
-            ),
+                  IconButton(
+                    onPressed: () {
+                      setState(() {
+                        _isSelectionMode = false;
+                        _selectedDoctorIds.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.close),
+                    tooltip: 'إلغاء',
+                  ),
+                ],
+              )
+            else
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) => AddDoctorScreen(
+                            centerId: widget.centerId!,
+                            centerName: widget.centerName!,
+                          ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.add),
+                tooltip: 'إضافة طبيب جديد',
+              ),
           ],
         ),
         body: SafeArea(
@@ -385,20 +555,24 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
                           },
                           decoration: InputDecoration(
                             hintText: 'البحث عن طبيب...',
-                            prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: Colors.grey[600],
+                            ),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
                 // Doctors list
-                Expanded(
-                  child: _buildDoctorsList(),
-                ),
+                Expanded(child: _buildDoctorsList()),
               ],
             ),
           ),
@@ -413,16 +587,11 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
-              color: Color.fromARGB(255, 156, 208, 235),
-            ),
+            CircularProgressIndicator(color: Color.fromARGB(255, 34, 96, 129)),
             SizedBox(height: 16),
             Text(
               'جاري تحميل الأطباء...',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
           ],
         ),
@@ -435,26 +604,16 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.people_outline,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+            Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             Text(
               'لا توجد أطباء في هذا المركز',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
               'لم يتم العثور على أي أطباء مسجلين',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(
@@ -467,7 +626,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
               icon: const Icon(Icons.refresh),
               label: const Text('إعادة المحاولة'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+                backgroundColor: const Color.fromARGB(255, 34, 96, 129),
                 foregroundColor: Colors.white,
               ),
             ),
@@ -477,7 +636,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     }
 
     final filteredDoctors = filterDoctors();
-    
+
     if (filteredDoctors.isEmpty && !_isInitialLoading) {
       return Center(
         child: Column(
@@ -490,13 +649,10 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              _searchQuery.isEmpty 
+              _searchQuery.isEmpty
                   ? 'لا يوجد أطباء في هذا المركز'
                   : 'لم يتم العثور على أطباء يطابقون البحث',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
             ),
           ],
         ),
@@ -504,7 +660,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
     }
 
     final paginatedDoctors = getPaginatedDoctors();
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: paginatedDoctors.length + (_hasMoreData ? 1 : 0),
@@ -521,10 +677,7 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
                     SizedBox(height: 8),
                     Text(
                       'جاري تحميل المزيد من الأطباء...',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
                 ),
@@ -543,20 +696,28 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
         final doctorData = paginatedDoctors[index];
         final doctorName = doctorData['name'] ?? 'طبيب غير معروف';
         final specialization = doctorData['specialization'] ?? 'غير محدد';
-        final photoUrl = doctorData['photoUrl'] ?? 
+        final photoUrl =
+            doctorData['photoUrl'] ??
             'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
         final doctorId = doctorData['doctorId'] ?? '';
         final isBookingEnabled = doctorData['isBookingEnabled'] ?? true;
+        final isActive = doctorData['isActive'] ?? true;
+        final isAlreadyAdded = _alreadyAddedDoctorIds.contains(doctorId);
+        final isSelected = _selectedDoctorIds.contains(doctorId);
 
         return Card(
-          color: isBookingEnabled ? Colors.white : Colors.orange[50],
-          margin: EdgeInsets.only(bottom: 12),
+          color: Colors.white,
+          margin: const EdgeInsets.only(bottom: 10),
           elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           child: ListTile(
-            contentPadding: EdgeInsets.all(8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 6,
+            ),
+
             leading: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -565,79 +726,173 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
                   style: const TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
+                    fontSize: 14,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 6),
+
                 CircleAvatar(
-                  radius: 30,
-                  backgroundImage: photoUrl.startsWith('http') 
-                      ? NetworkImage(photoUrl)
-                      : null,
-                  backgroundColor: photoUrl.startsWith('http') 
-                      ? null 
-                      : Colors.grey[300],
-                  child: photoUrl.startsWith('http') 
-                      ? null 
-                      : Icon(
-                          Icons.person,
-                          size: 30,
-                          color: Colors.grey[600],
-                        ),
-                  onBackgroundImageError: (exception, stackTrace) {
-                    // Handle image error
-                  },
+                  radius: 28,
+                  backgroundImage:
+                      photoUrl.startsWith('http')
+                          ? NetworkImage(photoUrl)
+                          : null,
+                  backgroundColor:
+                      photoUrl.startsWith('http') ? null : Colors.grey[300],
+                  child:
+                      photoUrl.startsWith('http')
+                          ? null
+                          : Icon(
+                            Icons.person,
+                            size: 20,
+                            color: Colors.grey[600],
+                          ),
+                  onBackgroundImageError: (exception, stackTrace) {},
                 ),
               ],
             ),
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+
+            title: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  doctorName,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        doctorName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(
+                            255,
+                            156,
+                            208,
+                            235,
+                          ).withAlpha(26),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          specialization,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color.fromARGB(255, 34, 96, 129),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 156, 208, 235).withAlpha(26),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    specialization,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color.fromARGB(255, 156, 208, 235),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+
+                const SizedBox(width: 6),
+
+                // حالة الطبيب والحجز
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (!isActive)
+                      const Text(
+                        'غير نشط',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                    if (!isBookingEnabled)
+                      const Text(
+                        'الحجز متوقف',
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
-            trailing: Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey[400],
-              size: 20,
-            ),
+
+            trailing:
+                _isSelectionMode
+                    ? Checkbox(
+                      value: isSelected,
+                      activeColor: const Color.fromARGB(255, 34, 96, 129),
+                      onChanged: (value) {
+                        setState(() {
+                          if (value == true) {
+                            _selectedDoctorIds.add(doctorId);
+                          } else {
+                            _selectedDoctorIds.remove(doctorId);
+                          }
+                        });
+                      },
+                    )
+                    : Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.grey[400],
+                      size: 15,
+                    ),
+            onLongPress: () {
+              if (_isSelectionMode) return;
+
+              setState(() {
+                _isSelectionMode = true;
+
+                // نبدأ بكل الأطباء المحفوظين محددين
+                _selectedDoctorIds
+                  ..clear()
+                  ..addAll(_alreadyAddedDoctorIds);
+
+                // ونحدد الطبيب الذي ضغطنا عليه
+                _selectedDoctorIds.add(doctorId);
+              });
+            },
+
             onTap: () {
+              if (_isSelectionMode) {
+                setState(() {
+                  if (_selectedDoctorIds.contains(doctorId)) {
+                    _selectedDoctorIds.remove(doctorId);
+                  } else {
+                    _selectedDoctorIds.add(doctorId);
+                  }
+                });
+                return;
+              }
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => AdminDoctorDetailsScreen(
-                    doctorId: doctorId,
-                    centerId: widget.centerId!,
-                    centerName: widget.centerName,
-                  ),
+                  builder:
+                      (context) => AdminDoctorDetailsScreen(
+                        doctorId: doctorId,
+                        centerId: widget.centerId!,
+                        centerName: widget.centerName,
+                      ),
                 ),
               ).then((result) {
-                // تحديث القائمة عند العودة من تفاصيل الطبيب
                 if (mounted) {
                   fetchAllDoctors();
+                  _loadAlreadyAddedDoctors();
                 }
               });
             },
@@ -646,5 +901,4 @@ class _AdminDoctorsScreenState extends State<AdminDoctorsScreen> {
       },
     );
   }
-
 }

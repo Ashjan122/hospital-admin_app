@@ -34,25 +34,24 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
   String? patientPhone;
   bool isLoading = false;
   String? selectedTime;
-  
+
   // Controllers for text fields
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
-  
+
   // Data for display
   String? facilityName;
   String? specializationName;
   String? doctorName;
 
-
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize controllers
     _nameController = TextEditingController();
     _phoneController = TextEditingController();
-    
+
     // إذا كان هذا تأجيل حجز، استخدم البيانات القديمة
     if (widget.isReschedule && widget.oldBookingData != null) {
       patientName = widget.oldBookingData!['patientName'];
@@ -60,7 +59,7 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
       _nameController.text = patientName ?? '';
       _phoneController.text = patientPhone ?? '';
     }
-    
+
     // جلب بيانات المركز والتخصص والطبيب
     _loadFacilityData();
   }
@@ -72,59 +71,62 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
     super.dispose();
   }
 
-
-
   Future<void> _loadFacilityData() async {
     try {
       // جلب اسم المركز
-      final facilityDoc = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .get();
-      
+      final facilityDoc =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .get();
+
       if (facilityDoc.exists) {
         facilityName = facilityDoc.data()?['name'] ?? 'مركز طبي';
       }
-      
+
       // جلب اسم التخصص
-      final specializationDoc = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .doc(widget.specializationId)
-          .get();
-      
+      final specializationDoc =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(widget.specializationId)
+              .get();
+
       if (specializationDoc.exists) {
-        specializationName = specializationDoc.data()?['specName'] ?? 'تخصص طبي';
+        specializationName =
+            specializationDoc.data()?['specName'] ?? 'تخصص طبي';
       }
-      
+
       // جلب اسم الطبيب
-      final doctorDoc = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .doc(widget.specializationId)
-          .collection('doctors')
-          .doc(widget.doctorId)
-          .get();
-      
+      final doctorDoc =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(widget.specializationId)
+              .collection('doctors')
+              .doc(widget.doctorId)
+              .get();
+
       if (doctorDoc.exists) {
         final d = doctorDoc.data();
         // محاولة جلب اسم الطبيب من عدة مفاتيح محتملة بما فيها docName
-        doctorName = (d?['docName']
-                ?? d?['name']
-                ?? d?['doctorName']
-                ?? d?['displayName']
-                ?? d?['fullName']
-                ?? d?['nameAr']
-                ?? d?['arabicName'])
-            ?.toString()
-            .trim();
+        doctorName =
+            (d?['docName'] ??
+                    d?['name'] ??
+                    d?['doctorName'] ??
+                    d?['displayName'] ??
+                    d?['fullName'] ??
+                    d?['nameAr'] ??
+                    d?['arabicName'])
+                ?.toString()
+                .trim();
         if (doctorName == null || doctorName!.isEmpty) {
           doctorName = 'طبيب';
         }
       }
-      
+
       if (mounted) {
         setState(() {});
       }
@@ -157,37 +159,40 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
     final schedule = widget.workingSchedule[dayName];
     final shiftKey = widget.selectedShift ?? 'morning';
     final shiftData = schedule[shiftKey];
-    
+
     if (shiftData == null) return null;
 
     // فحص عدد المرضى المحجوزين في هذا اليوم والفترة
     final dateStr = intl.DateFormat('yyyy-MM-dd').format(date);
-    final shiftBookings = await FirebaseFirestore.instance
-        .collection('medicalFacilities')
-        .doc(widget.centerId)
-        .collection('specializations')
-        .doc(widget.specializationId)
-        .collection('doctors')
-        .doc(widget.doctorId)
-        .collection('appointments')
-        .where('date', isEqualTo: dateStr)
-        .where('period', isEqualTo: shiftKey)
-        .get();
+    final shiftBookings =
+        await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(widget.specializationId)
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .collection('appointments')
+            .where('date', isEqualTo: dateStr)
+            .where('period', isEqualTo: shiftKey)
+            .get();
 
     // الحصول على حد المرضى للطبيب
-    final doctorDoc = await FirebaseFirestore.instance
-        .collection('medicalFacilities')
-        .doc(widget.centerId)
-        .collection('specializations')
-        .doc(widget.specializationId)
-        .collection('doctors')
-        .doc(widget.doctorId)
-        .get();
+    final doctorDoc =
+        await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(widget.specializationId)
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .get();
 
     final doctorData = doctorDoc.data();
-    final patientLimit = shiftKey == 'morning' 
-        ? (doctorData?['morningPatientLimit'] ?? 20)
-        : (doctorData?['eveningPatientLimit'] ?? 20);
+    final patientLimit =
+        shiftKey == 'morning'
+            ? (doctorData?['morningPatientLimit'] ?? 20)
+            : (doctorData?['eveningPatientLimit'] ?? 20);
 
     // فحص إذا كان العدد قد اكتمل
     if (shiftBookings.docs.length >= patientLimit) {
@@ -197,7 +202,7 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
     // تحويل الوقت من 12 ساعة إلى 24 ساعة
     int startHour = int.parse(shiftData['start'].split(":")[0]);
     int endHour = int.parse(shiftData['end'].split(":")[0]);
-    
+
     // إذا كان وقت النهاية أقل من وقت البداية، فهذا يعني أنه بعد الظهر
     if (endHour < startHour) {
       endHour += 12; // تحويل إلى 24 ساعة
@@ -229,7 +234,7 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
     print('رقم الهاتف: $patientPhone');
     print('التاريخ المحدد: ${widget.selectedDate}');
     print('الفترة المحددة: ${widget.selectedShift}');
-    
+
     if (patientName == null ||
         patientName!.isEmpty ||
         patientPhone == null ||
@@ -239,12 +244,17 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
     }
 
     // التحقق من الاسم (اسمين على الأقل)
-    List<String> nameParts = patientName!.trim().split(' ').where((part) => part.isNotEmpty).toList();
+    List<String> nameParts =
+        patientName!
+            .trim()
+            .split(' ')
+            .where((part) => part.isNotEmpty)
+            .toList();
     if (nameParts.length < 2) {
       _showDialog("تنبيه", "يرجى إدخال الاسم (اسمين على الأقل)");
       return;
     }
-    
+
     // التحقق من رقم الهاتف (يجب أن يحتوي على أرقام فقط)
     String phoneDigits = patientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
     if (phoneDigits.isEmpty) {
@@ -253,70 +263,77 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
     }
 
     // التحقق من عدم وجود حجز سابق لنفس الشخص في نفس اليوم (بالاسم الثلاثي فقط)
-    final checkDateStr = intl.DateFormat('yyyy-MM-dd').format(widget.selectedDate);
-    final existingBooking = await FirebaseFirestore.instance
-        .collection('medicalFacilities')
-        .doc(widget.centerId)
-        .collection('specializations')
-        .doc(widget.specializationId)
-        .collection('doctors')
-        .doc(widget.doctorId)
-        .collection('appointments')
-        .where('date', isEqualTo: checkDateStr)
-        .where('patientName', isEqualTo: patientName)
-        .get();
+    final checkDateStr = intl.DateFormat(
+      'yyyy-MM-dd',
+    ).format(widget.selectedDate);
+    final existingBooking =
+        await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(widget.centerId)
+            .collection('specializations')
+            .doc(widget.specializationId)
+            .collection('doctors')
+            .doc(widget.doctorId)
+            .collection('appointments')
+            .where('date', isEqualTo: checkDateStr)
+            .where('patientName', isEqualTo: patientName)
+            .get();
 
     if (existingBooking.docs.isNotEmpty) {
-      _showDialog("حجز موجود", "يوجد حجز سابق لنفس الاسم في نفس اليوم لهذا الطبيب. لا يمكن الحجز مرة اخرى");
+      _showDialog(
+        "حجز موجود",
+        "يوجد حجز سابق لنفس الاسم في نفس اليوم لهذا الطبيب. لا يمكن الحجز مرة اخرى",
+      );
       return;
     }
-    
-
 
     if (!mounted) return;
     setState(() => isLoading = true);
 
     final result = await getAvailableTime(widget.selectedDate);
     if (!mounted) return;
-    
+
     if (result == null) {
       if (!mounted) return;
       setState(() => isLoading = false);
-      
+
       // فحص إذا كان السبب هو اكتمال العدد
       final dateStr = intl.DateFormat('yyyy-MM-dd').format(widget.selectedDate);
       final shiftKey = widget.selectedShift ?? 'morning';
-      final shiftBookings = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .doc(widget.specializationId)
-          .collection('doctors')
-          .doc(widget.doctorId)
-          .collection('appointments')
-          .where('date', isEqualTo: dateStr)
-          .where('period', isEqualTo: shiftKey)
-          .get();
+      final shiftBookings =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(widget.specializationId)
+              .collection('doctors')
+              .doc(widget.doctorId)
+              .collection('appointments')
+              .where('date', isEqualTo: dateStr)
+              .where('period', isEqualTo: shiftKey)
+              .get();
 
-      final doctorDoc = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .doc(widget.specializationId)
-          .collection('doctors')
-          .doc(widget.doctorId)
-          .get();
+      final doctorDoc =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .doc(widget.specializationId)
+              .collection('doctors')
+              .doc(widget.doctorId)
+              .get();
 
       final doctorData = doctorDoc.data();
-      final patientLimit = shiftKey == 'morning' 
-          ? (doctorData?['morningPatientLimit'] ?? 20)
-          : (doctorData?['eveningPatientLimit'] ?? 20);
+      final patientLimit =
+          shiftKey == 'morning'
+              ? (doctorData?['morningPatientLimit'] ?? 20)
+              : (doctorData?['eveningPatientLimit'] ?? 20);
 
       if (shiftBookings.docs.length >= patientLimit) {
         final periodText = shiftKey == 'morning' ? 'الصباحية' : 'المسائية';
         _showDialog(
-          "اكتمل العدد", 
-          "عذراً، اكتمل العدد المحدد للمرضى في الفترة $periodText لهذا اليوم (${patientLimit} مريض).\nيرجى اختيار يوم آخر أو فترة أخرى."
+          "اكتمل العدد",
+          "عذراً، اكتمل العدد المحدد للمرضى في الفترة $periodText لهذا اليوم (${patientLimit} مريض).\nيرجى اختيار يوم آخر أو فترة أخرى.",
         );
       } else {
         _showDialog("لا يوجد موعد", "لا توجد مواعيد متاحة في هذا اليوم");
@@ -366,30 +383,28 @@ class _PatientInfoScreenState extends State<PatientInfoScreen> {
           'createdAt': FieldValue.serverTimestamp(),
           'isConfirmed': false, // الحجز الجديد يحتاج تأكيد
         });
-         // إضافة نسخة من الحجز داخل المركز
-String? bookingId;
-await FirebaseFirestore.instance
-    .collection('medicalFacilities')
-    .doc(widget.centerId)
-    .collection('appointments')
-    .doc(bookingId)
-    .set({
-      'patientName': patientName,
-      'patientPhone': patientPhone,
-      'patientId': patientId,
-      'facilityId': widget.centerId,
-      'centralSpecialtyId': widget.specializationId,
-      'doctorId': widget.doctorId,
-      'doctorName': doctorName ?? 'طبيب',
-      'specializationName': specializationName ?? 'تخصص طبي',
-      'date': dateStr,
-      'time': availableTime,
-      'period': period,
-      'createdAt': FieldValue.serverTimestamp(),
-      'isConfirmed': false,
-});
-
-
+    // إضافة نسخة من الحجز داخل المركز
+    String? bookingId;
+    await FirebaseFirestore.instance
+        .collection('medicalFacilities')
+        .doc(widget.centerId)
+        .collection('appointments')
+        .doc(bookingId)
+        .set({
+          'patientName': patientName,
+          'patientPhone': patientPhone,
+          'patientId': patientId,
+          'facilityId': widget.centerId,
+          'centralSpecialtyId': widget.specializationId,
+          'doctorId': widget.doctorId,
+          'doctorName': doctorName ?? 'طبيب',
+          'specializationName': specializationName ?? 'تخصص طبي',
+          'date': dateStr,
+          'time': availableTime,
+          'period': period,
+          'createdAt': FieldValue.serverTimestamp(),
+          'isConfirmed': false,
+        });
 
     if (!mounted) return;
 
@@ -405,63 +420,66 @@ await FirebaseFirestore.instance
   }
 
   void _showBookingSuccessDialog(String dateStr, String time) {
-    final formattedDate = intl.DateFormat('EEEE - yyyy/MM/dd', 'ar').format(widget.selectedDate);
+    final formattedDate = intl.DateFormat(
+      'EEEE - yyyy/MM/dd',
+      'ar',
+    ).format(widget.selectedDate);
     final periodText = widget.selectedShift == 'morning' ? 'صباحية' : 'مسائية';
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.green, size: 32),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'تم الحجز بنجاح',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 32),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'تم الحجز بنجاح',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                  ),
                 ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                _buildInfoRow('الاسم', patientName ?? ''),
+                const SizedBox(height: 8),
+                _buildInfoRow('رقم الهاتف', patientPhone ?? ''),
+                const SizedBox(height: 8),
+                _buildInfoRow('التاريخ', formattedDate),
+                const SizedBox(height: 8),
+                _buildInfoRow('الوقت', time),
+                const SizedBox(height: 8),
+                _buildInfoRow('الفترة', periodText),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // إغلاق dialog
+                  Navigator.of(context).pop(); // العودة للشاشة السابقة
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 34, 96, 129),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text('موافق'),
               ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-           
-            const SizedBox(height: 16),
-            _buildInfoRow('الاسم', patientName ?? ''),
-            const SizedBox(height: 8),
-            _buildInfoRow('رقم الهاتف', patientPhone ?? ''),
-            const SizedBox(height: 8),
-            _buildInfoRow('التاريخ', formattedDate),
-            const SizedBox(height: 8),
-            _buildInfoRow('الوقت', time),
-            const SizedBox(height: 8),
-            _buildInfoRow('الفترة', periodText),
-          ],
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // إغلاق dialog
-              Navigator.of(context).pop(); // العودة للشاشة السابقة
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color.fromARGB(255, 156, 208, 235),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: const Text('موافق'),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -479,43 +497,33 @@ await FirebaseFirestore.instance
             ),
           ),
         ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-            ),
-          ),
-        ),
+        Expanded(child: Text(value, style: TextStyle(fontSize: 14))),
       ],
     );
   }
 
-
-
-
   void _showDialog(String title, String message) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Center(
-          child: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
-        ),
-        content: Text(message, textAlign: TextAlign.center),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text("موافق", style: TextStyle(fontSize: 16)),
+      builder:
+          (ctx) => AlertDialog(
+            title: Center(
+              child: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            content: Text(message, textAlign: TextAlign.center),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text("موافق", style: TextStyle(fontSize: 16)),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -527,29 +535,38 @@ await FirebaseFirestore.instance
             widget.isReschedule ? "تأجيل الحجز" : "إدخال البيانات",
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: const Color.fromARGB(255, 156, 208, 235),
+              color: const Color.fromARGB(255, 34, 96, 129),
               fontSize: 30,
             ),
           ),
         ),
         body: SafeArea(
-          child: isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    children: [
+          child:
+              isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      children: [
                         // حقل الاسم
                         TextFormField(
                           decoration: InputDecoration(
                             labelText: 'الاسم *',
                             hintText: 'أدخل الاسم (اسمين على الأقل)',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.person, color: const Color.fromARGB(255, 156, 208, 235)),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: const Color.fromARGB(255, 156, 208, 235), width: 2),
+                            prefixIcon: Icon(
+                              Icons.person,
+                              color: const Color.fromARGB(255, 34, 96, 129),
                             ),
-                            labelStyle: TextStyle(color: const Color.fromARGB(255, 156, 208, 235)),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: const Color.fromARGB(255, 34, 96, 129),
+                                width: 2,
+                              ),
+                            ),
+                            labelStyle: TextStyle(
+                              color: const Color.fromARGB(255, 34, 96, 129),
+                            ),
                           ),
                           onChanged: (val) => patientName = val,
                           textDirection: TextDirection.rtl,
@@ -558,29 +575,42 @@ await FirebaseFirestore.instance
                             if (value == null || value.isEmpty) {
                               return 'يرجى إدخال الاسم';
                             }
-                            
-                            List<String> nameParts = value.trim().split(' ').where((part) => part.isNotEmpty).toList();
-                            
+
+                            List<String> nameParts =
+                                value
+                                    .trim()
+                                    .split(' ')
+                                    .where((part) => part.isNotEmpty)
+                                    .toList();
+
                             if (nameParts.length < 2) {
                               return 'يرجى إدخال الاسم (اسمين على الأقل)';
                             }
-                            
+
                             return null;
                           },
                         ),
                         const SizedBox(height: 16),
-                        
+
                         // حقل رقم الهاتف
                         TextFormField(
                           decoration: InputDecoration(
                             labelText: 'رقم الهاتف *',
                             hintText: 'أدخل رقم الهاتف',
                             border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.phone, color: const Color.fromARGB(255, 156, 208, 235)),
-                            focusedBorder: OutlineInputBorder(
-                              borderSide: BorderSide(color: const Color.fromARGB(255, 156, 208, 235), width: 2),
+                            prefixIcon: Icon(
+                              Icons.phone,
+                              color: const Color.fromARGB(255, 34, 96, 129),
                             ),
-                            labelStyle: TextStyle(color: const Color.fromARGB(255, 156, 208, 235)),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(
+                                color: const Color.fromARGB(255, 34, 96, 129),
+                                width: 2,
+                              ),
+                            ),
+                            labelStyle: TextStyle(
+                              color: const Color.fromARGB(255, 34, 96, 129),
+                            ),
                           ),
                           onChanged: (val) => patientPhone = val,
                           keyboardType: TextInputType.phone,
@@ -590,51 +620,60 @@ await FirebaseFirestore.instance
                             if (value == null || value.isEmpty) {
                               return 'يرجى إدخال رقم الهاتف';
                             }
-                            
-                            String phoneDigits = value.replaceAll(RegExp(r'[^0-9]'), '');
+
+                            String phoneDigits = value.replaceAll(
+                              RegExp(r'[^0-9]'),
+                              '',
+                            );
                             if (phoneDigits.isEmpty) {
                               return 'يرجى إدخال رقم هاتف صحيح';
                             }
-                            
+
                             return null;
                           },
                         ),
-                        
+
                         // مساحة فارغة لدفع الزر لأسفل
                         const Spacer(),
-                        
+
                         // زر حجز الآن - في نهاية الشاشة
                         SizedBox(
                           width: double.infinity,
                           height: 60,
                           child: OutlinedButton(
-                        onPressed: confirmBooking,
+                            onPressed: confirmBooking,
                             style: OutlinedButton.styleFrom(
                               side: BorderSide(
-                                color: const Color.fromARGB(255, 156, 208, 235),
+                                color: const Color.fromARGB(255, 34, 96, 129),
                                 width: 2,
                               ),
-                              foregroundColor: const Color.fromARGB(255, 156, 208, 235),
-                              backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          widget.isReschedule ? "تأكيد التأجيل" : "حجز الآن",
-                          style: const TextStyle(
-                                fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                              foregroundColor: const Color.fromARGB(
+                                255,
+                                34,
+                                96,
+                                129,
                               ),
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              widget.isReschedule
+                                  ? "تأكيد التأجيل"
+                                  : "حجز الآن",
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      
-                        const SizedBox(height: 20),
 
-                    ],
+                        const SizedBox(height: 20),
+                      ],
+                    ),
                   ),
-                ),
         ),
       ),
     );

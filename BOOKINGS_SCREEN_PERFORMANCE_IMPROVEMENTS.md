@@ -108,7 +108,7 @@ Widget _buildInitialLoadingScreen() {
           child: CircularProgressIndicator(
             strokeWidth: 6,
             valueColor: AlwaysStoppedAnimation<Color>(
-              const Color(0xFF2FBDAF),
+              const Color.fromARGB(255, 34, 96, 129),
             ),
           ),
         ),
@@ -120,7 +120,7 @@ Widget _buildInitialLoadingScreen() {
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF2FBDAF),
+            color: Color.fromARGB(255, 34, 96, 129),
           ),
           textAlign: TextAlign.center,
         ),
@@ -142,14 +142,14 @@ Widget _buildInitialLoadingScreen() {
           ),
           child: Column(
             children: [
-              Icon(Icons.person, size: 48, color: const Color(0xFF2FBDAF)),
+              Icon(Icons.person, size: 48, color: const Color.fromARGB(255, 34, 96, 129),),
               const SizedBox(height: 8),
               Text(
                 'د. ${widget.doctorName}',
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2FBDAF),
+                  color: Color.fromARGB(255, 34, 96, 129),
                 ),
               ),
               const SizedBox(height: 4),

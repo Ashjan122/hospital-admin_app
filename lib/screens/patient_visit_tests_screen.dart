@@ -1,25 +1,25 @@
-import 'dart:io';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:hospital_admin_app/screens/pdf_view_screen.dart';
 import 'package:hospital_admin_app/screens/result_entry_screen.dart';
 import 'package:intl/intl.dart' as intl;
-import 'package:dio/dio.dart';
- import 'package:hospital_admin_app/screens/pdf_view_screen.dart';
 // import 'package:jawda_his/screens/result_entry_screen.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PatientVisitTestsScreen extends StatefulWidget {
   final int patientId;
-  
+
   final String patientPhone;
 
   const PatientVisitTestsScreen({
     super.key,
     required this.patientId,
-    
+
     required this.patientPhone,
   });
 
@@ -35,7 +35,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
   bool isLoading = true;
 
   final Color _color1 = const Color.fromARGB(255, 215, 213, 219);
-  final Color _color2 = const Color.fromARGB(255, 156, 208, 235);
+  final Color _color2 = const Color.fromARGB(255, 34, 96, 129);
 
   @override
   void initState() {
@@ -47,7 +47,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
     if (e is DioException) {
       if (e.response != null && e.response!.data != null) {
         final data = e.response!.data;
-        
+
         // محاولة استخراج الرسالة من حقول مختلفة
         if (data is Map) {
           // محاولة الحصول على message
@@ -58,7 +58,8 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
           if (data['error'] != null) {
             if (data['error'] is String) {
               return data['error'];
-            } else if (data['error'] is Map && data['error']['message'] != null) {
+            } else if (data['error'] is Map &&
+                data['error']['message'] != null) {
               return data['error']['message'].toString();
             }
           }
@@ -77,15 +78,15 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
             }
           }
         }
-        
+
         // إذا لم نجد رسالة واضحة، نعيد status code
         return 'خطأ ${e.response!.statusCode}: ${e.response!.statusMessage ?? 'حدث خطأ'}';
       }
-      
+
       // إذا لم يكن هناك response، نعيد رسالة الاتصال
       return 'خطأ في الاتصال بالسيرفر: ${e.message ?? 'يرجى التحقق من الاتصال بالإنترنت'}';
     }
-    
+
     return 'حدث خطأ غير متوقع: $e';
   }
 
@@ -94,15 +95,12 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
     if (!mounted) return;
     setState(() => isLoading = true);
 
-    final url = 
-      'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-requests';
-    
+    final url =
+        'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-requests';
 
     try {
       final dio = Dio();
-      dio.options.headers = {
-        'Accept': 'application/json',
-      };
+      dio.options.headers = {'Accept': 'application/json'};
 
       final response = await dio.get(url);
 
@@ -127,9 +125,10 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                 };
               }).toList();
 
-          checked = tests.map<bool>((test) {
-            return test['hidden'] == false;
-          }).toList();
+          checked =
+              tests.map<bool>((test) {
+                return test['hidden'] == false;
+              }).toList();
 
           final firstItem = data.first;
           patient = {
@@ -154,10 +153,12 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
           } else if (responseData['error'] != null) {
             if (responseData['error'] is String) {
               errorMsg = responseData['error'];
-            } else if (responseData['error'] is Map && responseData['error']['message'] != null) {
+            } else if (responseData['error'] is Map &&
+                responseData['error']['message'] != null) {
               errorMsg = responseData['error']['message'].toString();
             }
-          } else if (responseData['errors'] != null && responseData['errors'] is Map) {
+          } else if (responseData['errors'] != null &&
+              responseData['errors'] is Map) {
             final errors = responseData['errors'] as Map;
             if (errors.isNotEmpty) {
               final firstError = errors.values.first;
@@ -169,24 +170,24 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
             }
           }
         }
-        
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(errorMsg)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMsg)));
         }
       }
     } on DioException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_extractErrorMessage(e))),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_extractErrorMessage(e))));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ غير متوقع: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('حدث خطأ غير متوقع: $e')));
       }
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -221,9 +222,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
       final file = File('${dir.path}/$filename');
 
       final dio = Dio();
-      dio.options.headers = {
-        'Accept': 'application/pdf',
-      };
+      dio.options.headers = {'Accept': 'application/pdf'};
 
       final response = await dio.download(pdfUrl, file.path);
 
@@ -508,7 +507,10 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                     enabled: !isSending,
                     decoration: const InputDecoration(
                       labelText: 'رقم الهاتف',
-                      prefixIcon: Icon(Icons.phone, color: Color.fromARGB(255, 156, 208, 235)),
+                      prefixIcon: Icon(
+                        Icons.phone,
+                        color: Color.fromARGB(255, 34, 96, 129),
+                      ),
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -535,8 +537,13 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                         style: const TextStyle(color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 156, 208, 235),
-                        disabledBackgroundColor: const Color.fromARGB(255, 156, 208, 235).withOpacity(0.6),
+                        backgroundColor: const Color.fromARGB(255, 34, 96, 129),
+                        disabledBackgroundColor: const Color.fromARGB(
+                          255,
+                          34,
+                          96,
+                          129,
+                        ).withOpacity(0.6),
                       ),
                       onPressed:
                           isSending
@@ -559,9 +566,8 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                 setState(() => isSending = true);
 
                                 try {
-                                  final pdfUrl = 
-                                    'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-report/pdf';
-                                  
+                                  final pdfUrl =
+                                      'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-report/pdf';
 
                                   print('Downloading PDF from: $pdfUrl');
                                   final pdfFile = await _downloadPdf(
@@ -622,7 +628,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
             style: TextStyle(color: Colors.white),
           ),
           centerTitle: true,
-          backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           actions: [
             IconButton(
               icon: const FaIcon(
@@ -642,9 +648,9 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                 end: Alignment.bottomCenter,
                 colors: [
                   _color1,
-                 Color.fromARGB(255, 156, 208, 235).withOpacity(0.2),
-                  Color.fromARGB(255, 156, 208, 235).withOpacity(0.4),
-                  Color.fromARGB(255, 156, 208, 235).withOpacity(0.6),
+                  Color.fromARGB(255, 34, 96, 129).withOpacity(0.2),
+                  Color.fromARGB(255, 34, 96, 129).withOpacity(0.4),
+                  Color.fromARGB(255, 34, 96, 129).withOpacity(0.6),
                 ],
               ),
             ),
@@ -652,7 +658,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                 isLoading
                     ? const Center(
                       child: CircularProgressIndicator(
-                        color: Color.fromARGB(255, 156, 208, 235),
+                        color: Color.fromARGB(255, 34, 96, 129),
                       ),
                     )
                     : Column(
@@ -669,7 +675,7 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: const BorderSide(
-                                    color: Color.fromARGB(255, 156, 208, 235),
+                                    color: Color.fromARGB(255, 34, 96, 129),
                                   ),
                                 ),
                                 child: Padding(
@@ -686,7 +692,12 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                         style: const TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.bold,
-                                          color: Color.fromARGB(255, 156, 208, 235),
+                                          color: Color.fromARGB(
+                                            255,
+                                            34,
+                                            96,
+                                            129,
+                                          ),
                                         ),
                                       ),
                                       const SizedBox(height: 10),
@@ -716,7 +727,12 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         side: const BorderSide(
-                                          color: Color.fromARGB(255, 156, 208, 235),
+                                          color: Color.fromARGB(
+                                            255,
+                                            34,
+                                            96,
+                                            129,
+                                          ),
                                         ),
                                       ),
                                       child: ListView.builder(
@@ -759,8 +775,14 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                             fontSize: 16,
                                                             color:
                                                                 checked[i]
-                                                                    ? Color.fromARGB(255, 156, 208, 235)
-                                                                    : Colors.black,
+                                                                    ? Color.fromARGB(
+                                                                      255,
+                                                                      34,
+                                                                      96,
+                                                                      129,
+                                                                    )
+                                                                    : Colors
+                                                                        .black,
                                                             fontWeight:
                                                                 checked[i]
                                                                     ? FontWeight
@@ -772,12 +794,19 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                       ),
                                                       Checkbox(
                                                         value: checked[i],
-                                                        activeColor: const Color.fromARGB(255, 156, 208, 235),
+                                                        activeColor:
+                                                            const Color.fromARGB(
+                                                              255,
+                                                              34,
+                                                              96,
+                                                              129,
+                                                            ),
                                                         onChanged:
                                                             (val) => setState(
                                                               () =>
                                                                   checked[i] =
-                                                                      val ?? false,
+                                                                      val ??
+                                                                      false,
                                                             ),
                                                       ),
                                                     ],
@@ -787,7 +816,12 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                                   const Divider(
                                                     height: 1,
                                                     thickness: 1,
-                                                    color: Color.fromARGB(255, 156, 208, 235),
+                                                    color: Color.fromARGB(
+                                                      255,
+                                                      34,
+                                                      96,
+                                                      129,
+                                                    ),
                                                   ),
                                               ],
                                             ),
@@ -846,7 +880,12 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                       ),
                                     ),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color.fromARGB(255, 156, 208, 235),
+                                      backgroundColor: const Color.fromARGB(
+                                        255,
+                                        34,
+                                        96,
+                                        129,
+                                      ),
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 14,
                                       ),
@@ -855,16 +894,15 @@ class _PatientVisitTestsScreenState extends State<PatientVisitTestsScreen> {
                                       ),
                                     ),
                                     onPressed: () async {
-                                      final pdfUrl = 
-                                        'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-report/pdf';
-                                      
+                                      final pdfUrl =
+                                          'https://alroomy.a.pinggy.link/jawda-medical/public/api/visits/${widget.patientId}/lab-report/pdf';
+
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder:
-                                              (_) => PdfViewScreen(
-                                                pdfUrl: pdfUrl,
-                                              ),
+                                              (_) =>
+                                                  PdfViewScreen(pdfUrl: pdfUrl),
                                         ),
                                       );
                                     },

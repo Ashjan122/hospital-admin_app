@@ -52,31 +52,36 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
 
         if (doctorDoc.exists) {
           final doctorData = doctorDoc.data()!;
-          
+
           // جلب معلومات الطبيب من قاعدة البيانات المركزية
           try {
-            final centralDoctorDoc = await FirebaseFirestore.instance
-                .collection('allDoctors')
-                .doc(widget.doctorId)
-                .get();
-            
+            final centralDoctorDoc =
+                await FirebaseFirestore.instance
+                    .collection('allDoctors')
+                    .doc(widget.doctorId)
+                    .get();
+
             if (centralDoctorDoc.exists) {
               final centralDoctorData = centralDoctorDoc.data()!;
-              doctorData['name'] = centralDoctorData['name'] ?? 'طبيب غير معروف';
-              doctorData['phoneNumber'] = centralDoctorData['phoneNumber'] ?? '';
-              doctorData['photoUrl'] = centralDoctorData['photoUrl'] ?? 
+              doctorData['name'] =
+                  centralDoctorData['name'] ?? 'طبيب غير معروف';
+              doctorData['phoneNumber'] =
+                  centralDoctorData['phoneNumber'] ?? '';
+              doctorData['photoUrl'] =
+                  centralDoctorData['photoUrl'] ??
                   'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQupVHd_oeqnkds0k3EjT1SX4ctwwblwYP2Uw&s';
             }
           } catch (e) {
             // إذا فشل في جلب البيانات من المركزية، استخدم المعرف
             doctorData['name'] = widget.doctorId;
           }
-          
+
           // إضافة اسم التخصص للبيانات
           final specializationData = specDoc.data();
-          doctorData['specialization'] = specializationData['specName'] ?? specDoc.id;
+          doctorData['specialization'] =
+              specializationData['specName'] ?? specDoc.id;
           doctorData['specializationId'] = specDoc.id;
-          
+
           setState(() {
             _doctorData = doctorData;
             _isLoading = false;
@@ -84,7 +89,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
           return;
         }
       }
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -98,29 +103,42 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
 
   void _showEditScheduleDialog(String day) {
     if (_doctorData == null) return;
-    
-    final workingSchedule = _doctorData!['workingSchedule'] as Map<String, dynamic>? ?? {};
+
+    final workingSchedule =
+        _doctorData!['workingSchedule'] as Map<String, dynamic>? ?? {};
     final daySchedule = workingSchedule[day] ?? {};
     final doctorName = _doctorData!['name'] ?? 'طبيب غير معروف';
-    
+
     // تحديد الأوقات الافتراضية
     final morningStartController = TextEditingController(
-      text: daySchedule['morning']?['start'] ?? daySchedule['morning']?['startTime'] ?? '09:00'
+      text:
+          daySchedule['morning']?['start'] ??
+          daySchedule['morning']?['startTime'] ??
+          '09:00',
     );
     final morningEndController = TextEditingController(
-      text: daySchedule['morning']?['end'] ?? daySchedule['morning']?['endTime'] ?? '12:00'
+      text:
+          daySchedule['morning']?['end'] ??
+          daySchedule['morning']?['endTime'] ??
+          '12:00',
     );
     final eveningStartController = TextEditingController(
-      text: daySchedule['evening']?['start'] ?? daySchedule['evening']?['startTime'] ?? '18:00'
+      text:
+          daySchedule['evening']?['start'] ??
+          daySchedule['evening']?['startTime'] ??
+          '18:00',
     );
     final eveningEndController = TextEditingController(
-      text: daySchedule['evening']?['end'] ?? daySchedule['evening']?['endTime'] ?? '23:00'
+      text:
+          daySchedule['evening']?['end'] ??
+          daySchedule['evening']?['endTime'] ??
+          '23:00',
     );
-    
+
     // تفعيل الفترات تلقائياً إذا لم تكن موجودة
     bool hasMorning = daySchedule['morning'] != null;
     bool hasEvening = daySchedule['evening'] != null;
-    
+
     // إذا لم تكن هناك فترات محددة، تفعيل الفترة الصباحية تلقائياً
     if (!hasMorning && !hasEvening) {
       hasMorning = true;
@@ -128,147 +146,149 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text('تعديل جدول $doctorName - $day'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Morning shift
-                Row(
-                  children: [
-                    Checkbox(
-                      value: hasMorning,
-                      onChanged: (value) {
-                        setState(() {
-                          hasMorning = value ?? false;
-                          if (!hasMorning) {
-                            morningStartController.clear();
-                            morningEndController.clear();
-                          } else {
-                            // إعادة تعيين الأوقات الافتراضية إذا كانت فارغة
-                            if (morningStartController.text.isEmpty) {
-                              morningStartController.text = '09:00';
-                            }
-                            if (morningEndController.text.isEmpty) {
-                              morningEndController.text = '12:00';
-                            }
-                          }
-                        });
-                      },
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setState) => AlertDialog(
+                  title: Text('تعديل جدول $doctorName - $day'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Morning shift
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: hasMorning,
+                              onChanged: (value) {
+                                setState(() {
+                                  hasMorning = value ?? false;
+                                  if (!hasMorning) {
+                                    morningStartController.clear();
+                                    morningEndController.clear();
+                                  } else {
+                                    // إعادة تعيين الأوقات الافتراضية إذا كانت فارغة
+                                    if (morningStartController.text.isEmpty) {
+                                      morningStartController.text = '09:00';
+                                    }
+                                    if (morningEndController.text.isEmpty) {
+                                      morningEndController.text = '12:00';
+                                    }
+                                  }
+                                });
+                              },
+                            ),
+                            const Text('الفترة الصباحية'),
+                          ],
+                        ),
+                        if (hasMorning) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: morningStartController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'وقت البداية',
+                                    hintText: 'مثال: 09:00',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: morningEndController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'وقت النهاية',
+                                    hintText: 'مثال: 12:00',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Evening shift
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: hasEvening,
+                              onChanged: (value) {
+                                setState(() {
+                                  hasEvening = value ?? false;
+                                  if (!hasEvening) {
+                                    eveningStartController.clear();
+                                    eveningEndController.clear();
+                                  } else {
+                                    // إعادة تعيين الأوقات الافتراضية إذا كانت فارغة
+                                    if (eveningStartController.text.isEmpty) {
+                                      eveningStartController.text = '18:00';
+                                    }
+                                    if (eveningEndController.text.isEmpty) {
+                                      eveningEndController.text = '23:00';
+                                    }
+                                  }
+                                });
+                              },
+                            ),
+                            const Text('الفترة المسائية'),
+                          ],
+                        ),
+                        if (hasEvening) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: eveningStartController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'وقت البداية',
+                                    hintText: 'مثال: 18:00',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: eveningEndController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'وقت النهاية',
+                                    hintText: 'مثال: 23:00',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
-                    const Text('الفترة الصباحية'),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('إلغاء'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        await _updateDoctorSchedule(
+                          day,
+                          hasMorning,
+                          hasEvening,
+                          morningStartController.text,
+                          morningEndController.text,
+                          eveningStartController.text,
+                          eveningEndController.text,
+                        );
+                        Navigator.of(context).pop();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 34, 96, 129),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('حفظ'),
+                    ),
                   ],
                 ),
-                if (hasMorning) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: morningStartController,
-                          decoration: const InputDecoration(
-                            labelText: 'وقت البداية',
-                            hintText: 'مثال: 09:00',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: morningEndController,
-                          decoration: const InputDecoration(
-                            labelText: 'وقت النهاية',
-                            hintText: 'مثال: 12:00',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                
-                // Evening shift
-                Row(
-                  children: [
-                    Checkbox(
-                      value: hasEvening,
-                      onChanged: (value) {
-                        setState(() {
-                          hasEvening = value ?? false;
-                          if (!hasEvening) {
-                            eveningStartController.clear();
-                            eveningEndController.clear();
-                          } else {
-                            // إعادة تعيين الأوقات الافتراضية إذا كانت فارغة
-                            if (eveningStartController.text.isEmpty) {
-                              eveningStartController.text = '18:00';
-                            }
-                            if (eveningEndController.text.isEmpty) {
-                              eveningEndController.text = '23:00';
-                            }
-                          }
-                        });
-                      },
-                    ),
-                    const Text('الفترة المسائية'),
-                  ],
-                ),
-                if (hasEvening) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: eveningStartController,
-                          decoration: const InputDecoration(
-                            labelText: 'وقت البداية',
-                            hintText: 'مثال: 18:00',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: eveningEndController,
-                          decoration: const InputDecoration(
-                            labelText: 'وقت النهاية',
-                            hintText: 'مثال: 23:00',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await _updateDoctorSchedule(
-                  day,
-                  hasMorning,
-                  hasEvening,
-                  morningStartController.text,
-                  morningEndController.text,
-                  eveningStartController.text,
-                  eveningEndController.text,
-                );
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2FBDAF),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('حفظ'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -283,32 +303,27 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
   ) async {
     try {
       if (_doctorData == null) return;
-      
-      final workingSchedule = _doctorData!['workingSchedule'] as Map<String, dynamic>? ?? {};
-      
+
+      final workingSchedule =
+          _doctorData!['workingSchedule'] as Map<String, dynamic>? ?? {};
+
       // Update the day schedule
       Map<String, dynamic> daySchedule = {};
-      
+
       if (hasMorning && morningStart.isNotEmpty && morningEnd.isNotEmpty) {
-        daySchedule['morning'] = {
-          'start': morningStart,
-          'end': morningEnd,
-        };
+        daySchedule['morning'] = {'start': morningStart, 'end': morningEnd};
       }
-      
+
       if (hasEvening && eveningStart.isNotEmpty && eveningEnd.isNotEmpty) {
-        daySchedule['evening'] = {
-          'start': eveningStart,
-          'end': eveningEnd,
-        };
+        daySchedule['evening'] = {'start': eveningStart, 'end': eveningEnd};
       }
-      
+
       // Update the working schedule
       workingSchedule[day] = daySchedule.isEmpty ? null : daySchedule;
-      
+
       // Remove empty days
       workingSchedule.removeWhere((key, value) => value == null);
-      
+
       // Update in Firestore
       await FirebaseFirestore.instance
           .collection('medicalFacilities')
@@ -317,9 +332,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
           .doc(_doctorData!['specializationId'])
           .collection('doctors')
           .doc(widget.doctorId)
-          .update({
-        'workingSchedule': workingSchedule,
-      });
+          .update({'workingSchedule': workingSchedule});
 
       // Update local data
       setState(() {
@@ -355,40 +368,46 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
               color: Colors.white,
             ),
           ),
-          backgroundColor: const Color(0xFF2FBDAF),
+          backgroundColor: const Color.fromARGB(255, 34, 96, 129),
           foregroundColor: Colors.white,
           elevation: 0,
         ),
-        body: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFF2FBDAF),
-                ),
-              )
-            : _doctorData == null
+        body:
+            _isLoading
+                ? const Center(
+                  child: CircularProgressIndicator(
+                    color: Color.fromARGB(255, 34, 96, 129),
+                  ),
+                )
+                : _doctorData == null
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'لم يتم العثور على بيانات الطبيب',
-                          style: TextStyle(fontSize: 18, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  )
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'لم يتم العثور على بيانات الطبيب',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                )
                 : _buildScheduleView(),
       ),
     );
   }
 
   Widget _buildScheduleView() {
-    final workingSchedule = _doctorData!['workingSchedule'] as Map<String, dynamic>? ?? {};
+    final workingSchedule =
+        _doctorData!['workingSchedule'] as Map<String, dynamic>? ?? {};
     final doctorName = _doctorData!['name'] ?? 'طبيب غير معروف';
     final specialization = _doctorData!['specialization'] ?? 'تخصص غير محدد';
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -410,17 +429,14 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                   const SizedBox(height: 4),
                   Text(
                     specialization,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                   ),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Schedule
           if (workingSchedule.isEmpty)
             Card(
@@ -428,7 +444,11 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                 padding: const EdgeInsets.all(32),
                 child: Column(
                   children: [
-                    const Icon(Icons.schedule_outlined, size: 48, color: Colors.grey),
+                    const Icon(
+                      Icons.schedule_outlined,
+                      size: 48,
+                      color: Colors.grey,
+                    ),
                     const SizedBox(height: 16),
                     const Text(
                       'لا يوجد جدول محدد للطبيب',
@@ -443,7 +463,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                     ElevatedButton(
                       onPressed: () => _showEditScheduleDialog('الأحد'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2FBDAF),
+                        backgroundColor: const Color.fromARGB(255, 34, 96, 129),
                         foregroundColor: Colors.white,
                       ),
                       child: const Text('إضافة جدول'),
@@ -471,7 +491,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                       icon: const Icon(Icons.add),
                       label: const Text('إضافة يوم'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2FBDAF),
+                        backgroundColor: const Color.fromARGB(255, 34, 96, 129),
                         foregroundColor: Colors.white,
                       ),
                     ),
@@ -479,12 +499,13 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                 ),
                 const SizedBox(height: 16),
                 ...workingSchedule.keys.map((day) {
-                  final schedule = workingSchedule[day] as Map<String, dynamic>?;
+                  final schedule =
+                      workingSchedule[day] as Map<String, dynamic>?;
                   if (schedule == null) return const SizedBox.shrink();
-                  
+
                   final morning = schedule['morning'] as Map<String, dynamic>?;
                   final evening = schedule['evening'] as Map<String, dynamic>?;
-                  
+
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
@@ -493,7 +514,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF2FBDAF),
+                          color: Color.fromARGB(255, 34, 96, 129),
                         ),
                       ),
                       subtitle: Column(
@@ -502,10 +523,16 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                           if (morning != null && morning.isNotEmpty) ...[
                             Row(
                               children: [
-                                const Icon(Icons.wb_sunny, size: 14, color: Colors.orange),
+                                const Icon(
+                                  Icons.wb_sunny,
+                                  size: 14,
+                                  color: Colors.orange,
+                                ),
                                 const SizedBox(width: 4),
                                 const Text('صباحاً: '),
-                                Text('${morning['start'] ?? morning['startTime'] ?? ''} - ${morning['end'] ?? morning['endTime'] ?? ''}'),
+                                Text(
+                                  '${morning['start'] ?? morning['startTime'] ?? ''} - ${morning['end'] ?? morning['endTime'] ?? ''}',
+                                ),
                               ],
                             ),
                             const SizedBox(height: 2),
@@ -513,18 +540,27 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen> {
                           if (evening != null && evening.isNotEmpty) ...[
                             Row(
                               children: [
-                                const Icon(Icons.nightlight, size: 14, color: Colors.indigo),
+                                const Icon(
+                                  Icons.nightlight,
+                                  size: 14,
+                                  color: Colors.indigo,
+                                ),
                                 const SizedBox(width: 4),
                                 const Text('مساءً: '),
-                                Text('${evening['start'] ?? evening['startTime'] ?? ''} - ${evening['end'] ?? evening['endTime'] ?? ''}'),
+                                Text(
+                                  '${evening['start'] ?? evening['startTime'] ?? ''} - ${evening['end'] ?? evening['endTime'] ?? ''}',
+                                ),
                               ],
                             ),
                           ],
-                          if ((morning == null || morning.isEmpty) && 
+                          if ((morning == null || morning.isEmpty) &&
                               (evening == null || evening.isEmpty)) ...[
                             const Text(
                               'لا يوجد مواعيد في هذا اليوم',
-                              style: TextStyle(color: Colors.grey, fontSize: 12),
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ],

@@ -1,13 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart' as intl;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart';
-import 'package:http/http.dart' as http;
+
+import '../services/presence_service.dart';
 import '../services/sms_service.dart';
 import 'doctor_bookings_screen.dart';
-import '../services/presence_service.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'login_screen.dart';
 
 class DoctorUserScreen extends StatefulWidget {
   final String doctorId;
@@ -52,8 +54,9 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
   Future<void> _subscribeToDoctorTopic() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final isSubscribed = prefs.getBool('doctor_notifications_enabled') ?? true;
-      
+      final isSubscribed =
+          prefs.getBool('doctor_notifications_enabled') ?? true;
+
       if (isSubscribed) {
         final topic = 'doctor_${widget.doctorId}';
         await FirebaseMessaging.instance.subscribeToTopic(topic);
@@ -77,16 +80,17 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
   Future<void> _toggleNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final isCurrentlyEnabled = prefs.getBool('doctor_notifications_enabled') ?? true;
+      final isCurrentlyEnabled =
+          prefs.getBool('doctor_notifications_enabled') ?? true;
       final newStatus = !isCurrentlyEnabled;
-      
+
       await prefs.setBool('doctor_notifications_enabled', newStatus);
-      
+
       // تحديث الواجهة فوراً
       if (mounted) {
         setState(() {});
       }
-      
+
       if (newStatus) {
         await _subscribeToDoctorTopic();
         if (mounted) {
@@ -127,38 +131,42 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
     });
 
     try {
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
 
       List<Map<String, dynamic>> allBookings = [];
 
       for (var specDoc in specializationsSnapshot.docs) {
-        final doctorDoc = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .get();
+        final doctorDoc =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .doc(widget.doctorId)
+                .get();
 
         if (doctorDoc.exists) {
           final specializationData = specDoc.data();
-          final specializationName = specializationData['specName'] ?? specDoc.id;
+          final specializationName =
+              specializationData['specName'] ?? specDoc.id;
 
           // جلب حجوزات الطبيب
-          final appointmentsSnapshot = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(widget.centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(widget.doctorId)
-              .collection('appointments')
-              .get();
+          final appointmentsSnapshot =
+              await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(widget.centerId)
+                  .collection('specializations')
+                  .doc(specDoc.id)
+                  .collection('doctors')
+                  .doc(widget.doctorId)
+                  .collection('appointments')
+                  .get();
 
           for (var appointmentDoc in appointmentsSnapshot.docs) {
             final appointmentData = appointmentDoc.data();
@@ -174,22 +182,28 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
       // فلترة حجوزات اليوم فقط
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
-      
-      final todayBookings = allBookings.where((booking) {
-        final bookingDate = DateTime.tryParse(booking['date'] ?? '');
-        return bookingDate != null && 
-               DateTime(bookingDate.year, bookingDate.month, bookingDate.day) == today;
-      }).toList();
+
+      final todayBookings =
+          allBookings.where((booking) {
+            final bookingDate = DateTime.tryParse(booking['date'] ?? '');
+            return bookingDate != null &&
+                DateTime(
+                      bookingDate.year,
+                      bookingDate.month,
+                      bookingDate.day,
+                    ) ==
+                    today;
+          }).toList();
 
       // ترتيب الحجوزات حسب وقت الإنشاء (آخر حجز يظهر أولاً)
       todayBookings.sort((a, b) {
         final createdAtA = a['createdAt'];
         final createdAtB = b['createdAt'];
-        
+
         if (createdAtA == null && createdAtB == null) return 0;
         if (createdAtA == null) return 1;
         if (createdAtB == null) return -1;
-        
+
         DateTime dateA, dateB;
         if (createdAtA is Timestamp) {
           dateA = createdAtA.toDate();
@@ -198,7 +212,7 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
         } else {
           return 1;
         }
-        
+
         if (createdAtB is Timestamp) {
           dateB = createdAtB.toDate();
         } else if (createdAtB is String) {
@@ -206,7 +220,7 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
         } else {
           return -1;
         }
-        
+
         return dateB.compareTo(dateA); // ترتيب تنازلي
       });
 
@@ -256,30 +270,41 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('userId') ?? '';
-      await PresenceService.setOffline(userId: userId);
+
+      // إيقاف حالة الطبيب
+      if (userId.isNotEmpty) {
+        await PresenceService.setOffline(userId: userId);
+      }
+
+      // إلغاء الاشتراك من إشعارات الطبيب
+      await _unsubscribeFromDoctorTopic();
+
+      // تسجيل الخروج من Firebase Auth
+      // مهم جداً حتى لا يرجع الحساب تلقائياً بعد إعادة فتح التطبيق
+      await FirebaseAuth.instance.signOut();
+
+      // مسح بيانات الجلسة المحلية
       await prefs.clear();
-      
-      if (mounted && context.mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (context) => const LoginScreen(),
-          ),
-          (route) => false,
-        );
-      }
+
+      if (!mounted) return;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
     } catch (e) {
-      if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('خطأ في تسجيل الخروج: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('خطأ في تسجيل الخروج: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
-    @override
+  @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -297,13 +322,17 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
           elevation: 0,
           actions: [
             FutureBuilder<bool>(
-              future: SharedPreferences.getInstance().then((prefs) => 
-                prefs.getBool('doctor_notifications_enabled') ?? true),
+              future: SharedPreferences.getInstance().then(
+                (prefs) =>
+                    prefs.getBool('doctor_notifications_enabled') ?? true,
+              ),
               builder: (context, snapshot) {
                 final isEnabled = snapshot.data ?? true;
                 return IconButton(
                   icon: Icon(
-                    isEnabled ? Icons.notifications_active : Icons.notifications_off,
+                    isEnabled
+                        ? Icons.notifications_active
+                        : Icons.notifications_off,
                     color: isEnabled ? Colors.white : Colors.orange[300],
                   ),
                   onPressed: _toggleNotifications,
@@ -324,119 +353,128 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
           ],
         ),
         body: SafeArea(
-          child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF2FBDAF),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _refreshBookings,
-                  color: const Color(0xFF2FBDAF),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        // تاريخ اليوم أعلى الصفحة
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 20),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              intl.DateFormat('EEEE، d MMMM yyyy', 'ar').format(DateTime.now()),
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[700],
-                                fontWeight: FontWeight.w600,
+          child:
+              _loading
+                  ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF2FBDAF)),
+                  )
+                  : RefreshIndicator(
+                    onRefresh: _refreshBookings,
+                    color: const Color(0xFF2FBDAF),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          // تاريخ اليوم أعلى الصفحة
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                intl.DateFormat(
+                                  'EEEE، d MMMM yyyy',
+                                  'ar',
+                                ).format(DateTime.now()),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        
-                        // GridView للبطاقات الأربع
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                          children: [
-                            // بطاقة حجوزات اليوم
-                            _buildDashboardCard(
-                              context,
-                              'حجوزات اليوم',
-                              Icons.today,
-                              const Color(0xFF2FBDAF),
-                              '',
-                              () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) => DoctorBookingsScreen(
-                                      doctorId: widget.doctorId,
-                                      centerId: widget.centerId,
-                                      centerName: widget.centerName,
-                                      doctorName: widget.doctorName,
+
+                          // GridView للبطاقات الأربع
+                          GridView.count(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                            children: [
+                              // بطاقة حجوزات اليوم
+                              _buildDashboardCard(
+                                context,
+                                'حجوزات اليوم',
+                                Icons.today,
+                                const Color(0xFF2FBDAF),
+                                '',
+                                () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => DoctorBookingsScreen(
+                                            doctorId: widget.doctorId,
+                                            centerId: widget.centerId,
+                                            centerName: widget.centerName,
+                                            doctorName: widget.doctorName,
+                                          ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                            
-                            // بطاقة المواعيد المجدولة
-                            _buildDashboardCard(
-                              context,
-                              'المواعيد المجدولة',
-                              Icons.schedule,
-                              Colors.orange,
-                              '',
-                              () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) => _ScheduledAppointmentsScreen(
-                                      doctorId: widget.doctorId,
-                                      centerId: widget.centerId,
-                                      doctorName: widget.doctorName,
+                                  );
+                                },
+                              ),
+
+                              // بطاقة المواعيد المجدولة
+                              _buildDashboardCard(
+                                context,
+                                'المواعيد المجدولة',
+                                Icons.schedule,
+                                Colors.orange,
+                                '',
+                                () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) =>
+                                              _ScheduledAppointmentsScreen(
+                                                doctorId: widget.doctorId,
+                                                centerId: widget.centerId,
+                                                doctorName: widget.doctorName,
+                                              ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                            
-                            // بطاقة المفضلون
-                            _buildDashboardCard(
-                              context,
-                              'المفضلون',
-                              Icons.favorite,
-                              Colors.red,
-                              '',
-                              () {
-                                // يمكن إضافة صفحة المفضلون هنا
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('قريباً - صفحة المفضلون')),
-                                );
-                              },
-                            ),
-                            
-                            // بطاقة الإحصائيات
-                            _buildDashboardCard(
-                              context,
-                              'الإحصائيات',
-                              Icons.analytics,
-                              Colors.purple,
-                              '',
-                              () {
-                                // يمكن إضافة صفحة الإحصائيات هنا
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('قريباً - صفحة الإحصائيات')),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ],
+                                  );
+                                },
+                              ),
+
+                              // بطاقة المفضلون
+                              _buildDashboardCard(
+                                context,
+                                'المفضلون',
+                                Icons.favorite,
+                                Colors.red,
+                                '',
+                                () {
+                                  // يمكن إضافة صفحة المفضلون هنا
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('قريباً - صفحة المفضلون'),
+                                    ),
+                                  );
+                                },
+                              ),
+
+                              // بطاقة الإحصائيات
+                              _buildDashboardCard(
+                                context,
+                                'الإحصائيات',
+                                Icons.analytics,
+                                Colors.purple,
+                                '',
+                                () {
+                                  // يمكن إضافة صفحة الإحصائيات هنا
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('قريباً - صفحة الإحصائيات'),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
         ),
       ),
     );
@@ -467,11 +505,7 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 48,
-                color: color,
-              ),
+              Icon(icon, size: 48, color: color),
               const SizedBox(height: 12),
               Text(
                 title,
@@ -485,7 +519,10 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
               if (count.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -518,7 +555,7 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
       } else {
         return '';
       }
-      
+
       return intl.DateFormat('HH:mm', 'ar').format(date);
     } catch (e) {
       return '';
@@ -548,11 +585,7 @@ class _DoctorUserScreenState extends State<DoctorUserScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 48,
-                color: color,
-              ),
+              Icon(icon, size: 48, color: color),
               const SizedBox(height: 12),
               Text(
                 title,
@@ -599,22 +632,24 @@ class _PatientNotesScreenState extends State<_PatientNotesScreen> {
   }
 
   String get _patientKey {
-    final keySource = (widget.patientPhone.isNotEmpty)
-        ? widget.patientPhone
-        : widget.patientName;
+    final keySource =
+        (widget.patientPhone.isNotEmpty)
+            ? widget.patientPhone
+            : widget.patientName;
     return keySource.replaceAll('/', '_');
   }
 
-  CollectionReference<Map<String, dynamic>> get _notesCollection => FirebaseFirestore.instance
-      .collection('medicalFacilities')
-      .doc(widget.centerId)
-      .collection('specializations')
-      .doc('general') // You may need to adjust this based on your structure
-      .collection('doctors')
-      .doc(widget.doctorId)
-      .collection('appointments')
-      .doc(_patientKey)
-      .collection('notes');
+  CollectionReference<Map<String, dynamic>> get _notesCollection =>
+      FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(widget.centerId)
+          .collection('specializations')
+          .doc('general') // You may need to adjust this based on your structure
+          .collection('doctors')
+          .doc(widget.doctorId)
+          .collection('appointments')
+          .doc(_patientKey)
+          .collection('notes');
 
   Future<void> _saveNote() async {
     final text = _noteController.text.trim();
@@ -632,15 +667,15 @@ class _PatientNotesScreenState extends State<_PatientNotesScreen> {
       });
       _noteController.clear();
       if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم حفظ الملاحظة')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم حفظ الملاحظة')));
       }
     } catch (e) {
       if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e')));
       }
     } finally {
       if (mounted) {
@@ -688,7 +723,10 @@ class _PatientNotesScreenState extends State<_PatientNotesScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.black, width: 2),
+                        borderSide: const BorderSide(
+                          color: Colors.black,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
@@ -724,15 +762,22 @@ class _PatientNotesScreenState extends State<_PatientNotesScreen> {
                 const SizedBox(height: 8),
                 Expanded(
                   child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: _notesCollection.orderBy('createdAt', descending: true).snapshots(),
+                    stream:
+                        _notesCollection
+                            .orderBy('createdAt', descending: true)
+                            .snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
-                          child: CircularProgressIndicator(color: Color(0xFF2FBDAF)),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF2FBDAF),
+                          ),
                         );
                       }
                       if (snapshot.hasError) {
-                        return Center(child: Text('حدث خطأ في تحميل الملاحظات'));
+                        return Center(
+                          child: Text('حدث خطأ في تحميل الملاحظات'),
+                        );
                       }
                       final notes = snapshot.data?.docs ?? [];
                       if (notes.isEmpty) {
@@ -752,7 +797,10 @@ class _PatientNotesScreenState extends State<_PatientNotesScreen> {
                           final createdAt = data['createdAt'];
                           String dateStr = '';
                           if (createdAt is Timestamp) {
-                            dateStr = intl.DateFormat('yyyy/MM/dd HH:mm', 'ar').format(createdAt.toDate());
+                            dateStr = intl.DateFormat(
+                              'yyyy/MM/dd HH:mm',
+                              'ar',
+                            ).format(createdAt.toDate());
                           }
                           return Container(
                             decoration: BoxDecoration(
@@ -768,7 +816,10 @@ class _PatientNotesScreenState extends State<_PatientNotesScreen> {
                                   if (dateStr.isNotEmpty)
                                     Text(
                                       dateStr,
-                                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
                                     ),
                                   const SizedBox(height: 6),
                                   Text(
@@ -839,9 +890,17 @@ class _PatientDetailsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _infoTile(label: 'الاسم', value: patientName, icon: Icons.person),
+                _infoTile(
+                  label: 'الاسم',
+                  value: patientName,
+                  icon: Icons.person,
+                ),
                 const SizedBox(height: 12),
-                _infoTile(label: 'رقم الهاتف', value: patientPhone, icon: Icons.phone),
+                _infoTile(
+                  label: 'رقم الهاتف',
+                  value: patientPhone,
+                  icon: Icons.phone,
+                ),
               ],
             ),
           ),
@@ -850,7 +909,11 @@ class _PatientDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _infoTile({required String label, required String value, required IconData icon}) {
+  Widget _infoTile({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -915,7 +978,8 @@ class _MessageScreenState extends State<_MessageScreen> {
   final TextEditingController _messageController = TextEditingController();
   bool _sendingWhatsApp = false;
   bool _sendingSMS = false;
-  final String _apologyTemplate = 'عذراً، تم إلغاء موعد اليوم. يرجى الحجز في يوم آخر.';
+  final String _apologyTemplate =
+      'عذراً، تم إلغاء موعد اليوم. يرجى الحجز في يوم آخر.';
 
   @override
   void dispose() {
@@ -926,9 +990,9 @@ class _MessageScreenState extends State<_MessageScreen> {
   Future<void> _sendWhatsAppMessage() async {
     final phone = widget.booking['patientPhone']?.toString() ?? '';
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('رقم الهاتف غير متوفر')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('رقم الهاتف غير متوفر')));
       return;
     }
 
@@ -939,17 +1003,18 @@ class _MessageScreenState extends State<_MessageScreen> {
       _sendingWhatsApp = true;
     });
 
-         try {
-       // استخدام الرقم كما هو محفوظ في Firestore بدون أي تعديل
-       final formattedPhone = phone;
-       print('📞 WhatsApp - رقم الهاتف كما هو محفوظ: $formattedPhone');
+    try {
+      // استخدام الرقم كما هو محفوظ في Firestore بدون أي تعديل
+      final formattedPhone = phone;
+      print('📞 WhatsApp - رقم الهاتف كما هو محفوظ: $formattedPhone');
 
-      var headers = {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      };
-      
+      var headers = {'Content-Type': 'application/x-www-form-urlencoded'};
+
       print('🌐 WhatsApp - إرسال طلب إلى API...');
-      var request = http.Request('POST', Uri.parse('https://api.ultramsg.com/instance140877/messages/chat'));
+      var request = http.Request(
+        'POST',
+        Uri.parse('https://api.ultramsg.com/instance140877/messages/chat'),
+      );
       request.bodyFields = {
         'token': 'df2r46jz82otkegg',
         'to': formattedPhone,
@@ -973,16 +1038,20 @@ class _MessageScreenState extends State<_MessageScreen> {
       } else {
         if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('خطأ في إرسال الرسالة: ${response.statusCode} - ${responseBody}')),
+            SnackBar(
+              content: Text(
+                'خطأ في إرسال الرسالة: ${response.statusCode} - ${responseBody}',
+              ),
+            ),
           );
         }
       }
     } catch (e) {
       print('❌ WhatsApp - خطأ: $e');
       if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
       }
     } finally {
       if (mounted) {
@@ -996,9 +1065,9 @@ class _MessageScreenState extends State<_MessageScreen> {
   Future<void> _sendSMS() async {
     final phone = widget.booking['patientPhone']?.toString() ?? '';
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('رقم الهاتف غير متوفر')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('رقم الهاتف غير متوفر')));
       return;
     }
 
@@ -1007,8 +1076,11 @@ class _MessageScreenState extends State<_MessageScreen> {
     });
 
     try {
-      final result = await SMSService.sendSimpleSMS(phone, _messageController.text);
-      
+      final result = await SMSService.sendSimpleSMS(
+        phone,
+        _messageController.text,
+      );
+
       if (result['success'] == true) {
         if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1018,15 +1090,17 @@ class _MessageScreenState extends State<_MessageScreen> {
       } else {
         if (mounted && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('فشل في إرسال الرسالة: ${result['message']}')),
+            SnackBar(
+              content: Text('فشل في إرسال الرسالة: ${result['message']}'),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
       }
     } finally {
       if (mounted) {
@@ -1093,20 +1167,26 @@ class _MessageScreenState extends State<_MessageScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.black, width: 2),
+                      borderSide: const BorderSide(
+                        color: Colors.black,
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Send buttons
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: _sendingWhatsApp ? null : _sendWhatsAppMessage,
+                        onPressed:
+                            _sendingWhatsApp ? null : _sendWhatsAppMessage,
                         icon: const Icon(Icons.chat, color: Colors.white),
-                        label: Text(_sendingWhatsApp ? 'جاري الإرسال...' : 'واتساب'),
+                        label: Text(
+                          _sendingWhatsApp ? 'جاري الإرسال...' : 'واتساب',
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
@@ -1122,7 +1202,9 @@ class _MessageScreenState extends State<_MessageScreen> {
                       child: ElevatedButton.icon(
                         onPressed: _sendingSMS ? null : _sendSMS,
                         icon: const Icon(Icons.sms, color: Colors.white),
-                        label: Text(_sendingSMS ? 'جاري الإرسال...' : 'رسالة نصية'),
+                        label: Text(
+                          _sendingSMS ? 'جاري الإرسال...' : 'رسالة نصية',
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2FBDAF),
                           foregroundColor: Colors.white,
@@ -1160,18 +1242,17 @@ class _ScheduleAppointmentScreen extends StatefulWidget {
   });
 
   @override
-  State<_ScheduleAppointmentScreen> createState() => _ScheduleAppointmentScreenState();
+  State<_ScheduleAppointmentScreen> createState() =>
+      _ScheduleAppointmentScreenState();
 }
 
-class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> {
+class _ScheduleAppointmentScreenState
+    extends State<_ScheduleAppointmentScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String _appointmentType = 'مقابلة';
   bool _saving = false;
 
-  final List<String> _appointmentTypes = [
-    'مقابلة',
-    'عملية صغيرة',
-  ];
+  final List<String> _appointmentTypes = ['مقابلة', 'عملية صغيرة'];
 
   @override
   void dispose() {
@@ -1200,7 +1281,7 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
           );
         },
       );
-      
+
       if (picked != null) {
         setState(() {
           _selectedDate = DateTime(picked.year, picked.month, picked.day);
@@ -1217,8 +1298,6 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
       );
     }
   }
-
-
 
   Future<void> _saveAppointment() async {
     if (_selectedDate.isBefore(DateTime.now())) {
@@ -1241,22 +1320,24 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
       );
 
       // البحث عن التخصص الذي ينتمي إليه الطبيب
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
 
       String? specializationId;
       for (var specDoc in specializationsSnapshot.docs) {
-        final doctorDoc = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .get();
+        final doctorDoc =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .doc(widget.doctorId)
+                .get();
 
         if (doctorDoc.exists) {
           specializationId = specDoc.id;
@@ -1278,17 +1359,17 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
           .doc(widget.doctorId)
           .collection('scheduledAppointments')
           .add({
-        'patientName': widget.patientName,
-        'patientPhone': widget.patientPhone,
-        'doctorId': widget.doctorId,
-        'doctorName': widget.doctorName,
-        'centerId': widget.centerId,
-        'appointmentDate': appointmentDateTime.toIso8601String(),
-        'appointmentType': _appointmentType,
-        'scheduledAt': FieldValue.serverTimestamp(),
-        'reminderSent': false,
-        'status': 'scheduled',
-      });
+            'patientName': widget.patientName,
+            'patientPhone': widget.patientPhone,
+            'doctorId': widget.doctorId,
+            'doctorName': widget.doctorName,
+            'centerId': widget.centerId,
+            'appointmentDate': appointmentDateTime.toIso8601String(),
+            'appointmentType': _appointmentType,
+            'scheduledAt': FieldValue.serverTimestamp(),
+            'reminderSent': false,
+            'status': 'scheduled',
+          });
 
       if (mounted && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1333,7 +1414,6 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-
                 // اختيار التاريخ
                 _buildSection(
                   title: 'تاريخ الموعد',
@@ -1349,7 +1429,10 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today, color: const Color(0xFF2FBDAF)),
+                          Icon(
+                            Icons.calendar_today,
+                            color: const Color(0xFF2FBDAF),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -1379,14 +1462,18 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
                       value: _appointmentType,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
                       ),
-                      items: _appointmentTypes.map((String type) {
-                        return DropdownMenuItem<String>(
-                          value: type,
-                          child: Text(type),
-                        );
-                      }).toList(),
+                      items:
+                          _appointmentTypes.map((String type) {
+                            return DropdownMenuItem<String>(
+                              value: type,
+                              child: Text(type),
+                            );
+                          }).toList(),
                       onChanged: (String? newValue) {
                         if (newValue != null) {
                           setState(() {
@@ -1412,7 +1499,10 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
                   ),
                   child: Text(
                     _saving ? 'جاري الحفظ...' : 'حفظ الموعد',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -1424,12 +1514,30 @@ class _ScheduleAppointmentScreenState extends State<_ScheduleAppointmentScreen> 
   }
 
   String _formatDate(DateTime date) {
-    final days = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
-    final months = [
-      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+    final days = [
+      'الاثنين',
+      'الثلاثاء',
+      'الأربعاء',
+      'الخميس',
+      'الجمعة',
+      'السبت',
+      'الأحد',
     ];
-    
+    final months = [
+      'يناير',
+      'فبراير',
+      'مارس',
+      'أبريل',
+      'مايو',
+      'يونيو',
+      'يوليو',
+      'أغسطس',
+      'سبتمبر',
+      'أكتوبر',
+      'نوفمبر',
+      'ديسمبر',
+    ];
+
     return '${days[date.weekday - 1]} ${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
@@ -1464,45 +1572,50 @@ class _ScheduledAppointmentsScreen extends StatefulWidget {
   });
 
   @override
-  State<_ScheduledAppointmentsScreen> createState() => _ScheduledAppointmentsScreenState();
+  State<_ScheduledAppointmentsScreen> createState() =>
+      _ScheduledAppointmentsScreenState();
 }
 
-class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScreen> {
+class _ScheduledAppointmentsScreenState
+    extends State<_ScheduledAppointmentsScreen> {
   int _refreshKey = 0;
 
   Future<List<Map<String, dynamic>>> _fetchScheduledAppointments() async {
     try {
       // البحث في جميع التخصصات للعثور على الطبيب
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(widget.centerId)
-          .collection('specializations')
-          .get();
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(widget.centerId)
+              .collection('specializations')
+              .get();
 
       List<Map<String, dynamic>> allScheduledAppointments = [];
 
       for (var specDoc in specializationsSnapshot.docs) {
-        final doctorDoc = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(widget.doctorId)
-            .get();
+        final doctorDoc =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .doc(widget.doctorId)
+                .get();
 
         if (doctorDoc.exists) {
           // جلب المواعيد المجدولة من هذا التخصص
-          final scheduledAppointmentsSnapshot = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(widget.centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(widget.doctorId)
-              .collection('scheduledAppointments')
-              .where('status', isEqualTo: 'scheduled')
-              .get();
+          final scheduledAppointmentsSnapshot =
+              await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(widget.centerId)
+                  .collection('specializations')
+                  .doc(specDoc.id)
+                  .collection('doctors')
+                  .doc(widget.doctorId)
+                  .collection('scheduledAppointments')
+                  .where('status', isEqualTo: 'scheduled')
+                  .get();
 
           for (var appointmentDoc in scheduledAppointmentsSnapshot.docs) {
             final appointmentData = appointmentDoc.data();
@@ -1521,50 +1634,56 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
     }
   }
 
-  Future<void> _cancelAppointment(String appointmentId, String patientName) async {
+  Future<void> _cancelAppointment(
+    String appointmentId,
+    String patientName,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد الإلغاء'),
-        content: Text('هل أنت متأكد من إلغاء موعد "$patientName"؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('تأكيد الإلغاء'),
+            content: Text('هل أنت متأكد من إلغاء موعد "$patientName"؟'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('إلغاء الموعد'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('إلغاء الموعد'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
       try {
         // البحث عن التخصص الذي يحتوي على الموعد
-        final specializationsSnapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(widget.centerId)
-            .collection('specializations')
-            .get();
+        final specializationsSnapshot =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(widget.centerId)
+                .collection('specializations')
+                .get();
 
         bool appointmentFound = false;
         for (var specDoc in specializationsSnapshot.docs) {
-          final appointmentDoc = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(widget.centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(widget.doctorId)
-              .collection('scheduledAppointments')
-              .doc(appointmentId)
-              .get();
+          final appointmentDoc =
+              await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(widget.centerId)
+                  .collection('specializations')
+                  .doc(specDoc.id)
+                  .collection('doctors')
+                  .doc(widget.doctorId)
+                  .collection('scheduledAppointments')
+                  .doc(appointmentId)
+                  .get();
 
           if (appointmentDoc.exists) {
             await FirebaseFirestore.instance
@@ -1577,9 +1696,9 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
                 .collection('scheduledAppointments')
                 .doc(appointmentId)
                 .update({
-              'status': 'cancelled',
-              'cancelledAt': FieldValue.serverTimestamp(),
-            });
+                  'status': 'cancelled',
+                  'cancelledAt': FieldValue.serverTimestamp(),
+                });
             appointmentFound = true;
             break;
           }
@@ -1621,8 +1740,6 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
       return dateStr;
     }
   }
-
-
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -1686,7 +1803,11 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+                      Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red[400],
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         'حدث خطأ في تحميل المواعيد',
@@ -1725,10 +1846,12 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
                 itemCount: appointments.length,
                 itemBuilder: (context, index) {
                   final appointment = appointments[index];
-                  final patientName = appointment['patientName'] ?? 'مريض غير معروف';
+                  final patientName =
+                      appointment['patientName'] ?? 'مريض غير معروف';
                   final patientPhone = appointment['patientPhone'] ?? '';
                   final appointmentDate = appointment['appointmentDate'] ?? '';
-                  final appointmentType = appointment['appointmentType'] ?? 'موعد';
+                  final appointmentType =
+                      appointment['appointmentType'] ?? 'موعد';
                   final notes = appointment['notes'] ?? '';
                   final status = appointment['status'] ?? 'scheduled';
                   final reminderSent = appointment['reminderSent'] ?? false;
@@ -1778,7 +1901,10 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
                                 decoration: BoxDecoration(
                                   color: _getStatusColor(status),
                                   borderRadius: BorderRadius.circular(12),
@@ -1797,30 +1923,51 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+                              Icon(
+                                Icons.calendar_today,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 _formatAppointmentDate(appointmentDate),
-                                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              Icon(Icons.medical_services, size: 16, color: Colors.grey[600]),
+                              Icon(
+                                Icons.medical_services,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 appointmentType,
-                                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
                               ),
                               if (reminderSent) ...[
                                 const SizedBox(width: 16),
-                                Icon(Icons.notifications_active, size: 16, color: Colors.green[600]),
+                                Icon(
+                                  Icons.notifications_active,
+                                  size: 16,
+                                  color: Colors.green[600],
+                                ),
                                 const SizedBox(width: 4),
                                 Text(
                                   'تم التذكير',
-                                  style: TextStyle(fontSize: 12, color: Colors.green[600]),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green[600],
+                                  ),
                                 ),
                               ],
                             ],
@@ -1829,7 +1976,10 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
                             const SizedBox(height: 8),
                             Text(
                               'ملاحظات: $notes',
-                              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[500],
+                              ),
                             ),
                           ],
                           if (status == 'scheduled') ...[
@@ -1838,14 +1988,18 @@ class _ScheduledAppointmentsScreenState extends State<_ScheduledAppointmentsScre
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
                                 ElevatedButton(
-                                  onPressed: () => _cancelAppointment(
-                                    appointment['appointmentId'],
-                                    patientName,
-                                  ),
+                                  onPressed:
+                                      () => _cancelAppointment(
+                                        appointment['appointmentId'],
+                                        patientName,
+                                      ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.red,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -1884,14 +2038,17 @@ class _ScheduledAppointmentsList extends StatelessWidget {
 
   Future<List<Map<String, dynamic>>> _fetchScheduledAppointments() async {
     try {
-      print('Fetching scheduled appointments for doctor: $doctorId in center: $centerId');
-      
+      print(
+        'Fetching scheduled appointments for doctor: $doctorId in center: $centerId',
+      );
+
       // البحث في التخصصات أولاً
-      final specializationsSnapshot = await FirebaseFirestore.instance
-          .collection('medicalFacilities')
-          .doc(centerId)
-          .collection('specializations')
-          .get();
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(centerId)
+              .collection('specializations')
+              .get();
 
       print('Found ${specializationsSnapshot.docs.length} specializations');
 
@@ -1900,62 +2057,73 @@ class _ScheduledAppointmentsList extends StatelessWidget {
 
       for (var specDoc in specializationsSnapshot.docs) {
         print('Checking specialization: ${specDoc.id}');
-        
-        final doctorDoc = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(centerId)
-            .collection('specializations')
-            .doc(specDoc.id)
-            .collection('doctors')
-            .doc(doctorId)
-            .get();
+
+        final doctorDoc =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(centerId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
+                .doc(doctorId)
+                .get();
 
         if (doctorDoc.exists) {
           print('Found doctor in specialization: ${specDoc.id}');
-          
-          // البحث في جميع المواعيد أولاً للتصحيح
-          final allAppointmentsSnapshot = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(doctorId)
-              .collection('scheduledAppointments')
-              .get();
 
-          print('Found ${allAppointmentsSnapshot.docs.length} total appointments in specialization ${specDoc.id}');
+          // البحث في جميع المواعيد أولاً للتصحيح
+          final allAppointmentsSnapshot =
+              await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(centerId)
+                  .collection('specializations')
+                  .doc(specDoc.id)
+                  .collection('doctors')
+                  .doc(doctorId)
+                  .collection('scheduledAppointments')
+                  .get();
+
+          print(
+            'Found ${allAppointmentsSnapshot.docs.length} total appointments in specialization ${specDoc.id}',
+          );
 
           for (var appointmentDoc in allAppointmentsSnapshot.docs) {
             final appointmentData = appointmentDoc.data();
             appointmentData['appointmentId'] = appointmentDoc.id;
             appointmentData['specializationId'] = specDoc.id;
             allAppointments.add(appointmentData);
-            
-            final status = appointmentData['status']?.toString() ?? '';
-            print('Appointment: ${appointmentData['patientName']} - Status: $status - Date: ${appointmentData['appointmentDate']}');
-          }
-          
-          // البحث في المواعيد المجدولة فقط
-          final scheduledAppointmentsSnapshot = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(doctorId)
-              .collection('scheduledAppointments')
-              .where('status', isEqualTo: 'scheduled')
-              .get();
 
-          print('Found ${scheduledAppointmentsSnapshot.docs.length} scheduled appointments in specialization ${specDoc.id}');
+            final status = appointmentData['status']?.toString() ?? '';
+            print(
+              'Appointment: ${appointmentData['patientName']} - Status: $status - Date: ${appointmentData['appointmentDate']}',
+            );
+          }
+
+          // البحث في المواعيد المجدولة فقط
+          final scheduledAppointmentsSnapshot =
+              await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(centerId)
+                  .collection('specializations')
+                  .doc(specDoc.id)
+                  .collection('doctors')
+                  .doc(doctorId)
+                  .collection('scheduledAppointments')
+                  .where('status', isEqualTo: 'scheduled')
+                  .get();
+
+          print(
+            'Found ${scheduledAppointmentsSnapshot.docs.length} scheduled appointments in specialization ${specDoc.id}',
+          );
 
           for (var appointmentDoc in scheduledAppointmentsSnapshot.docs) {
             final appointmentData = appointmentDoc.data();
             appointmentData['appointmentId'] = appointmentDoc.id;
             appointmentData['specializationId'] = specDoc.id;
             allScheduledAppointments.add(appointmentData);
-            print('Added scheduled appointment: ${appointmentData['patientName']} on ${appointmentData['appointmentDate']}');
+            print(
+              'Added scheduled appointment: ${appointmentData['patientName']} on ${appointmentData['appointmentDate']}',
+            );
           }
           break; // وجدنا الطبيب، لا نحتاج للبحث في تخصصات أخرى
         }
@@ -1963,21 +2131,25 @@ class _ScheduledAppointmentsList extends StatelessWidget {
 
       print('=== DEBUG INFO ===');
       print('Total appointments found: ${allAppointments.length}');
-      print('Total scheduled appointments found: ${allScheduledAppointments.length}');
-      
+      print(
+        'Total scheduled appointments found: ${allScheduledAppointments.length}',
+      );
+
       // ترتيب المواعيد حسب التاريخ
       allScheduledAppointments.sort((a, b) {
         final dateA = DateTime.tryParse(a['appointmentDate'] ?? '');
         final dateB = DateTime.tryParse(b['appointmentDate'] ?? '');
-        
+
         if (dateA == null && dateB == null) return 0;
         if (dateA == null) return 1;
         if (dateB == null) return -1;
-        
+
         return dateA.compareTo(dateB); // ترتيب تصاعدي (الأقدم أولاً)
       });
 
-      print('Total scheduled appointments found: ${allScheduledAppointments.length}');
+      print(
+        'Total scheduled appointments found: ${allScheduledAppointments.length}',
+      );
       return allScheduledAppointments;
     } catch (e) {
       print('Error fetching scheduled appointments: $e');
@@ -1985,50 +2157,57 @@ class _ScheduledAppointmentsList extends StatelessWidget {
     }
   }
 
-  Future<void> _cancelAppointment(BuildContext context, String appointmentId, String patientName) async {
+  Future<void> _cancelAppointment(
+    BuildContext context,
+    String appointmentId,
+    String patientName,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد الإلغاء'),
-        content: Text('هل أنت متأكد من إلغاء موعد "$patientName"؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('تأكيد الإلغاء'),
+            content: Text('هل أنت متأكد من إلغاء موعد "$patientName"؟'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('إلغاء'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('إلغاء الموعد'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('إلغاء الموعد'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
       try {
         // البحث عن الموعد في التخصصات
-        final specializationsSnapshot = await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(centerId)
-            .collection('specializations')
-            .get();
+        final specializationsSnapshot =
+            await FirebaseFirestore.instance
+                .collection('medicalFacilities')
+                .doc(centerId)
+                .collection('specializations')
+                .get();
 
         bool appointmentFound = false;
         for (var specDoc in specializationsSnapshot.docs) {
-          final appointmentDoc = await FirebaseFirestore.instance
-              .collection('medicalFacilities')
-              .doc(centerId)
-              .collection('specializations')
-              .doc(specDoc.id)
-              .collection('doctors')
-              .doc(doctorId)
-              .collection('scheduledAppointments')
-              .doc(appointmentId)
-              .get();
+          final appointmentDoc =
+              await FirebaseFirestore.instance
+                  .collection('medicalFacilities')
+                  .doc(centerId)
+                  .collection('specializations')
+                  .doc(specDoc.id)
+                  .collection('doctors')
+                  .doc(doctorId)
+                  .collection('scheduledAppointments')
+                  .doc(appointmentId)
+                  .get();
 
           if (appointmentDoc.exists) {
             await FirebaseFirestore.instance
@@ -2041,9 +2220,9 @@ class _ScheduledAppointmentsList extends StatelessWidget {
                 .collection('scheduledAppointments')
                 .doc(appointmentId)
                 .update({
-              'status': 'cancelled',
-              'cancelledAt': FieldValue.serverTimestamp(),
-            });
+                  'status': 'cancelled',
+                  'cancelledAt': FieldValue.serverTimestamp(),
+                });
             appointmentFound = true;
             break;
           }
@@ -2129,7 +2308,8 @@ class _ScheduledAppointmentsList extends StatelessWidget {
             itemCount: appointments.length,
             itemBuilder: (context, index) {
               final appointment = appointments[index];
-              final patientName = appointment['patientName'] ?? 'مريض غير معروف';
+              final patientName =
+                  appointment['patientName'] ?? 'مريض غير معروف';
               final patientPhone = appointment['patientPhone'] ?? '';
               final appointmentDate = appointment['appointmentDate'] ?? '';
               final appointmentType = appointment['appointmentType'] ?? 'موعد';
@@ -2172,26 +2352,44 @@ class _ScheduledAppointmentsList extends StatelessWidget {
                             ),
                           ),
                           if (reminderSent)
-                            Icon(Icons.notifications_active, size: 16, color: Colors.green[600]),
+                            Icon(
+                              Icons.notifications_active,
+                              size: 16,
+                              color: Colors.green[600],
+                            ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 14,
+                            color: Colors.grey[600],
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
                               _formatAppointmentDate(appointmentDate),
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Icon(Icons.medical_services, size: 14, color: Colors.grey[600]),
+                          Icon(
+                            Icons.medical_services,
+                            size: 14,
+                            color: Colors.grey[600],
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             appointmentType,
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
                           ),
                         ],
                       ),
@@ -2200,15 +2398,19 @@ class _ScheduledAppointmentsList extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           ElevatedButton(
-                            onPressed: () => _cancelAppointment(
-                              context,
-                              appointment['appointmentId'],
-                              patientName,
-                            ),
+                            onPressed:
+                                () => _cancelAppointment(
+                                  context,
+                                  appointment['appointmentId'],
+                                  patientName,
+                                ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(6),
                               ),

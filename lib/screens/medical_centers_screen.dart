@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:hospital_admin_app/screens/control_panel_screen.dart';
 import 'package:hospital_admin_app/screens/dashboard_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
@@ -26,15 +25,17 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
   final _centerNameController = TextEditingController();
   final _centerAddressController = TextEditingController();
   final _centerPhoneController = TextEditingController();
-  final _centerOrderController = TextEditingController();
+
   final _centerNameFocus = FocusNode();
   final _centerAddressFocus = FocusNode();
   final _centerPhoneFocus = FocusNode();
-  final _centerOrderFocus = FocusNode();
+
   bool _isAddingCenter = false;
   bool _showAddForm = false;
   String? _editingCenterId;
   bool _requireBookingConfirmation = false;
+  bool _disableAllDoctorBookings = false;
+  DateTime _selectedDate = DateTime.now();
 
   // Image handling variables
   String _selectedImageUrl = '';
@@ -47,11 +48,11 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
     _centerNameController.dispose();
     _centerAddressController.dispose();
     _centerPhoneController.dispose();
-    _centerOrderController.dispose();
+
     _centerNameFocus.dispose();
     _centerAddressFocus.dispose();
     _centerPhoneFocus.dispose();
-    _centerOrderFocus.dispose();
+
     super.dispose();
   }
 
@@ -205,13 +206,12 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
         _centerNameController.clear();
         _centerAddressController.clear();
         _centerPhoneController.clear();
-        _centerOrderController.clear();
+
         setState(() {
           _selectedImageUrl = '';
           _selectedImageFile = null;
           _requireBookingConfirmation = false;
           _showAddForm = false;
-          
         });
 
         if (mounted) {
@@ -268,6 +268,39 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<int> _getBookingsCount(String centerId, DateTime date) async {
+    final selectedDate =
+        '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(centerId)
+            .collection('appointments')
+            .where('date', isEqualTo: selectedDate)
+            .get();
+
+    return snapshot.docs.length;
+  }
+
+  Future<void> _selectDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      locale: const Locale('ar'),
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        _selectedDate = pickedDate;
+      });
     }
   }
 
@@ -698,80 +731,155 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
     }
   }
 
+  Future<bool> _areAllDoctorBookingsDisabled(String centerId) async {
+    final specializationsSnapshot =
+        await FirebaseFirestore.instance
+            .collection('medicalFacilities')
+            .doc(centerId)
+            .collection('specializations')
+            .get();
+
+    bool hasDoctors = false;
+
+    for (final specDoc in specializationsSnapshot.docs) {
+      final doctorsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(centerId)
+              .collection('specializations')
+              .doc(specDoc.id)
+              .collection('doctors')
+              .get();
+
+      for (final doctorDoc in doctorsSnapshot.docs) {
+        hasDoctors = true;
+
+        final isBookingEnabled = doctorDoc.data()['isBookingEnabled'] ?? true;
+
+        if (isBookingEnabled == true) {
+          return false;
+        }
+      }
+    }
+
+    return hasDoctors;
+  }
+
   Future<void> _editCenter(
     String centerId,
     Map<String, dynamic> centerData,
   ) async {
+    // جلب حالة إيقاف الحجز للأطباء أولاً
+    final allDoctorBookingsDisabled = await _areAllDoctorBookingsDisabled(
+      centerId,
+    );
+
+    if (!mounted) return;
+
     setState(() {
       _editingCenterId = centerId;
-      _centerNameController.text = centerData['name'] ?? '';
-      _centerAddressController.text = centerData['address'] ?? '';
-      _centerPhoneController.text = centerData['phone'] ?? '';
-      _selectedImageUrl = centerData['imageUrl'] ?? '';
+
+      _centerNameController.text = centerData['name']?.toString() ?? '';
+
+      _centerAddressController.text = centerData['address']?.toString() ?? '';
+
+      _centerPhoneController.text = centerData['phone']?.toString() ?? '';
+
+      _selectedImageUrl = centerData['imageUrl']?.toString() ?? '';
+
       _requireBookingConfirmation =
           centerData['requireBookingConfirmation'] as bool? ?? false;
+
+      _disableAllDoctorBookings = allDoctorBookingsDisabled;
+
       _showAddForm = true;
     });
   }
 
   Future<void> _updateCenter() async {
-    if (_formKey.currentState!.validate() && _editingCenterId != null) {
-      setState(() {
-        _isAddingCenter = true;
-      });
+    if (!_formKey.currentState!.validate()) return;
 
-      try {
-        // الحفاظ على الترتيب الحالي للمركز
-        final currentCenterDoc =
+    if (_editingCenterId == null) return;
+
+    setState(() {
+      _isAddingCenter = true;
+    });
+
+    try {
+      // تحديث بيانات المركز
+      await FirebaseFirestore.instance
+          .collection('medicalFacilities')
+          .doc(_editingCenterId)
+          .update({
+            'address': _centerAddressController.text.trim(),
+            'phone': _centerPhoneController.text.trim(),
+
+            'requireBookingConfirmation': _requireBookingConfirmation,
+            'imageUrl': _selectedImageUrl.isNotEmpty ? _selectedImageUrl : null,
+          });
+
+      // تحديث حالة الحجز لجميع الأطباء
+      final specializationsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('medicalFacilities')
+              .doc(_editingCenterId)
+              .collection('specializations')
+              .get();
+
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (final specDoc in specializationsSnapshot.docs) {
+        final doctorsSnapshot =
             await FirebaseFirestore.instance
                 .collection('medicalFacilities')
                 .doc(_editingCenterId)
+                .collection('specializations')
+                .doc(specDoc.id)
+                .collection('doctors')
                 .get();
 
-        final currentOrder = currentCenterDoc.data()?['order'] ?? 999;
+        for (final doctorDoc in doctorsSnapshot.docs) {
+          batch.update(doctorDoc.reference, {
+            'isBookingEnabled': !_disableAllDoctorBookings,
+          });
+        }
+      }
 
-        await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(_editingCenterId)
-            .update({
-              'name': _centerNameController.text.trim(),
-              'address': _centerAddressController.text.trim(),
-              'phone': _centerPhoneController.text.trim(),
-              'order': currentOrder,
-              'requireBookingConfirmation': _requireBookingConfirmation,
-              'imageUrl':
-                  _selectedImageUrl.isNotEmpty ? _selectedImageUrl : null,
-            });
+      await batch.commit();
 
+      if (!mounted) return;
+
+      setState(() {
+        _editingCenterId = null;
+        _showAddForm = false;
         _centerNameController.clear();
         _centerAddressController.clear();
         _centerPhoneController.clear();
-        _centerOrderController.clear();
-        setState(() {
-          _selectedImageUrl = '';
-          _selectedImageFile = null;
-          _editingCenterId = null;
-          _showAddForm = false;
-        });
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم تحديث المركز بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطأ في تحديث المركز: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
+        _selectedImageUrl = '';
+        _selectedImageFile = null;
+
+        _requireBookingConfirmation = false;
+        _disableAllDoctorBookings = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تحديث بيانات المركز بنجاح'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ أثناء تحديث المركز: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
         setState(() {
           _isAddingCenter = false;
         });
@@ -786,60 +894,11 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
       _centerNameController.clear();
       _centerAddressController.clear();
       _centerPhoneController.clear();
-      _centerOrderController.clear();
+
       _selectedImageUrl = '';
       _selectedImageFile = null;
       _requireBookingConfirmation = false;
     });
-  }
-
-  Future<void> _deleteCenter(String centerId, String centerName) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('تأكيد الحذف'),
-            content: Text('هل أنت متأكد من حذف المركز "$centerName"؟'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('إلغاء'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('حذف'),
-              ),
-            ],
-          ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await FirebaseFirestore.instance
-            .collection('medicalFacilities')
-            .doc(centerId)
-            .delete();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم حذف المركز بنجاح'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('خطأ في حذف المركز: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    }
   }
 
   void _showCenterDetailsDialog(
@@ -957,27 +1016,18 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
   }
 
   Future<void> _onReorderCenters(
-    List<QueryDocumentSnapshot> centers,
-    int oldIndex,
-    int newIndex,
+    List<QueryDocumentSnapshot> reorderedCenters,
   ) async {
-    if (oldIndex == newIndex) return;
-
     try {
-      // إنشاء نسخة من القائمة لتعديلها
-      final List<QueryDocumentSnapshot> reorderedCenters = List.from(centers);
-
-      // إعادة ترتيب القائمة
-      final item = reorderedCenters.removeAt(oldIndex);
-      reorderedCenters.insert(newIndex, item);
-
-      // إعادة ترقيم order للجميع
       final batch = FirebaseFirestore.instance.batch();
+
       for (int i = 0; i < reorderedCenters.length; i++) {
         final center = reorderedCenters[i];
+
         final centerRef = FirebaseFirestore.instance
             .collection('medicalFacilities')
             .doc(center.id);
+
         batch.update(centerRef, {'order': i + 1});
       }
 
@@ -1036,11 +1086,7 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
             onPressed: () {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => const ControlPanelScreen(),
-                ),
-              );
+              Navigator.of(context).pop();
             },
             tooltip: 'العودة إلى لوحة التحكم',
           ),
@@ -1052,6 +1098,11 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
           elevation: 0,
           centerTitle: true,
           actions: [
+            IconButton(
+              onPressed: _selectDate,
+              icon: const Icon(Icons.calendar_today, color: Colors.white),
+              tooltip: 'اختيار تاريخ الحجوزات',
+            ),
             IconButton(
               onPressed: () => setState(() => _showAddForm = !_showAddForm),
               icon: Icon(
@@ -1066,555 +1117,601 @@ class _MedicalCentersScreenState extends State<MedicalCentersScreen> {
           children: [
             // Add Center Section
             if (_showAddForm)
-              Container(
-                padding: const EdgeInsets.all(16.0),
-                child: Card(
-                  elevation: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              _editingCenterId != null
-                                  ? Icons.edit
-                                  : Icons.add_business,
-                              color: const Color(0xFF0D47A1),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _editingCenterId != null
-                                  ? 'تعديل المركز'
-                                  : 'إضافة مركز جديد',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Form(
-                          key: _formKey,
-                          child: Column(
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Card(
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              // Image selection section
-                              Center(
-                                child: Column(
-                                  children: [
-                                    GestureDetector(
-                                      onTap: _showImageSourceDialog,
-                                      child: Container(
-                                        width: 120,
-                                        height: 120,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: const Color(0xFF0D47A1),
-                                            width: 3,
+                              Icon(
+                                _editingCenterId != null
+                                    ? Icons.edit
+                                    : Icons.add_business,
+                                color: const Color(0xFF0D47A1),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _editingCenterId != null
+                                    ? 'تعديل المركز'
+                                    : 'إضافة مركز جديد',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                // Image selection section
+                                Center(
+                                  child: Column(
+                                    children: [
+                                      GestureDetector(
+                                        onTap: _showImageSourceDialog,
+                                        child: Container(
+                                          width: 120,
+                                          height: 120,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: const Color(0xFF0D47A1),
+                                              width: 3,
+                                            ),
+                                          ),
+                                          child: ClipOval(
+                                            child:
+                                                _isUploadingImage
+                                                    ? const Center(
+                                                      child:
+                                                          CircularProgressIndicator(),
+                                                    )
+                                                    : _selectedImageUrl
+                                                        .isNotEmpty
+                                                    ? Image.network(
+                                                      _selectedImageUrl,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (
+                                                        context,
+                                                        error,
+                                                        stackTrace,
+                                                      ) {
+                                                        return Image.asset(
+                                                          'assets/images/center.png',
+                                                          fit: BoxFit.cover,
+                                                        );
+                                                      },
+                                                    )
+                                                    : Image.asset(
+                                                      'assets/images/center.png',
+                                                      fit: BoxFit.cover,
+                                                    ),
                                           ),
                                         ),
-                                        child: ClipOval(
-                                          child:
-                                              _isUploadingImage
-                                                  ? const Center(
-                                                    child:
-                                                        CircularProgressIndicator(),
-                                                  )
-                                                  : _selectedImageUrl.isNotEmpty
-                                                  ? Image.network(
-                                                    _selectedImageUrl,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (
-                                                      context,
-                                                      error,
-                                                      stackTrace,
-                                                    ) {
-                                                      return Image.asset(
-                                                        'assets/images/center.png',
-                                                        fit: BoxFit.cover,
-                                                      );
-                                                    },
-                                                  )
-                                                  : Image.asset(
-                                                    'assets/images/center.png',
-                                                    fit: BoxFit.cover,
-                                                  ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextButton.icon(
+                                        onPressed: _showImageSourceDialog,
+                                        icon: const Icon(Icons.camera_alt),
+                                        label: const Text('اختيار صورة المركز'),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: const Color(
+                                            0xFF0D47A1,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextButton.icon(
-                                      onPressed: _showImageSourceDialog,
-                                      icon: const Icon(Icons.camera_alt),
-                                      label: const Text('اختيار صورة المركز'),
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: const Color(
-                                          0xFF0D47A1,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-                              TextFormField(
-                                controller: _centerNameController,
-                                focusNode: _centerNameFocus,
-                                decoration: const InputDecoration(
-                                  labelText: 'اسم المركز',
-                                  border: OutlineInputBorder(),
+                                const SizedBox(height: 16),
+                                TextFormField(
+                                  controller: _centerNameController,
+                                  focusNode: _centerNameFocus,
+                                  readOnly: _editingCenterId != null,
+                                  decoration: InputDecoration(
+                                    labelText: 'اسم المركز',
+                                    border: const OutlineInputBorder(),
+                                    filled: _editingCenterId != null,
+                                    fillColor:
+                                        _editingCenterId != null
+                                            ? Colors.grey.shade200
+                                            : null,
+                                    suffixIcon:
+                                        _editingCenterId != null
+                                            ? const Icon(
+                                              Icons.lock_outline,
+                                              color: Colors.grey,
+                                              size: 20,
+                                            )
+                                            : null,
+                                  ),
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) {
+                                    _centerNameFocus.unfocus();
+                                    _centerAddressFocus.requestFocus();
+                                  },
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'يرجى إدخال اسم المركز';
+                                    }
+                                    return null;
+                                  },
                                 ),
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) {
-                                  _centerNameFocus.unfocus();
-                                  _centerAddressFocus.requestFocus();
-                                },
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال اسم المركز';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _centerAddressController,
-                                focusNode: _centerAddressFocus,
-                                decoration: const InputDecoration(
-                                  labelText: 'عنوان المركز',
-                                  border: OutlineInputBorder(),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _centerAddressController,
+                                  focusNode: _centerAddressFocus,
+                                  decoration: const InputDecoration(
+                                    labelText: 'عنوان المركز',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) {
+                                    _centerAddressFocus.unfocus();
+                                    _centerPhoneFocus.requestFocus();
+                                  },
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'يرجى إدخال عنوان المركز';
+                                    }
+                                    return null;
+                                  },
                                 ),
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) {
-                                  _centerAddressFocus.unfocus();
-                                  _centerPhoneFocus.requestFocus();
-                                },
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال عنوان المركز';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _centerPhoneController,
-                                focusNode: _centerPhoneFocus,
-                                decoration: const InputDecoration(
-                                  labelText: 'رقم الهاتف',
-                                  border: OutlineInputBorder(),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _centerPhoneController,
+                                  focusNode: _centerPhoneFocus,
+                                  decoration: const InputDecoration(
+                                    labelText: 'رقم الهاتف',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  keyboardType: TextInputType.phone,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) {
+                                    _centerPhoneFocus.unfocus();
+                                  },
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'يرجى إدخال رقم الهاتف';
+                                    }
+                                    return null;
+                                  },
                                 ),
-                                keyboardType: TextInputType.phone,
-                                textInputAction: TextInputAction.next,
-                                onFieldSubmitted: (_) {
-                                  _centerPhoneFocus.unfocus();
-                                  _centerOrderFocus.requestFocus();
-                                },
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال رقم الهاتف';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
-                                controller: _centerOrderController,
-                                focusNode: _centerOrderFocus,
-                                decoration: const InputDecoration(
-                                  labelText: 'ترتيب المركز (رقم)',
-                                  border: OutlineInputBorder(),
-                                  hintText:
-                                      'مثال: 1 للمركز الأول، 2 للمركز الثاني',
-                                ),
-                                keyboardType: TextInputType.number,
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) {
-                                  _centerOrderFocus.unfocus();
-                                },
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'يرجى إدخال ترتيب المركز';
-                                  }
-                                  final number = int.tryParse(value);
-                                  if (number == null || number <= 0) {
-                                    return 'يرجى إدخال رقم صحيح موجب';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 8),
 
-                              SwitchListTile(
-                                contentPadding: EdgeInsets.zero,
-                                title: const Text(
-                                  'تأكيد الحجز',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                subtitle: const Text(
-                                  'عند التفعيل يحتاج الحجز إلى تأكيد من المركز',
-                                ),
-                                value: _requireBookingConfirmation,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _requireBookingConfirmation = value;
-                                  });
-                                },
-                                secondary: Icon(
-                                  _requireBookingConfirmation
-                                      ? Icons.verified
-                                      : Icons.verified_outlined,
-                                  color:
-                                      _requireBookingConfirmation
-                                          ? Colors.green
-                                          : Colors.grey,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      onPressed:
-                                          _isAddingCenter
-                                              ? null
-                                              : (_editingCenterId != null
-                                                  ? _updateCenter
-                                                  : _addCenter),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(
-                                          0xFF0D47A1,
-                                        ),
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                      child:
-                                          _isAddingCenter
-                                              ? const SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  valueColor:
-                                                      AlwaysStoppedAnimation<
-                                                        Color
-                                                      >(Colors.white),
-                                                ),
-                                              )
-                                              : Text(
-                                                _editingCenterId != null
-                                                    ? 'تحديث المركز'
-                                                    : 'إضافة المركز',
-                                              ),
+                                const SizedBox(height: 8),
+
+                                SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'تأكيد الحجز',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  if (_editingCenterId != null) ...[
-                                    const SizedBox(width: 12),
+                                  subtitle: const Text(
+                                    'عند التفعيل يحتاج الحجز إلى تأكيد من المركز',
+                                  ),
+                                  value: _requireBookingConfirmation,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _requireBookingConfirmation = value;
+                                    });
+                                  },
+                                  secondary: Icon(
+                                    _requireBookingConfirmation
+                                        ? Icons.verified
+                                        : Icons.verified_outlined,
+                                    color:
+                                        _requireBookingConfirmation
+                                            ? Colors.green
+                                            : Colors.grey,
+                                  ),
+                                ),
+                                if (_editingCenterId != null)
+                                  SwitchListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: const Text(
+                                      'إيقاف الحجز لجميع الأطباء',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    subtitle: const Text(
+                                      'عند التفعيل يتم إيقاف الحجز لجميع الأطباء داخل المركز',
+                                    ),
+                                    value: _disableAllDoctorBookings,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        _disableAllDoctorBookings = value;
+                                      });
+                                    },
+                                    secondary: Icon(
+                                      _disableAllDoctorBookings
+                                          ? Icons.event_busy
+                                          : Icons.event_available,
+                                      color:
+                                          _disableAllDoctorBookings
+                                              ? Colors.red
+                                              : Colors.green,
+                                    ),
+                                  ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
                                     Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: _cancelEdit,
-                                        style: OutlinedButton.styleFrom(
+                                      child: ElevatedButton(
+                                        onPressed:
+                                            _isAddingCenter
+                                                ? null
+                                                : (_editingCenterId != null
+                                                    ? _updateCenter
+                                                    : _addCenter),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF0D47A1,
+                                          ),
+                                          foregroundColor: Colors.white,
                                           padding: const EdgeInsets.symmetric(
                                             vertical: 12,
                                           ),
                                         ),
-                                        child: const Text('إلغاء'),
+                                        child:
+                                            _isAddingCenter
+                                                ? const SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                          Color
+                                                        >(Colors.white),
+                                                  ),
+                                                )
+                                                : Text(
+                                                  _editingCenterId != null
+                                                      ? 'تحديث المركز'
+                                                      : 'إضافة المركز',
+                                                ),
                                       ),
                                     ),
+                                    if (_editingCenterId != null) ...[
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: _cancelEdit,
+                                          style: OutlinedButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 12,
+                                            ),
+                                          ),
+                                          child: const Text('إلغاء'),
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              ),
-                            ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
 
             // Centers List
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream:
-                    FirebaseFirestore.instance
-                        .collection('medicalFacilities')
-                        .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error, color: Colors.red, size: 64),
-                          const SizedBox(height: 16),
-                          Text('خطأ في الاتصال: ${snapshot.error}'),
-                        ],
-                      ),
-                    );
-                  }
-
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final allCenters = snapshot.data?.docs ?? [];
-                  final centers = _filterCenters(allCenters);
-
-                  if (centers.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.business,
-                            color: Colors.grey,
-                            size: 64,
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'لا توجد مراكز طبية',
-                            style: TextStyle(fontSize: 18, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'قم بإضافة مركز جديد باستخدام النموذج أعلاه',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed:
-                                () => setState(() => _showAddForm = true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0D47A1),
-                              foregroundColor: Colors.white,
+            if (!_showAddForm)
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream:
+                      FirebaseFirestore.instance
+                          .collection('medicalFacilities')
+                          .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.error,
+                              color: Colors.red,
+                              size: 64,
                             ),
-                            child: const Text('إضافة مركز جديد'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return StatefulBuilder(
-                    builder: (context, setStateLocal) {
-                      List<QueryDocumentSnapshot> localCenters = List.from(
-                        centers,
+                            const SizedBox(height: 16),
+                            Text('خطأ في الاتصال: ${snapshot.error}'),
+                          ],
+                        ),
                       );
+                    }
 
-                      return ReorderableListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        itemCount: localCenters.length,
-                        onReorder: (oldIndex, newIndex) {
-                          if (newIndex > oldIndex) {
-                            newIndex -= 1;
-                          }
-                          setStateLocal(() {
-                            final item = localCenters.removeAt(oldIndex);
-                            localCenters.insert(newIndex, item);
-                          });
-                          _onReorderCenters(localCenters, oldIndex, newIndex);
-                        },
-                        itemBuilder: (context, index) {
-                          final center = localCenters[index];
-                          final centerData =
-                              center.data() as Map<String, dynamic>;
-                          final centerId = center.id;
-                          final centerName = centerData['name'] ?? '';
-                          final centerAddress = centerData['address'] ?? '';
-                          final centerPhone = centerData['phone'] ?? '';
-                          final isAvailable = centerData['available'] ?? false;
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                          return Card(
-                            key: ValueKey(centerId),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              onTap:
-                                  () => _navigateToCenterDashboard(
-                                    centerId,
-                                    centerName,
-                                  ),
+                    final allCenters = snapshot.data?.docs ?? [];
+                    final centers = _filterCenters(allCenters);
 
-                              title: Text(
-                                centerName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
+                    if (centers.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.business,
+                              color: Colors.grey,
+                              size: 64,
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'لا توجد مراكز طبية',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'قم بإضافة مركز جديد باستخدام النموذج أعلاه',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed:
+                                  () => setState(() => _showAddForm = true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D47A1),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('إضافة مركز جديد'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return StatefulBuilder(
+                      builder: (context, setStateLocal) {
+                        List<QueryDocumentSnapshot> localCenters = List.from(
+                          centers,
+                        );
+
+                        return ReorderableListView.builder(
+                          buildDefaultDragHandles: false,
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          itemCount: localCenters.length,
+                          onReorder: (oldIndex, newIndex) {
+                            if (newIndex > oldIndex) {
+                              newIndex -= 1;
+                            }
+
+                            final reorderedCenters =
+                                List<QueryDocumentSnapshot>.from(localCenters);
+
+                            final item = reorderedCenters.removeAt(oldIndex);
+                            reorderedCenters.insert(newIndex, item);
+
+                            setStateLocal(() {
+                              localCenters = reorderedCenters;
+                            });
+
+                            _onReorderCenters(reorderedCenters);
+                          },
+                          itemBuilder: (context, index) {
+                            final center = localCenters[index];
+                            final centerData =
+                                center.data() as Map<String, dynamic>;
+                            final centerId = center.id;
+                            final centerName = centerData['name'] ?? '';
+                            final centerAddress = centerData['address'] ?? '';
+                            final centerPhone = centerData['phone'] ?? '';
+                            final isAvailable =
+                                centerData['available'] ?? false;
+
+                            return Card(
+                              key: ValueKey(centerId),
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                onTap:
+                                    () => _navigateToCenterDashboard(
+                                      centerId,
+                                      centerName,
+                                    ),
+                                leading: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ReorderableDragStartListener(
+                                      index: index,
+                                      child: const Icon(
+                                        Icons.menu,
+                                        color: Color(0xFF0D47A1),
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${centerData['order'] ?? index + 1}',
+                                      style: const TextStyle(
+                                        color: Color(0xFF0D47A1),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Row(
-                                children: [
-                                  // حالة المركز
-                                  Icon(
-                                    isAvailable
-                                        ? Icons.check_circle
-                                        : Icons.cancel,
-                                    color:
-                                        isAvailable ? Colors.green : Colors.red,
-                                    size: 17,
+                                title: Text(
+                                  centerName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    isAvailable ? 'مفعل' : 'غير مفعل',
-                                    style: TextStyle(
-                                      color:
-                                          isAvailable
-                                              ? Colors.green
-                                              : Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Row(
+                                  children: [
+                                    Text(
+                                      isAvailable ? 'مفعل' : 'غير مفعل',
+                                      style: TextStyle(
+                                        color:
+                                            isAvailable
+                                                ? Colors.green
+                                                : Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
                                     ),
-                                  ),
 
-                                  const SizedBox(width: 16),
+                                    const SizedBox(width: 10),
 
-                                  // الترتيب
-                                  const Icon(
-                                    Icons.sort,
-                                    color: Color(0xFF0D47A1),
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'ترتيب: ${centerData['order'] ?? 999}',
-                                    style: const TextStyle(
-                                      color: Color(0xFF0D47A1),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
+                                    FutureBuilder<int>(
+                                      key: ValueKey(
+                                        '${centerId}_${_selectedDate.toIso8601String()}',
+                                      ),
+                                      future: _getBookingsCount(
+                                        centerId,
+                                        _selectedDate,
+                                      ),
+                                      builder: (context, bookingSnapshot) {
+                                        final count = bookingSnapshot.data ?? 0;
+
+                                        return Text(
+                                          'الحجوزات: $count',
+                                          style: const TextStyle(
+                                            color: Color(0xFF0D47A1),
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        );
+                                      },
                                     ),
-                                  ),
-                                ],
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.info_outline,
-                                      color: Color(0xFF0D47A1),
+                                  ],
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert),
+                                      onSelected: (value) {
+                                        switch (value) {
+                                          case 'edit':
+                                            _editCenter(centerId, centerData);
+                                            break;
+                                          case 'toggle':
+                                            _toggleCenterAvailability(
+                                              centerId,
+                                              isAvailable,
+                                            );
+                                            break;
+
+                                          case 'export_pdf':
+                                            _exportCenterDoctorsSchedulePdf(
+                                              centerId,
+                                              centerName,
+                                            );
+                                            break;
+                                        }
+                                      },
+                                      itemBuilder:
+                                          (context) => [
+                                            PopupMenuItem<String>(
+                                              value: 'edit',
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.edit,
+                                                    color: Color(0xFF0D47A1),
+                                                    size: 20,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  const Text('تعديل المركز'),
+                                                ],
+                                              ),
+                                            ),
+                                            PopupMenuItem<String>(
+                                              value: 'toggle',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    isAvailable
+                                                        ? Icons.block
+                                                        : Icons.check_circle,
+                                                    color:
+                                                        isAvailable
+                                                            ? Colors.orange
+                                                            : Colors.green,
+                                                    size: 20,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    isAvailable
+                                                        ? 'إلغاء التفعيل'
+                                                        : 'تفعيل',
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+
+                                            const PopupMenuDivider(),
+                                            const PopupMenuItem<String>(
+                                              value: 'export_pdf',
+                                              child: Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.picture_as_pdf,
+                                                    color: Color(0xFF0D47A1),
+                                                    size: 20,
+                                                  ),
+                                                  SizedBox(width: 8),
+                                                  Text('جدول الأطباء PDF'),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                     ),
-                                    onPressed:
-                                        () => _showCenterDetailsDialog(
+                                    InkWell(
+                                      onTap: () {
+                                        _navigateToCenterDashboard(
+                                          centerId,
                                           centerName,
-                                          centerAddress,
-                                          centerPhone,
-                                          isAvailable,
+                                        );
+                                      },
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 4,
                                         ),
-                                    tooltip: 'تفاصيل المركز',
-                                  ),
-
-                                  PopupMenuButton<String>(
-                                    icon: const Icon(Icons.more_vert),
-                                    onSelected: (value) {
-                                      switch (value) {
-                                        case 'edit':
-                                          _editCenter(centerId, centerData);
-                                          break;
-                                        case 'toggle':
-                                          _toggleCenterAvailability(
-                                            centerId,
-                                            isAvailable,
-                                          );
-                                          break;
-                                        case 'delete':
-                                          _deleteCenter(centerId, centerName);
-                                          break;
-                                        case 'export_pdf':
-                                          _exportCenterDoctorsSchedulePdf(
-                                            centerId,
-                                            centerName,
-                                          );
-                                          break;
-                                      }
-                                    },
-                                    itemBuilder:
-                                        (context) => [
-                                          PopupMenuItem<String>(
-                                            value: 'edit',
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.edit,
-                                                  color: Color(0xFF0D47A1),
-                                                  size: 20,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                const Text('تعديل المركز'),
-                                              ],
-                                            ),
-                                          ),
-                                          PopupMenuItem<String>(
-                                            value: 'toggle',
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  isAvailable
-                                                      ? Icons.block
-                                                      : Icons.check_circle,
-                                                  color:
-                                                      isAvailable
-                                                          ? Colors.orange
-                                                          : Colors.green,
-                                                  size: 20,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  isAvailable
-                                                      ? 'إلغاء التفعيل'
-                                                      : 'تفعيل',
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          PopupMenuItem<String>(
-                                            value: 'delete',
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.delete,
-                                                  color: Colors.red,
-                                                  size: 20,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                const Text('حذف المركز'),
-                                              ],
-                                            ),
-                                          ),
-                                          const PopupMenuDivider(),
-                                          const PopupMenuItem<String>(
-                                            value: 'export_pdf',
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.picture_as_pdf,
-                                                  color: Color(0xFF0D47A1),
-                                                  size: 20,
-                                                ),
-                                                SizedBox(width: 8),
-                                                Text('جدول الأطباء PDF'),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                  ),
-                                ],
+                                        child: Icon(
+                                          Icons.arrow_forward_ios,
+                                          size: 14,
+                                          color: Color(0xFF0D47A1),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
           ],
         ),
       ),
